@@ -17,6 +17,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url) => {
     ipcRenderer.send('open-external', url);
   },
+
+  // 文件操作 API
+  file: {
+    read: (filename) => ipcRenderer.invoke('file:read', filename),
+    write: (filename, data) => ipcRenderer.invoke('file:write', filename, data),
+    delete: (filename) => ipcRenderer.invoke('file:delete', filename),
+    exists: (filename) => ipcRenderer.invoke('file:exists', filename),
+    list: (pattern) => ipcRenderer.invoke('file:list', pattern)
+  }
 });
 
 // 安全限制：禁止直接暴露 ipcRenderer

@@ -2,10 +2,10 @@ import { createRouter, createWebHistory } from 'vue-router';
 import AppLayout from '../components/AppLayout.vue';
 import FolderManager from '../components/FolderManager.vue';
 import { ApplicationService } from '../../application';
-import { LocalStorageDocumentRepository, LocalStorageFolderRepository } from '../../infrastructure';
+import { FileSystemDocumentRepository, FileSystemFolderRepository } from '../../infrastructure';
 
-const documentRepository = new LocalStorageDocumentRepository();
-const folderRepository = new LocalStorageFolderRepository();
+const documentRepository = new FileSystemDocumentRepository();
+const folderRepository = new FileSystemFolderRepository();
 const applicationService = new ApplicationService(documentRepository, folderRepository);
 
 const router = createRouter({
