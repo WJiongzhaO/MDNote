@@ -1,0 +1,51 @@
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+
+export class MarkdownProcessor {
+  private static instance: MarkdownProcessor;
+
+  private constructor() {
+    this.configureMarked();
+  }
+
+  static getInstance(): MarkdownProcessor {
+    if (!MarkdownProcessor.instance) {
+      MarkdownProcessor.instance = new MarkdownProcessor();
+    }
+    return MarkdownProcessor.instance;
+  }
+
+  private configureMarked(): void {
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+    });
+  }
+
+  processMarkdown(content: string): string {
+    const processedContent = marked(content) as string;
+    return DOMPurify.sanitize(processedContent);
+  }
+
+  extractTitle(content: string): string {
+    const lines = content.split('\n').filter(line => line.trim());
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith('# ')) {
+        return trimmedLine.substring(2).trim();
+      }
+    }
+
+    const firstLine = lines[0] || '';
+    return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine;
+  }
+
+  generateSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+}

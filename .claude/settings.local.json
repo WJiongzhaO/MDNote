@@ -7,7 +7,14 @@
       "Bash(npm run dev:*)",
       "Bash(git add:*)",
       "Bash(rm:*)",
-      "Bash(npm run electron:serve:*)"
+      "Bash(npm run electron:serve:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(curl:*)",
+      "Bash(start:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test)",
+      "Bash(npm run)",
+      "Bash(npm run test:unit:*)"
     ]
   }
 }

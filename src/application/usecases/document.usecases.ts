@@ -1,0 +1,98 @@
+import { Document } from '../../domain/entities/document.entity';
+import type { DocumentId, DocumentTitle, DocumentContent } from '../../domain/types/document.types';
+import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
+import { MarkdownProcessor } from '../../domain/services/markdown-processor.domain.service';
+import type {
+  CreateDocumentRequest,
+  UpdateDocumentRequest,
+  DocumentResponse,
+  DocumentListItem
+} from '../dto/document.dto';
+
+export class DocumentUseCases {
+  constructor(
+    private readonly documentRepository: DocumentRepository,
+    private readonly markdownProcessor: MarkdownProcessor
+  ) {}
+
+  async createDocument(request: CreateDocumentRequest): Promise<DocumentResponse> {
+    const document = Document.create(
+      { value: request.title },
+      { value: request.content }
+    );
+
+    await this.documentRepository.save(document);
+
+    return this.mapToResponse(document);
+  }
+
+  async updateDocument(request: UpdateDocumentRequest): Promise<DocumentResponse | null> {
+    const document = await this.documentRepository.findById({ value: request.id });
+
+    if (!document) {
+      return null;
+    }
+
+    document.update(
+      { value: request.title },
+      { value: request.content }
+    );
+
+    await this.documentRepository.save(document);
+
+    return this.mapToResponse(document);
+  }
+
+  async deleteDocument(id: string): Promise<boolean> {
+    try {
+      await this.documentRepository.delete({ value: id });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getDocument(id: string): Promise<DocumentResponse | null> {
+    const document = await this.documentRepository.findById({ value: id });
+
+    if (!document) {
+      return null;
+    }
+
+    return this.mapToResponse(document);
+  }
+
+  async getAllDocuments(): Promise<DocumentListItem[]> {
+    const documents = await this.documentRepository.findAll();
+
+    return documents.map(doc => ({
+      id: doc.getId().value,
+      title: doc.getTitle().value,
+      updatedAt: doc.getUpdatedAt().value
+    }));
+  }
+
+  async searchDocuments(query: string): Promise<DocumentListItem[]> {
+    const documents = await this.documentRepository.search(query);
+
+    return documents.map(doc => ({
+      id: doc.getId().value,
+      title: doc.getTitle().value,
+      updatedAt: doc.getUpdatedAt().value
+    }));
+  }
+
+  async renderMarkdown(content: string): Promise<string> {
+    return this.markdownProcessor.processMarkdown(content);
+  }
+
+  private mapToResponse(document: Document): DocumentResponse {
+    return {
+      id: document.getId().value,
+      title: document.getTitle().value,
+      content: document.getContent().value,
+      createdAt: document.getCreatedAt().value,
+      updatedAt: document.getUpdatedAt().value
+    };
+  }
+}
