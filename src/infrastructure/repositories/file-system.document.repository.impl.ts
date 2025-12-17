@@ -1,5 +1,5 @@
 import { Document } from '../../domain/entities/document.entity';
-import type { DocumentId, DocumentTitle, DocumentContent, FolderId } from '../../domain/types/document.types';
+import type { DocumentId, FolderId } from '../../domain/types/document.types';
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
 
 export interface DocumentData {
@@ -54,6 +54,13 @@ export class FileSystemDocumentRepository implements DocumentRepository {
   async findByFolderId(folderId: FolderId): Promise<Document[]> {
     const documentsData = (await this.getAllDocumentsFromFile())
       .filter(data => data.folderId === folderId.value);
+
+    return documentsData.map(data => this.mapToEntity(data));
+  }
+
+  async findByTitle(title: { value: string }): Promise<Document[]> {
+    const documentsData = (await this.getAllDocumentsFromFile())
+      .filter(data => data.title === title.value);
 
     return documentsData.map(data => this.mapToEntity(data));
   }

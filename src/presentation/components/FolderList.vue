@@ -44,7 +44,7 @@
         </div>
 
         <div v-if="folder.isExpanded && folder.children && folder.children.length > 0" class="folder-children">
-          <FolderTreeItemComponent
+          <FolderTreeItem
             v-for="child in folder.children"
             :key="child.id"
             :folder="child"
@@ -117,12 +117,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import type { FolderTreeItem } from '../../application';
-import FolderTreeItemComponent from './FolderTreeItem.vue';
+import { ref } from 'vue';
+import type { FolderTreeItem as FolderTreeItemType } from '../../application';
+import FolderTreeItem from './FolderTreeItem.vue';
 
 interface Props {
-  folderTree: FolderTreeItem[];
+  folderTree: FolderTreeItemType[];
   selectedFolderId?: string | null;
   isLoading?: boolean;
 }
@@ -155,7 +155,7 @@ const deletingFolderName = ref('');
 const isDragOver = ref(false);
 const dragOverFolderId = ref<string | null>(null);
 
-const toggleFolder = (folder: FolderTreeItem) => {
+const toggleFolder = (folder: FolderTreeItemType) => {
   folder.isExpanded = !folder.isExpanded;
 };
 
@@ -175,7 +175,7 @@ const handleCreateFolder = () => {
   }
 };
 
-const editFolder = (folder: FolderTreeItem) => {
+const editFolder = (folder: FolderTreeItemType) => {
   editingFolderId.value = folder.id;
   editingFolderName.value = folder.name;
   showEditFolderModal.value = true;
@@ -192,7 +192,7 @@ const handleUpdateFolder = () => {
   }
 };
 
-const confirmDeleteFolder = (folder: FolderTreeItem) => {
+const confirmDeleteFolder = (folder: FolderTreeItemType) => {
   deletingFolderId.value = folder.id;
   deletingFolderName.value = folder.name;
   showDeleteConfirmModal.value = true;

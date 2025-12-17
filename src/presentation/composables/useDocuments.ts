@@ -1,18 +1,18 @@
 import { ref, computed, onMounted } from 'vue';
 import { ApplicationService } from '../../application';
-import type { CreateDocumentRequest, UpdateDocumentRequest } from '../../application';
+import type { CreateDocumentRequest, UpdateDocumentRequest, DocumentResponse, DocumentListItem } from '../../application';
 
 export function useDocuments(applicationService: ApplicationService) {
   const documentUseCases = applicationService.getDocumentUseCases();
 
-  const documents = ref([]);
-  const currentDocument = ref(null);
+  const documents = ref<DocumentListItem[]>([]);
+  const currentDocument = ref<DocumentResponse | null>(null);
   const isLoading = ref(false);
-  const error = ref(null);
+  const error = ref<string | null>(null);
 
   const sortedDocuments = computed(() => {
-    return documents.value.sort((a, b) =>
-      new Date(b.updatedAt) - new Date(a.updatedAt)
+    return [...documents.value].sort((a, b) =>
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   });
 
@@ -125,6 +125,25 @@ export function useDocuments(applicationService: ApplicationService) {
     }
   };
 
+  const searchDocuments = async (query: string) => {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      if (query.trim()) {
+        const searchResults = await documentUseCases.searchDocuments(query);
+        documents.value = searchResults;
+      } else {
+        await loadDocuments();
+      }
+    } catch (err) {
+      error.value = 'Failed to search documents';
+      console.error('Error searching documents:', err);
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   const loadDocumentsByFolder = async (folderId: string | null) => {
     isLoading.value = true;
     error.value = null;
@@ -164,6 +183,7 @@ export function useDocuments(applicationService: ApplicationService) {
     updateDocument,
     deleteDocument,
     loadDocument,
+    searchDocuments,
     renderMarkdown
   };
 }

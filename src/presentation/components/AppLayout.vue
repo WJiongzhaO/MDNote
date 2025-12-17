@@ -62,6 +62,7 @@ const {
   documents,
   currentDocument,
   isLoading,
+  searchDocuments,
   error,
   createDocument,
   updateDocument,
@@ -123,15 +124,7 @@ const handleUpdateDocument = async (id: string, title: string, content: string) 
 
 const handleSearch = async (query: string) => {
   searchQuery.value = query;
-
-  if (query.trim()) {
-    const documentUseCases = props.applicationService.getDocumentUseCases();
-    const searchResults = await documentUseCases.searchDocuments(query);
-    documents.value = searchResults;
-  } else {
-    // 如果搜索框为空，重新加载所有文档
-    await loadDocuments();
-  }
+  await searchDocuments(query);
 };
 
 const handleSelectFolder = async (folderId: string | null) => {
@@ -164,7 +157,7 @@ const handleDeleteFolder = async (id: string) => {
 
 const handleMoveDocument = async (documentId: string, targetFolderId: string | null) => {
   // 获取当前文档信息
-  const documentUseCases = applicationService.getDocumentUseCases();
+  const documentUseCases = props.applicationService.getDocumentUseCases();
   const currentDoc = await documentUseCases.getDocument(documentId);
 
   if (currentDoc) {

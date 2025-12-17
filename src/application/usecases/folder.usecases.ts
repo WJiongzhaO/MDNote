@@ -1,5 +1,4 @@
 import { Folder } from '../../domain/entities/folder.entity';
-import type { FolderId, FolderName, ParentFolderId } from '../../domain/types/folder.types';
 import type { FolderRepository } from '../../domain/repositories/folder.repository.interface';
 import type {
   CreateFolderRequest,
@@ -94,7 +93,7 @@ export class FolderUseCases {
 
   async getFolderTree(): Promise<FolderTreeItem[]> {
     const allFolders = await this.getAllFolders();
-    
+
     return this.buildFolderTree(allFolders, null);
   }
 
