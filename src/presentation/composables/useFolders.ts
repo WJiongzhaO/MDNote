@@ -28,16 +28,24 @@ export function useFolders(applicationService: ApplicationService) {
   };
 
   const createFolder = async (request: CreateFolderRequest) => {
+    if (!request.name || request.name.trim() === '') {
+      error.value = 'Folder name is required';
+      return null;
+    }
+
     isLoading.value = true;
     error.value = null;
 
     try {
       const newFolder = await folderUseCases.createFolder(request);
+      // 总是重新加载文件夹列表，无论创建是否成功
       await loadFolders();
       return newFolder;
     } catch (err) {
       error.value = 'Failed to create folder';
       console.error('Error creating folder:', err);
+      // 即使出错也要重新加载，确保UI状态正确
+      await loadFolders();
       return null;
     } finally {
       isLoading.value = false;

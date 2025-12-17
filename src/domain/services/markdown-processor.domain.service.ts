@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import katex from 'katex';
 
 export class MarkdownProcessor {
   private static instance: MarkdownProcessor;
@@ -19,6 +20,56 @@ export class MarkdownProcessor {
     marked.setOptions({
       breaks: true,
       gfm: true,
+    });
+
+    // 添加数学公式扩展
+    marked.use({
+      extensions: [
+        {
+          name: 'mathInline',
+          level: 'inline',
+          start(src: string) { return src.match(/\$/)?.index; },
+          tokenizer(src: string) {
+            const rule = /^\$([^$\n]+?)\$/;
+            const match = rule.exec(src);
+            if (match) {
+              return {
+                type: 'mathInline',
+                raw: match[0],
+                text: match[1].trim()
+              };
+            }
+          },
+          renderer(token: any) {
+            return katex.renderToString(token.text, {
+              throwOnError: false,
+              displayMode: false
+            });
+          }
+        },
+        {
+          name: 'mathBlock',
+          level: 'block',
+          start(src: string) { return src.match(/^\$\$/)?.index; },
+          tokenizer(src: string) {
+            const rule = /^\$\$([\s\S]+?)\$\$/;
+            const match = rule.exec(src);
+            if (match) {
+              return {
+                type: 'mathBlock',
+                raw: match[0],
+                text: match[1].trim()
+              };
+            }
+          },
+          renderer(token: any) {
+            return katex.renderToString(token.text, {
+              throwOnError: false,
+              displayMode: true
+            });
+          }
+        }
+      ]
     });
   }
 

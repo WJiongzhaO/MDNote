@@ -3,10 +3,10 @@
     <div class="manager-header">
       <h1>文件夹管理</h1>
       <div class="header-actions">
-        <button class="btn btn-secondary" @click="$emit('back-to-docs')">
+        <button class="btn btn-secondary" @click="handleBackToDocs">
           ← 返回文档
         </button>
-        <button class="btn btn-primary" @click="showCreateFolderModal = true">
+        <button class="btn btn-primary" @click="showCreateFolderModal = true" :disabled="isLoading">
           <span class="plus-icon">+</span>
           新建文件夹
         </button>
@@ -201,6 +201,12 @@
         </div>
       </div>
     </div>
+
+    <!-- 错误提示 -->
+    <div v-if="error" class="error-toast">
+      {{ error }}
+      <button @click="error = null" class="error-close">×</button>
+    </div>
   </div>
 </template>
 
@@ -333,15 +339,28 @@ const collapseAll = () => {
   setCollapsed(folderTree.value);
 };
 
-const handleCreateFolder = () => {
-  if (newFolderName.value.trim()) {
-    createFolder({
+const handleCreateFolder = async () => {
+  if (!newFolderName.value.trim()) {
+    return;
+  }
+
+  try {
+    const result = await createFolder({
       name: newFolderName.value.trim(),
       parentId: newFolderParentId.value
     });
-    showCreateFolderModal.value = false;
-    newFolderName.value = '';
-    newFolderParentId.value = null;
+
+    if (result) {
+      // 创建成功，重置表单并关闭模态框
+      showCreateFolderModal.value = false;
+      newFolderName.value = '';
+      newFolderParentId.value = null;
+    } else {
+      // 创建失败，显示错误信息
+      console.error('Failed to create folder');
+    }
+  } catch (error) {
+    console.error('Error creating folder:', error);
   }
 };
 
@@ -351,13 +370,26 @@ const editFolder = (folder: FolderTreeItem) => {
   showEditFolderModal.value = true;
 };
 
-const handleUpdateFolder = () => {
-  if (editingFolderId.value && editingFolderName.value.trim()) {
-    updateFolder({
+const handleUpdateFolder = async () => {
+  if (!editingFolderId.value || !editingFolderName.value.trim()) {
+    return;
+  }
+
+  try {
+    const result = await updateFolder({
       id: editingFolderId.value,
       name: editingFolderName.value.trim()
     });
-    showEditFolderModal.value = false;
+
+    if (result) {
+      showEditFolderModal.value = false;
+      editingFolderId.value = null;
+      editingFolderName.value = '';
+    } else {
+      console.error('Failed to update folder');
+    }
+  } catch (error) {
+    console.error('Error updating folder:', error);
   }
 };
 
@@ -414,6 +446,11 @@ const formatDate = (date: Date): string => {
     const years = Math.floor(diffDays / 365);
     return `${years} 年前`;
   }
+};
+
+const handleBackToDocs = () => {
+  emit('back-to-docs');
+  router.push('/');
 };
 
 onMounted(() => {
@@ -793,5 +830,49 @@ onMounted(() => {
   color: #e53e3e;
   font-size: 0.9rem;
   margin-top: 10px;
+}
+
+.error-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #dc3545;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1000;
+  animation: slideUp 0.3s ease-out;
+  max-width: 80%;
+}
+
+.error-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  margin-left: 8px;
+}
+
+.error-close:hover {
+  opacity: 0.8;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
 }
 </style>
