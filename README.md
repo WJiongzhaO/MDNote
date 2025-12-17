@@ -1,166 +1,399 @@
-# MD Note - DDD架构的Markdown笔记应用
+# MD Note
 
-一个基于Vue 3 + Electron + TypeScript的现代化Markdown笔记应用，采用DDD（领域驱动设计）架构。
+一个现代化的 Markdown 笔记应用程序，基于 Vue 3 和 Electron 构建，提供本地文件系统存储和强大的编辑功能。
 
-## 🏗️ 架构设计
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
+![Vue](https://img.shields.io/badge/vue-3.5.12-green.svg)
+![Electron](https://img.shields.io/badge/electron-30.0.0-blue.svg)
 
-本项目采用严格的DDD架构，分为四个主要层次：
+## ✨ 特性
 
-### 1. Domain Layer (领域层)
-`src/domain/`
-- **实体 (Entities)**: `Document` - 文档的核心业务对象
-- **值对象 (Value Objects)**: `DocumentId`, `DocumentTitle`, `DocumentContent` 等
-- **领域服务 (Domain Services)**: `MarkdownProcessor` - Markdown处理逻辑
-- **仓储接口 (Repository Interfaces)**: `DocumentRepository` - 数据访问抽象
-
-### 2. Application Layer (应用层)
-`src/application/`
-- **用例 (Use Cases)**: `DocumentUseCases` - 文档相关的业务用例
-- **DTO (Data Transfer Objects)**: 文档数据传输对象
-- **应用服务 (Application Services)**: 协调领域服务和用例
-
-### 3. Infrastructure Layer (基础设施层)
-`src/infrastructure/`
-- **仓储实现**: `InMemoryDocumentRepository` - 内存数据存储
-- **外部服务集成**: 数据持久化等基础设施服务
-
-### 4. Presentation Layer (表示层)
-`src/presentation/`
-- **Vue组件**: 用户界面组件
-- **Composables**: 响应式业务逻辑封装
-- **状态管理**: 基于Vue 3 Composition API
-
-## 🚀 功能特性
-
-- ✅ **Markdown 编辑** - 支持完整的Markdown语法
-- ✅ **实时预览** - 左侧编辑，右侧实时预览
-- ✅ **文档管理** - 创建、编辑、删除文档
-- ✅ **搜索功能** - 按标题和内容搜索文档
-- ✅ **响应式设计** - 适配不同屏幕尺寸
-- ✅ **自动保存** - 防抖保存机制
-- ✅ **类型安全** - 完整的TypeScript支持
+- **📝 强大的 Markdown 编辑** - 支持实时预览和语法高亮
+- **🔬 数学公式支持** - 集成 KaTeX 渲染数学表达式
+- **📊 图表绘制** - 内置 Mermaid 图表支持
+- **📁 文件夹管理** - 完整的文件夹创建、重命名和删除功能
+- **💾 本地存储** - 基于 Electron 的本地文件系统存储
+- **📄 文档导出** - 支持 Word 文档 (.docx) 格式导出
+- **🔒 数据安全** - DOMPurify XSS 防护和内容过滤
+- **🌙 现代界面** - 响应式设计和用户友好的界面
+- **⚡ 高性能** - 基于现代前端技术栈的快速响应
 
 ## 🛠️ 技术栈
 
-- **前端框架**: Vue 3.5.12 (Composition API)
-- **桌面应用**: Electron 30.0.0
-- **类型系统**: TypeScript 5.6.2
-- **构建工具**: Vite 5.4.8
-- **Markdown处理**: Marked 17.0.1
-- **HTML安全**: DOMPurify 3.3.1
-- **路由**: Vue Router 4.6.4
-- **代码规范**: ESLint + Prettier
+### 前端
+- **Vue 3.5.12** - 渐进式 JavaScript 框架
+- **Vue Router 4.6.4** - 官方路由管理器
+- **Vite 5.4.8** - 现代前端构建工具
+- **TypeScript 5.6.2** - 类型安全的 JavaScript 超集
 
-## 📁 项目结构
+### 后端/桌面
+- **Electron 30.0.0** - 跨平台桌面应用框架
+- **Node.js 20+** - JavaScript 运行时
+
+### 核心功能库
+- **Marked 17.0.1** - Markdown 解析器
+- **KaTeX 0.16.11** - 数学公式渲染引擎
+- **Mermaid 11.4.1** - 图表绘制库
+- **DOMPurify 3.3.1** - HTML 清理和 XSS 防护
+- **Docxtemplater 3.67.5** - Word 文档生成
+
+### 开发和测试
+- **Vitest 2.1.4** - 单元测试框架
+- **Playwright 1.49.0** - 端到端测试框架
+- **ESLint 9.13.0** - 代码质量检查
+- **Prettier 3.3.3** - 代码格式化
+
+## 📋 项目结构
 
 ```
-src/
-├── domain/                  # 领域层
-│   ├── entities/           # 实体
-│   ├── types/              # 类型定义
-│   ├── services/           # 领域服务
-│   └── repositories/       # 仓储接口
-├── application/            # 应用层
-│   ├── dto/               # 数据传输对象
-│   ├── usecases/          # 用例
-│   └── services/          # 应用服务
-├── infrastructure/         # 基础设施层
-│   └── repositories/       # 仓储实现
-├── presentation/           # 表示层
-│   ├── components/         # Vue组件
-│   └── composables/        # Composables
-├── App.vue                # 根组件
-└── main.ts                # 应用入口
+MDNote/
+├── src/
+│   ├── domain/                 # 领域层 - 业务逻辑
+│   │   ├── entities/          # 实体
+│   │   ├── repositories/      # 仓储接口
+│   │   ├── services/          # 领域服务
+│   │   └── types/             # 类型定义
+│   ├── application/           # 应用层 - 应用逻辑
+│   │   ├── dto/               # 数据传输对象
+│   │   ├── services/          # 应用服务
+│   │   └── usecases/          # 用例
+│   ├── infrastructure/        # 基础设施层 - 技术实现
+│   │   └── repositories/      # 仓储实现
+│   └── presentation/          # 表现层 - UI 和交互
+│       ├── components/        # Vue 组件
+│       ├── composables/       # Vue 组合式函数
+│       └── router/            # 路由配置
+├── e2e/                       # 端到端测试
+│   ├── electron/              # Electron 应用测试
+│   └── vue.spec.ts            # Web 浏览器测试
+├── public/                    # 静态资源
+├── main.js                    # Electron 主进程
+└── dist/                      # 构建输出
 ```
 
-## 🎯 核心特性说明
-
-### DDD架构优势
-1. **关注点分离**: 每层职责明确，便于维护
-2. **可测试性**: 业务逻辑与UI分离，易于单元测试
-3. **可扩展性**: 可轻松替换基础设施层实现
-4. **代码复用**: 领域逻辑可在不同前端技术中复用
-
-### Markdown处理
-- 使用Marked进行Markdown解析
-- DOMPurify确保HTML安全
-- 支持代码高亮、表格、列表等语法
-- 实时预览和同步滚动
-
-### 数据管理
-- 基于Repository模式的数据访问
-- 内存存储实现（可扩展为持久化存储）
-- 响应式数据更新
-- 防抖保存机制
-
-## 📦 安装和运行
+## 🚀 快速开始
 
 ### 环境要求
+
 - Node.js >= 20.0.0
 - npm 或 yarn
 
 ### 安装依赖
+
 ```bash
+# 克隆项目
+git clone <repository-url>
+cd MDNote
+
+# 安装依赖
 npm install
 ```
 
 ### 开发模式
+
 ```bash
-npm run dev              # 启动Web开发服务器
-npm run electron:serve   # 启动Electron应用
+# 启动开发服务器 (仅前端)
+npm run dev
+
+# 启动 Electron 应用 (完整开发环境)
+npm run electron:serve
 ```
 
-### 构建
+### 构建应用
+
 ```bash
-npm run build            # 构建Web版本
-npm run electron:build   # 构建Electron版本
+# 构建前端资源
+npm run build
+
+# 预览构建结果
+npm run preview
+
+# 构建 Electron 应用
+npm run electron:build
 ```
 
-### 测试
+## 🧪 测试
+
+### 单元测试
+
 ```bash
-npm run test:unit        # 单元测试
-npm run test:e2e         # E2E测试
+# 运行单元测试
+npm run test:unit
 ```
 
-## 🔧 开发指南
+### 端到端测试
 
-### 添加新功能
-1. 在Domain层定义业务规则和实体
-2. 在Application层创建用例
-3. 在Infrastructure层实现基础设施
-4. 在Presentation层创建UI组件
+```bash
+# Web 浏览器测试
+npm run test:e2e
 
-### 代码规范
-- 使用TypeScript进行类型定义
-- 遵循Vue 3 Composition API最佳实践
-- 保持DDD架构的分层清晰
-- 编写单元测试覆盖业务逻辑
+# Electron 应用测试
+npm run test:electron
+```
 
-## IDE推荐设置
+### 测试覆盖率
+
+```bash
+# 生成测试覆盖率报告
+npm run test:unit -- --coverage
+```
+
+## 📖 核心功能
+
+### Markdown 编辑
+
+- **实时预览** - 左右分屏显示源码和渲染结果
+- **语法高亮** - 支持代码块语法高亮
+- **自动保存** - 文档内容自动保存到本地
+- **快捷键** - 支持常用 Markdown 快捷键
+
+### 数学公式
+
+支持 KaTeX 数学公式渲染：
+
+```markdown
+行内公式：$E = mc^2$
+
+块级公式：
+$$
+\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
+$$
+```
+
+### 图表绘制
+
+内置 Mermaid 图表支持：
+
+```markdown
+```mermaid
+graph TD
+    A[开始] --> B{条件判断}
+    B -->|是| C[执行操作]
+    B -->|否| D[结束]
+    C --> D
+```
+
+### 文件夹管理
+
+- 创建、重命名、删除文件夹
+- 文件夹层级导航
+- 文件拖拽移动
+- 文件夹搜索和过滤
+
+### 文档导出
+
+支持导出为 Word 文档 (.docx) 格式，保持格式和样式。
+
+## 🏗️ 架构设计
+
+项目采用 **领域驱动设计 (DDD)** 架构，分为三个主要层次：
+
+### 1. 领域层 (Domain Layer)
+- 包含核心业务逻辑和业务规则
+- 定义实体、值对象和聚合根
+- 提供领域服务和仓储接口
+
+### 2. 应用层 (Application Layer)
+- 协调领域对象完成应用程序功能
+- 实现用例和业务流程
+- 处理事务和外部接口
+
+### 3. 基础设施层 (Infrastructure Layer)
+- 提供技术实现细节
+- 实现仓储接口和外部服务集成
+- 处理数据持久化和通信
+
+## 🔄 开发工作流
+
+### 1. 功能开发
+
+```bash
+# 创建新的功能分支
+git checkout -b feature/new-feature
+
+# 开发和测试
+npm run electron:serve
+npm run test:unit
+npm run test:electron
+
+# 提交代码
+git add .
+git commit -m "feat: 添加新功能"
+git push origin feature/new-feature
+```
+
+### 2. 代码质量
+
+```bash
+# 代码检查
+npm run lint
+
+# 代码格式化
+npm run format
+
+# 类型检查
+npm run type-check
+```
+
+### 3. 构建和部署
+
+```bash
+# 构建生产版本
+npm run electron:build
+
+# 安装包位于 release/ 目录
+```
+
+## 🔧 配置说明
+
+### Electron 配置
+
+主要配置文件：`main.js`
+- 窗口大小和行为设置
+- 开发模式配置
+- IPC 通信处理
+
+### Vite 配置
+
+主要配置文件：`vite.config.ts`
+- 开发服务器设置
+- 构建优化配置
+- 插件配置
+
+### 测试配置
+
+- `playwright.config.ts` - Web 浏览器测试配置
+- `playwright.electron.config.ts` - Electron 应用测试配置
+- `vitest.config.ts` - 单元测试配置
+
+## 🐛 故障排除
+
+### 常见问题
+
+1. **Electron 应用无法启动**
+   ```bash
+   # 确保依赖已正确安装
+   npm install
+
+   # 清理缓存
+   npm run clean
+   npm install
+   ```
+
+2. **开发服务器端口冲突**
+   ```bash
+   # 修改 Vite 配置中的端口
+   # 或停止占用端口的其他应用
+   ```
+
+3. **构建失败**
+   ```bash
+   # 检查 Node.js 版本
+   node --version  # 应该 >= 20.0.0
+
+   # 清理 node_modules 重新安装
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+### 调试技巧
+
+1. **Electron 开发工具**
+   - 开发模式下自动打开 DevTools
+   - 可以检查渲染进程和主进程
+
+2. **Vue 开发工具**
+   - 集成 Vue DevTools 浏览器扩展
+   - 支持组件状态检查和调试
+
+3. **日志调试**
+   - 使用 `console.log` 进行基础调试
+   - Electron 主进程日志会显示在控制台
+
+## 🤝 贡献指南
+
+我们欢迎所有形式的贡献！请遵循以下步骤：
+
+### 1. 报告问题
+
+- 使用 GitHub Issues 报告 bug
+- 提供详细的复现步骤和环境信息
+- 包含相关的错误日志和截图
+
+### 2. 提交功能
+
+1. Fork 项目
+2. 创建功能分支：`git checkout -b feature/your-feature`
+3. 提交更改：`git commit -m 'feat: 添加新功能'`
+4. 推送分支：`git push origin feature/your-feature`
+5. 创建 Pull Request
+
+### 3. 代码规范
+
+- 遵循 ESLint 和 Prettier 配置
+- 编写有意义的提交信息
+- 为新功能添加测试用例
+- 更新相关文档
+
+### 4. 提交信息规范
+
+使用约定式提交格式：
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+类型包括：
+- `feat`: 新功能
+- `fix`: 修复 bug
+- `docs`: 文档更新
+- `style`: 代码格式化
+- `refactor`: 代码重构
+- `test`: 测试相关
+- `chore`: 构建或辅助工具变动
+
+## 💻 IDE 推荐
 
 ### VS Code
+
 推荐安装以下扩展：
+
 - [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
 - [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin)
 - [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint)
 - [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
 
 ### 浏览器开发工具
-- **Chromium浏览器** (Chrome, Edge等):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - 在Chrome DevTools中启用自定义对象格式化器
-- **Firefox**:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - 在Firefox DevTools中启用自定义对象格式化器
+
+- **Vue.js devtools** - 用于 Vue 应用调试
+- **React Developer Tools** - 如果需要调试 React 组件
 
 ## 📄 许可证
 
-MIT License
+本项目采用 [MIT 许可证](LICENSE)。
 
 ## 🙏 致谢
 
-感谢所有开源项目的贡献者，特别是：
-- [Vue.js](https://vuejs.org/) - 渐进式JavaScript框架
-- [Electron](https://www.electronjs.org/) - 跨平台桌面应用开发
-- [Marked](https://marked.js.org/) - Markdown解析器
-- [Vite](https://vitejs.dev/) - 下一代前端构建工具
+感谢以下开源项目的支持：
+
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
+- [Electron](https://www.electronjs.org/) - 跨平台桌面应用框架
+- [Marked](https://marked.js.org/) - Markdown 解析器
+- [KaTeX](https://katex.org/) - 数学公式渲染引擎
+- [Mermaid](https://mermaid-js.github.io/) - 图表绘制库
+- [Playwright](https://playwright.dev/) - 端到端测试框架
+
+## 📞 联系方式
+
+- 项目主页：[GitHub Repository]
+- 问题反馈：[GitHub Issues]
+- 邮箱：[your-email@example.com]
+
+---
+
+**Happy Coding! 🎉**

@@ -15,7 +15,9 @@
       "Bash(npm run test)",
       "Bash(npm run)",
       "Bash(npm run test:unit:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebSearch",
+      "Bash(npm run test:*)"
     ]
   }
 }

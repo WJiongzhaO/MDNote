@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test:unit": "vitest",
     "test:e2e": "playwright test",
+    "test:electron": "playwright test --config=playwright.electron.config.ts",
     "electron:serve": "concurrently \"npm run dev\" \"wait-on tcp:5173 && electron .\"",
     "electron:build": "vue-tsc && vite build && electron-builder"
   },
