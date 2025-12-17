@@ -15,6 +15,7 @@
         @create-folder="handleCreateFolder"
         @update-folder="handleUpdateFolder"
         @delete-folder="handleDeleteFolder"
+        @move-document="handleMoveDocument"
       />
     </div>
 
@@ -46,16 +47,16 @@ import { useRouter } from 'vue-router';
 import { useDocuments } from '../composables/useDocuments';
 import { useFolders } from '../composables/useFolders';
 import { ApplicationService } from '../../application';
-import { LocalStorageDocumentRepository, LocalStorageFolderRepository } from '../../infrastructure';
 import DocumentList from './DocumentList.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
 import FolderList from './FolderList.vue';
 
-const router = useRouter();
+interface Props {
+  applicationService: ApplicationService;
+}
 
-const documentRepository = new LocalStorageDocumentRepository();
-const folderRepository = new LocalStorageFolderRepository();
-const applicationService = new ApplicationService(documentRepository, folderRepository);
+const props = defineProps<Props>();
+const router = useRouter();
 
 const {
   documents,
@@ -68,7 +69,7 @@ const {
   loadDocuments,
   loadDocumentsByFolder,
   renderMarkdown
-} = useDocuments(applicationService);
+} = useDocuments(props.applicationService);
 
 const {
   folderTree,
@@ -76,13 +77,18 @@ const {
   updateFolder,
   deleteFolder,
   loadFolders
-} = useFolders(applicationService);
+} = useFolders(props.applicationService);
 
 const selectedFolderId = ref<string | null>(null);
 const searchQuery = ref('');
 
 const filteredDocuments = computed(() => {
   let filtered = documents.value;
+
+  // 根据选中的文件夹过滤文档
+  if (selectedFolderId.value !== null) {
+    filtered = filtered.filter(doc => doc.folderId === selectedFolderId.value);
+  }
 
   // 根据搜索查询过滤文档
   if (searchQuery.value.trim()) {
@@ -119,7 +125,7 @@ const handleSearch = async (query: string) => {
   searchQuery.value = query;
 
   if (query.trim()) {
-    const documentUseCases = applicationService.getDocumentUseCases();
+    const documentUseCases = props.applicationService.getDocumentUseCases();
     const searchResults = await documentUseCases.searchDocuments(query);
     documents.value = searchResults;
   } else {
@@ -156,6 +162,24 @@ const handleDeleteFolder = async (id: string) => {
   }
 };
 
+const handleMoveDocument = async (documentId: string, targetFolderId: string | null) => {
+  // 获取当前文档信息
+  const documentUseCases = applicationService.getDocumentUseCases();
+  const currentDoc = await documentUseCases.getDocument(documentId);
+
+  if (currentDoc) {
+    await updateDocument({
+      id: documentId,
+      title: currentDoc.title, // 保持原标题
+      content: currentDoc.content, // 保持原内容
+      folderId: targetFolderId
+    });
+
+    // 重新加载当前文件夹的文档
+    await loadDocumentsByFolder(selectedFolderId.value);
+  }
+};
+
 const goToFolderManager = () => {
   router.push('/folders');
 };
@@ -166,6 +190,7 @@ onMounted(async () => {
   await loadDocumentsByFolder(null);
 
   // 检查是否是首次运行，如果是则创建示例文档
+  const documentUseCases = props.applicationService.getDocumentUseCases();
   const existingDocs = await documentUseCases.getAllDocuments();
   if (existingDocs.length === 0) {
     await createDocument({
@@ -181,7 +206,7 @@ onMounted(async () => {
 - 📚 **文档管理** - 轻松管理您的所有文档
 - 🔍 **搜索功能** - 快速找到您需要的文档
 - 📁 **文件夹支持** - 支持嵌套文件夹管理文档
-- 💾 **本地存储** - 所有数据自动保存在浏览器本地
+- 💾 **本地存储** - 所有数据自动保存在用户本地文件系统
 
 ## 使用方法
 

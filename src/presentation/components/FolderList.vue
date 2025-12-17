@@ -8,7 +8,12 @@
     </div>
 
     <div class="folders">
-      <div class="folder-item root-folder" @click="selectFolder(null)">
+      <div class="folder-item root-folder"
+           :class="{ active: selectedFolderId === null, 'drag-over': isDragOver && dragOverFolderId === null }"
+           @click="selectFolder(null)"
+           @dragover.prevent="handleDragOver($event, null)"
+           @dragleave="handleDragLeave"
+           @drop="handleDrop($event, null)">
         <span class="folder-icon">📁</span>
         <span class="folder-name">根目录</span>
       </div>
@@ -16,12 +21,16 @@
       <template v-for="folder in folderTree" :key="folder.id">
         <div
           class="folder-item"
-          :class="{ active: selectedFolderId === folder.id }"
-          @click="toggleFolder(folder)"
+          :class="{ active: selectedFolderId === folder.id, 'drag-over': isDragOver && dragOverFolderId === folder.id }"
+          @click="selectFolder(folder.id)"
+          @dragover.prevent="handleDragOver($event, folder.id)"
+          @dragleave="handleDragLeave"
+          @drop="handleDrop($event, folder.id)"
         >
-          <span class="folder-toggle" v-if="folder.children && folder.children.length > 0">
+          <span class="folder-toggle" v-if="folder.children && folder.children.length > 0" @click.stop="toggleFolder(folder)">
             {{ folder.isExpanded ? '▼' : '▶' }}
           </span>
+          <span class="folder-toggle-placeholder" v-else></span>
           <span class="folder-icon">📂</span>
           <span class="folder-name">{{ folder.name }}</span>
           <div class="folder-actions">
@@ -34,14 +43,15 @@
           </div>
         </div>
 
-        <div v-if="folder.isExpanded" class="folder-children">
-          <FolderList
-            :folder-tree="folder.children"
+        <div v-if="folder.isExpanded && folder.children && folder.children.length > 0" class="folder-children">
+          <FolderTreeItemComponent
+            v-for="child in folder.children"
+            :key="child.id"
+            :folder="child"
             :selected-folder-id="selectedFolderId"
             @select-folder="selectFolder"
-            @create-folder="createFolder"
-            @update-folder="updateFolder"
-            @delete-folder="deleteFolder"
+            @edit-folder="editFolder"
+            @delete-folder="confirmDeleteFolder"
           />
         </div>
       </template>
@@ -109,6 +119,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { FolderTreeItem } from '../../application';
+import FolderTreeItemComponent from './FolderTreeItem.vue';
 
 interface Props {
   folderTree: FolderTreeItem[];
@@ -121,6 +132,7 @@ interface Emits {
   (e: 'create-folder', name: string, parentId: string | null): void;
   (e: 'update-folder', id: string, name: string): void;
   (e: 'delete-folder', id: string): void;
+  (e: 'move-document', documentId: string, targetFolderId: string | null): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -138,6 +150,10 @@ const editingFolderId = ref<string | null>(null);
 const editingFolderName = ref('');
 const deletingFolderId = ref<string | null>(null);
 const deletingFolderName = ref('');
+
+// 拖拽相关状态
+const isDragOver = ref(false);
+const dragOverFolderId = ref<string | null>(null);
 
 const toggleFolder = (folder: FolderTreeItem) => {
   folder.isExpanded = !folder.isExpanded;
@@ -190,6 +206,35 @@ const deleteFolder = (id: string) => {
 const handleDeleteFolder = () => {
   if (deletingFolderId.value) {
     deleteFolder(deletingFolderId.value);
+  }
+};
+
+// 拖拽相关事件处理
+const handleDragOver = (event: DragEvent, folderId: string | null) => {
+  event.preventDefault();
+  isDragOver.value = true;
+  dragOverFolderId.value = folderId;
+};
+
+const handleDragLeave = () => {
+  isDragOver.value = false;
+  dragOverFolderId.value = null;
+};
+
+const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
+  event.preventDefault();
+  isDragOver.value = false;
+  dragOverFolderId.value = null;
+
+  if (event.dataTransfer) {
+    try {
+      const data = JSON.parse(event.dataTransfer.getData('application/json'));
+      if (data.type === 'document' && data.id) {
+        emit('move-document', data.id, targetFolderId);
+      }
+    } catch (error) {
+      console.error('Failed to parse drag data:', error);
+    }
   }
 };
 </script>
@@ -262,6 +307,11 @@ const handleDeleteFolder = () => {
   border-left: 3px solid #667eea;
 }
 
+.folder-item.drag-over {
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
+}
+
 .root-folder {
   font-weight: 600;
 }
@@ -270,6 +320,12 @@ const handleDeleteFolder = () => {
   width: 16px;
   text-align: center;
   font-size: 0.8rem;
+  cursor: pointer;
+  color: #666;
+}
+
+.folder-toggle-placeholder {
+  width: 16px;
 }
 
 .folder-icon {

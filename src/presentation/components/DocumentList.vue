@@ -24,6 +24,9 @@
         class="document-item"
         :class="{ active: document.id === activeDocumentId }"
         @click="$emit('select-document', document.id)"
+        draggable="true"
+        @dragstart="handleDragStart($event, document)"
+        @dragend="handleDragEnd"
       >
         <div class="document-title">
           {{ document.title || '无标题' }}
@@ -61,6 +64,7 @@ interface Emits {
   (e: 'select-document', id: string): void;
   (e: 'create-new'): void;
   (e: 'search', query: string): void;
+  (e: 'move-document', documentId: string, targetFolderId: string | null): void;
 }
 
 const props = defineProps<Props>();
@@ -104,6 +108,21 @@ const formatDate = (date: Date): string => {
     const years = Math.floor(diffDays / 365);
     return `${years} 年前`;
   }
+};
+
+const handleDragStart = (event: DragEvent, document: any) => {
+  if (event.dataTransfer) {
+    event.dataTransfer.setData('application/json', JSON.stringify({
+      type: 'document',
+      id: document.id,
+      title: document.title
+    }));
+    event.dataTransfer.effectAllowed = 'move';
+  }
+};
+
+const handleDragEnd = () => {
+  // 清理拖拽状态
 };
 </script>
 

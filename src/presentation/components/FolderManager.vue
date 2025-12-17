@@ -31,15 +31,15 @@
           </div>
 
           <FolderTreeItemComponent
-            v-for="folder in folderTree"
-            :key="folder.id"
-            :folder="folder"
-            :selected-folder-id="selectedFolderId"
-            @select-folder="selectFolder"
-            @create-folder="createFolder"
-            @edit-folder="editFolder"
-            @delete-folder="confirmDeleteFolder"
-          />
+          v-for="folder in folderTree"
+          :key="folder.id"
+          :folder="folder"
+          :selected-folder-id="selectedFolderId"
+          @select-folder="selectFolder"
+          @create-folder="createFolder"
+          @edit-folder="editFolder"
+          @delete-folder="confirmDeleteFolder"
+        />
         </div>
 
         <div v-if="folderTree.length === 0 && !isLoading" class="empty-state">
@@ -210,7 +210,7 @@ import { useRouter } from 'vue-router';
 import { useFolders } from '../composables/useFolders';
 import { useDocuments } from '../composables/useDocuments';
 import type { FolderTreeItem } from '../../application';
-import FolderTreeItemComponent from './FolderTreeItem.vue';
+import { default as FolderTreeItemComponent } from './FolderTreeItem.vue';
 
 interface Props {
   applicationService: any;
