@@ -1,13 +1,12 @@
 <template>
-  <AppLayout />
+  <router-view />
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import AppLayout from './presentation/components/AppLayout.vue';
 
 onMounted(() => {
-  console.log('MD Note 应用已启动 - DDD架构版本');
+  console.log('MD Note 应用已启动 - DDD架构版本，支持文件夹管理');
 });
 </script>
 

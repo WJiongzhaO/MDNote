@@ -1,16 +1,12 @@
-export interface DocumentId {
-  value: string;
-}
-
-export interface DocumentTitle {
-  value: string;
-}
-
-export interface DocumentContent {
-  value: string;
-}
-
 export interface FolderId {
+  value: string;
+}
+
+export interface FolderName {
+  value: string;
+}
+
+export interface ParentFolderId {
   value: string | null;
 }
 

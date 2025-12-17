@@ -4,6 +4,7 @@ import type {
   DocumentId,
   DocumentTitle,
   DocumentContent,
+  FolderId,
   CreatedAt,
   UpdatedAt
 } from '../../types/document.types';
@@ -15,6 +16,7 @@ describe('Document Entity', () => {
       { value: 'test-id' } as DocumentId,
       { value: 'Test Title' } as DocumentTitle,
       { value: 'Test Content' } as DocumentContent,
+      { value: null } as FolderId,
       { value: now } as CreatedAt,
       { value: now } as UpdatedAt
     );

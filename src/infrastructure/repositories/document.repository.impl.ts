@@ -1,11 +1,12 @@
 import { Document } from '../../domain/entities/document.entity';
-import type { DocumentId, DocumentTitle } from '../../domain/types/document.types';
+import type { DocumentId, DocumentTitle, FolderId } from '../../domain/types/document.types';
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
 
 export interface DocumentData {
   id: string;
   title: string;
   content: string;
+  folderId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,6 +19,7 @@ export class InMemoryDocumentRepository implements DocumentRepository {
       id: document.getId().value,
       title: document.getTitle().value,
       content: document.getContent().value,
+      folderId: document.getFolderId().value,
       createdAt: document.getCreatedAt().value,
       updatedAt: document.getUpdatedAt().value
     };
@@ -67,11 +69,19 @@ export class InMemoryDocumentRepository implements DocumentRepository {
     return documentsData.map(data => this.mapToEntity(data));
   }
 
+  async findByFolderId(folderId: FolderId): Promise<Document[]> {
+    const documentsData = Array.from(this.documents.values())
+      .filter(data => data.folderId === folderId.value);
+
+    return documentsData.map(data => this.mapToEntity(data));
+  }
+
   private mapToEntity(data: DocumentData): Document {
     return new Document(
       { value: data.id },
       { value: data.title },
       { value: data.content },
+      { value: data.folderId },
       { value: data.createdAt },
       { value: data.updatedAt }
     );

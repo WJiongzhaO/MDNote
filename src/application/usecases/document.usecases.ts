@@ -18,7 +18,8 @@ export class DocumentUseCases {
   async createDocument(request: CreateDocumentRequest): Promise<DocumentResponse> {
     const document = Document.create(
       { value: request.title },
-      { value: request.content }
+      { value: request.content },
+      { value: request.folderId || null }
     );
 
     await this.documentRepository.save(document);
@@ -35,7 +36,8 @@ export class DocumentUseCases {
 
     document.update(
       { value: request.title },
-      { value: request.content }
+      { value: request.content },
+      request.folderId !== undefined ? { value: request.folderId } : undefined
     );
 
     await this.documentRepository.save(document);
@@ -68,8 +70,43 @@ export class DocumentUseCases {
     return documents.map(doc => ({
       id: doc.getId().value,
       title: doc.getTitle().value,
+      folderId: doc.getFolderId().value,
       updatedAt: doc.getUpdatedAt().value
     }));
+  }
+
+  async getDocumentsByFolderId(folderId: string | null): Promise<DocumentListItem[]> {
+    const documents = await this.documentRepository.findByFolderId({ value: folderId });
+
+    return documents.map(doc => ({
+      id: doc.getId().value,
+      title: doc.getTitle().value,
+      folderId: doc.getFolderId().value,
+      updatedAt: doc.getUpdatedAt().value
+    }));
+  }
+
+  async getDocumentsByFolder(folderId: string | null): Promise<DocumentListItem[]> {
+    if (folderId === null) {
+      // 获取根目录的文档（没有文件夹的文档）
+      const allDocuments = await this.documentRepository.findAll();
+      return allDocuments
+        .filter(doc => doc.getFolderId().value === null)
+        .map(doc => ({
+          id: doc.getId().value,
+          title: doc.getTitle().value,
+          folderId: doc.getFolderId().value,
+          updatedAt: doc.getUpdatedAt().value
+        }));
+    } else {
+      const documents = await this.documentRepository.findByFolderId({ value: folderId });
+      return documents.map(doc => ({
+        id: doc.getId().value,
+        title: doc.getTitle().value,
+        folderId: doc.getFolderId().value,
+        updatedAt: doc.getUpdatedAt().value
+      }));
+    }
   }
 
   async searchDocuments(query: string): Promise<DocumentListItem[]> {
@@ -78,6 +115,7 @@ export class DocumentUseCases {
     return documents.map(doc => ({
       id: doc.getId().value,
       title: doc.getTitle().value,
+      folderId: doc.getFolderId().value,
       updatedAt: doc.getUpdatedAt().value
     }));
   }
@@ -91,6 +129,7 @@ export class DocumentUseCases {
       id: document.getId().value,
       title: document.getTitle().value,
       content: document.getContent().value,
+      folderId: document.getFolderId().value,
       createdAt: document.getCreatedAt().value,
       updatedAt: document.getUpdatedAt().value
     };

@@ -40,7 +40,8 @@ export function useDocuments(applicationService: ApplicationService) {
       documents.value.push({
         id: newDocument.id,
         title: newDocument.title,
-        updatedAt: newDocument.updatedAt
+        updatedAt: newDocument.updatedAt,
+        folderId: newDocument.folderId
       });
       return newDocument;
     } catch (err) {
@@ -65,7 +66,8 @@ export function useDocuments(applicationService: ApplicationService) {
           documents.value[index] = {
             id: updatedDocument.id,
             title: updatedDocument.title,
-            updatedAt: updatedDocument.updatedAt
+            updatedAt: updatedDocument.updatedAt,
+            folderId: updatedDocument.folderId
           };
         }
 
@@ -123,6 +125,21 @@ export function useDocuments(applicationService: ApplicationService) {
     }
   };
 
+  const loadDocumentsByFolder = async (folderId: string | null) => {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const result = await documentUseCases.getDocumentsByFolder(folderId);
+      documents.value = result;
+    } catch (err) {
+      error.value = 'Failed to load documents for folder';
+      console.error('Error loading documents by folder:', err);
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   const renderMarkdown = async (content: string) => {
     try {
       return await documentUseCases.renderMarkdown(content);
@@ -142,6 +159,7 @@ export function useDocuments(applicationService: ApplicationService) {
     isLoading,
     error,
     loadDocuments,
+    loadDocumentsByFolder,
     createDocument,
     updateDocument,
     deleteDocument,
