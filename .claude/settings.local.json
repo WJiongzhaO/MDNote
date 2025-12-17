@@ -5,7 +5,9 @@
       "Bash(node:*)",
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(rm:*)",
+      "Bash(npm run electron:serve:*)"
     ]
   }
 }

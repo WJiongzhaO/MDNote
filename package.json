@@ -1,7 +1,7 @@
 {
   "name": "markdown-docs-editor",
   "version": "1.0.0",
-  "description": "A Markdown editor with real-time preview, KaTeX, Mermaid, and export capabilities.",
+  "description": "A modern Markdown note-taking application built with Vue and Electron.",
   "main": "main.js",
   "scripts": {
     "dev": "vite",
@@ -48,8 +48,8 @@
     "wait-on": "^8.0.5"
   },
   "build": {
-    "appId": "com.markdown-docs-editor.app",
-    "productName": "Markdown Docs Editor",
+    "appId": "com.mdnote.app",
+    "productName": "MD Note",
     "directories": {
       "output": "release"
     },
