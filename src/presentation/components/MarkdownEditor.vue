@@ -9,6 +9,16 @@
         @blur="updateDocument"
       />
       <div v-else class="title-placeholder">请选择或创建文档</div>
+      
+      <div v-if="document" class="editor-toolbar">
+        <button 
+          class="toolbar-btn" 
+          @click="openMermaidEditor"
+          title="编辑Mermaid图表"
+        >
+          📊 Mermaid编辑器
+        </button>
+      </div>
     </div>
 
     <div class="editor-content" v-if="document">
@@ -42,11 +52,46 @@
     <div class="save-indicator" :class="{ visible: hasChanges }">
       {{ hasChanges ? '未保存' : '已保存' }}
     </div>
+
+    <!-- Mermaid编辑器模态框 -->
+    <div v-if="showMermaidEditor" class="modal-overlay" @click="closeMermaidEditor" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    ">
+      <div class="modal-content" @click.stop style="
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 90vw;
+        max-height: 90vh;
+        overflow: auto;
+        position: relative;
+        border: 2px solid red;
+      ">
+        <div style="position: absolute; top: 10px; left: 10px; background: yellow; padding: 5px; z-index: 1001;">
+          模态框已显示
+        </div>
+        <MermaidEditor
+          :mermaid-code="currentMermaidCode"
+          @save="handleMermaidSave"
+          @close="closeMermaidEditor"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import MermaidEditor from './MermaidEditor.vue';
 import type { DocumentResponse } from '../../application';
 
 interface Props {
@@ -66,6 +111,12 @@ const content = ref('');
 const renderedContent = ref('');
 const hasChanges = ref(false);
 const previewElement = ref<HTMLDivElement>();
+
+// Mermaid编辑器相关状态
+const showMermaidEditor = ref(false);
+const currentMermaidCode = ref('');
+const currentSelectionStart = ref(0);
+const currentSelectionEnd = ref(0);
 
 let debounceTimer: number | null = null;
 let lastSavedTitle = '';
@@ -166,6 +217,131 @@ onMounted(() => {
     renderContent();
   }
 });
+
+// Mermaid编辑器相关方法
+const openMermaidEditor = () => {
+  console.log('=== 打开Mermaid编辑器按钮被点击 ===');
+  console.log('document状态:', !!props.document);
+  console.log('content值:', content.value ? `长度: ${content.value.length}` : '空');
+  
+  const textarea = document.querySelector('.markdown-textarea') as HTMLTextAreaElement;
+  if (!textarea) {
+    console.error('❌ 找不到Markdown文本区域');
+    return;
+  }
+  
+  console.log('✅ 找到文本区域');
+  
+  // 获取当前选择范围
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  console.log('选择范围:', { start, end });
+  
+  // 尝试提取Mermaid代码块
+  const mermaidCode = extractMermaidCode(content.value, start, end);
+  console.log('提取的Mermaid代码:', mermaidCode);
+  
+  currentMermaidCode.value = mermaidCode;
+  currentSelectionStart.value = start;
+  currentSelectionEnd.value = end;
+  showMermaidEditor.value = true;
+  
+  console.log('✅ Mermaid编辑器状态已设置为显示:', showMermaidEditor.value);
+  console.log('currentMermaidCode:', currentMermaidCode.value);
+  console.log('=== 结束调试信息 ===');
+};
+
+const extractMermaidCode = (content: string, start: number, end: number): string => {
+  // 如果用户选择了文本，优先使用选中的文本
+  if (start !== end) {
+    const selectedText = content.substring(start, end);
+    if (selectedText.trim().startsWith('```mermaid')) {
+      return selectedText.replace(/^```mermaid\s*\n?/, '').replace(/\n?```$/, '');
+    }
+    return selectedText;
+  }
+  
+  // 如果没有选择文本，查找光标位置附近的Mermaid代码块
+  const lines = content.split('\n');
+  let currentLine = 0;
+  let charCount = 0;
+  
+  // 更精确地计算当前行号
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineLength = line.length + 1; // +1 for newline
+    
+    if (charCount <= start && start < charCount + lineLength) {
+      currentLine = i;
+      break;
+    }
+    charCount += lineLength;
+  }
+  
+  // 向前查找Mermaid代码块开始
+  let mermaidStart = -1;
+  for (let i = currentLine; i >= 0; i--) {
+    const line = lines[i];
+    if (line && line.trim() === '```mermaid') {
+      mermaidStart = i;
+      break;
+    }
+  }
+  
+  // 向后查找Mermaid代码块结束
+  if (mermaidStart !== -1) {
+    for (let i = mermaidStart + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line && line.trim() === '```') {
+        return lines.slice(mermaidStart + 1, i).join('\n');
+      }
+    }
+  }
+  
+  // 如果没有找到Mermaid代码块，返回默认的流程图模板
+  return `graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]`;
+};
+
+const handleMermaidSave = (mermaidCode: string) => {
+  if (!content.value) return;
+  
+  const textarea = document.querySelector('.markdown-textarea') as HTMLTextAreaElement;
+  if (!textarea) return;
+  
+  const start = currentSelectionStart.value;
+  const end = currentSelectionEnd.value;
+  
+  let newContent = content.value;
+  
+  // 如果之前有选中的Mermaid代码块，替换它
+  if (start !== end) {
+    const selectedText = content.value.substring(start, end);
+    if (selectedText.trim().startsWith('```mermaid')) {
+      // 替换整个Mermaid代码块
+      const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
+      newContent = content.value.substring(0, start) + mermaidBlock + content.value.substring(end);
+    } else {
+      // 替换选中的文本
+      newContent = content.value.substring(0, start) + mermaidCode + content.value.substring(end);
+    }
+  } else {
+    // 如果没有选中文本，在当前位置插入Mermaid代码块
+    const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
+    newContent = content.value.substring(0, start) + mermaidBlock + content.value.substring(start);
+  }
+  
+  content.value = newContent;
+  checkChanges();
+  renderContent();
+  closeMermaidEditor();
+};
+
+const closeMermaidEditor = () => {
+  showMermaidEditor.value = false;
+  currentMermaidCode.value = '';
+  currentSelectionStart.value = 0;
+  currentSelectionEnd.value = 0;
+};
 </script>
 
 <style scoped>
@@ -290,6 +466,52 @@ onMounted(() => {
 
 .save-indicator.visible {
   opacity: 1;
+}
+
+/* Mermaid编辑器相关样式 */
+.editor-toolbar {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.toolbar-btn {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.toolbar-btn:hover {
+  background: #5a6fd8;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1200px;
+  height: 80%;
+  max-height: 800px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .markdown-preview :deep(h1),

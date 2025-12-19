@@ -1,9 +1,10 @@
 import { ref, computed, onMounted } from 'vue';
-import { ApplicationService } from '../../application';
+import { Application } from '../../core/application';
 import type { CreateFolderRequest, UpdateFolderRequest } from '../../application';
 
-export function useFolders(applicationService: ApplicationService) {
-  const folderUseCases = applicationService.getFolderUseCases();
+export function useFolders() {
+  const application = Application.getInstance();
+  const folderUseCases = application.getFolderUseCases();
 
   const folders = ref([]);
   const folderTree = ref([]);

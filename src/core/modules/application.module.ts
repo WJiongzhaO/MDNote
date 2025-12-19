@@ -1,0 +1,70 @@
+import { TYPES } from '../container/container.types';
+import type { ServiceContainer } from '../container/service-container.interface';
+import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
+import type { FolderRepository } from '../../domain/repositories/folder.repository.interface';
+import { MarkdownProcessor } from '../../domain/services/markdown-processor.domain.service';
+import { ExtensibleMarkdownProcessor } from '../../domain/services/extensible-markdown-processor.domain.service';
+import { HandlebarsTemplateProcessor } from '../../domain/services/template-processor.service';
+import { KatexMathRenderer } from '../../domain/services/katex-math-renderer.service';
+import { MermaidRendererService } from '../../domain/services/mermaid-renderer.service';
+import { MermaidMarkdownExtension } from '../../domain/services/mermaid-markdown-extension.service';
+import { MarkdownProcessorInitializer } from '../../domain/services/markdown-processor-initializer.service';
+import { ApplicationService } from '../../application/services/application.service';
+import { DocumentUseCases } from '../../application/usecases/document.usecases';
+import { FolderUseCases } from '../../application/usecases/folder.usecases';
+import { StorageAdapter } from '../../infrastructure/storage.adapter';
+
+/**
+ * 应用模块配置 - 负责配置应用层的依赖关系
+ */
+export class ApplicationModule {
+  static configure(container: ServiceContainer): void {
+    // 配置仓储实现
+    container.bind<DocumentRepository>(TYPES.DocumentRepository)
+      .toConstantValue(StorageAdapter.createDocumentRepository());
+    
+    container.bind<FolderRepository>(TYPES.FolderRepository)
+      .toConstantValue(StorageAdapter.createFolderRepository());
+
+    // 配置领域服务（暂时保持单例模式，后续重构）
+    container.bind<MarkdownProcessor>(TYPES.MarkdownProcessor)
+      .toConstantValue(MarkdownProcessor.getInstance());
+
+    // 配置新的可扩展处理器
+    container.bind<ExtensibleMarkdownProcessor>(TYPES.ExtensibleMarkdownProcessor)
+      .to(ExtensibleMarkdownProcessor);
+
+    container.bind<HandlebarsTemplateProcessor>(TYPES.TemplateProcessor)
+      .to(HandlebarsTemplateProcessor);
+
+    container.bind<KatexMathRenderer>(TYPES.MathRenderer)
+      .to(KatexMathRenderer);
+
+    container.bind<MermaidRendererService>(TYPES.MermaidRenderer)
+      .toSingleton(MermaidRendererService);
+
+    container.bind<MermaidMarkdownExtension>(TYPES.MermaidMarkdownExtension)
+      .to(MermaidMarkdownExtension);
+
+    container.bind<MarkdownProcessorInitializer>(TYPES.MarkdownProcessorInitializer)
+      .to(MarkdownProcessorInitializer);
+
+    // 配置应用服务
+    container.bind<ApplicationService>(TYPES.ApplicationService)
+      .to(ApplicationService);
+
+    container.bind<DocumentUseCases>(TYPES.DocumentUseCases)
+      .to(DocumentUseCases);
+
+    container.bind<FolderUseCases>(TYPES.FolderUseCases)
+      .to(FolderUseCases);
+
+    // 配置处理器之间的依赖关系
+    this.configureProcessorDependencies(container);
+  }
+
+  private static configureProcessorDependencies(container: ServiceContainer): void {
+    // 处理器依赖关系将在使用时自动配置
+    // 这里不再需要手动配置，因为依赖注入已经处理了这些关系
+  }
+}

@@ -1,9 +1,10 @@
 import { ref, computed, onMounted } from 'vue';
-import { ApplicationService } from '../../application';
+import { Application } from '../../core/application';
 import type { CreateDocumentRequest, UpdateDocumentRequest, DocumentResponse, DocumentListItem } from '../../application';
 
-export function useDocuments(applicationService: ApplicationService) {
-  const documentUseCases = applicationService.getDocumentUseCases();
+export function useDocuments() {
+  const application = Application.getInstance();
+  const documentUseCases = application.getDocumentUseCases();
 
   const documents = ref<DocumentListItem[]>([]);
   const currentDocument = ref<DocumentResponse | null>(null);

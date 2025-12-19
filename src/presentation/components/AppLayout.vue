@@ -44,18 +44,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { Application } from '../../core/application';
 import { useDocuments } from '../composables/useDocuments';
 import { useFolders } from '../composables/useFolders';
-import { ApplicationService } from '../../application';
 import DocumentList from './DocumentList.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
 import FolderList from './FolderList.vue';
 
-interface Props {
-  applicationService: ApplicationService;
-}
-
-const props = defineProps<Props>();
 const router = useRouter();
 
 const {
@@ -70,7 +65,7 @@ const {
   loadDocuments,
   loadDocumentsByFolder,
   renderMarkdown
-} = useDocuments(props.applicationService);
+} = useDocuments();
 
 const {
   folderTree,
@@ -78,7 +73,7 @@ const {
   updateFolder,
   deleteFolder,
   loadFolders
-} = useFolders(props.applicationService);
+} = useFolders();
 
 const selectedFolderId = ref<string | null>(null);
 const searchQuery = ref('');
@@ -157,7 +152,8 @@ const handleDeleteFolder = async (id: string) => {
 
 const handleMoveDocument = async (documentId: string, targetFolderId: string | null) => {
   // 获取当前文档信息
-  const documentUseCases = props.applicationService.getDocumentUseCases();
+  const application = Application.getInstance();
+  const documentUseCases = application.getDocumentUseCases();
   const currentDoc = await documentUseCases.getDocument(documentId);
 
   if (currentDoc) {
@@ -183,7 +179,8 @@ onMounted(async () => {
   await loadDocumentsByFolder(null);
 
   // 检查是否是首次运行，如果是则创建示例文档
-  const documentUseCases = props.applicationService.getDocumentUseCases();
+  const application = Application.getInstance();
+  const documentUseCases = application.getDocumentUseCases();
   const existingDocs = await documentUseCases.getAllDocuments();
   if (existingDocs.length === 0) {
     await createDocument({

@@ -1,7 +1,9 @@
+import { injectable, inject } from 'inversify';
+import { TYPES } from '../../core/container/container.types';
 import { Document } from '../../domain/entities/document.entity';
 import type { DocumentId, DocumentTitle, DocumentContent } from '../../domain/types/document.types';
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
-import { MarkdownProcessor } from '../../domain/services/markdown-processor.domain.service';
+import { ExtensibleMarkdownProcessor } from '../../domain/services/extensible-markdown-processor.domain.service';
 import type {
   CreateDocumentRequest,
   UpdateDocumentRequest,
@@ -9,10 +11,11 @@ import type {
   DocumentListItem
 } from '../dto/document.dto';
 
+@injectable()
 export class DocumentUseCases {
   constructor(
-    private readonly documentRepository: DocumentRepository,
-    private readonly markdownProcessor: MarkdownProcessor
+    @inject(TYPES.DocumentRepository) private readonly documentRepository: DocumentRepository,
+    @inject(TYPES.ExtensibleMarkdownProcessor) private readonly markdownProcessor: ExtensibleMarkdownProcessor
   ) {}
 
   async createDocument(request: CreateDocumentRequest): Promise<DocumentResponse> {
@@ -121,7 +124,11 @@ export class DocumentUseCases {
   }
 
   async renderMarkdown(content: string): Promise<string> {
-    return this.markdownProcessor.processMarkdown(content);
+    return await this.markdownProcessor.processMarkdown(content);
+  }
+
+  async processDocument(content: string, options?: any): Promise<any> {
+    return await this.markdownProcessor.processDocument(content, options);
   }
 
   private mapToResponse(document: Document): DocumentResponse {

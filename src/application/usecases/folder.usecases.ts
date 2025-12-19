@@ -1,3 +1,5 @@
+import { injectable, inject } from 'inversify';
+import { TYPES } from '../../core/container/container.types';
 import { Folder } from '../../domain/entities/folder.entity';
 import type { FolderRepository } from '../../domain/repositories/folder.repository.interface';
 import type {
@@ -8,8 +10,9 @@ import type {
   FolderTreeItem
 } from '../dto/folder.dto';
 
+@injectable()
 export class FolderUseCases {
-  constructor(private readonly folderRepository: FolderRepository) {}
+  constructor(@inject(TYPES.FolderRepository) private readonly folderRepository: FolderRepository) {}
 
   async createFolder(request: CreateFolderRequest): Promise<FolderResponse> {
     const folder = Folder.create(
