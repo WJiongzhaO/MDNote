@@ -233,6 +233,27 @@ const chartTemplates = [
     D --> E`
   },
   {
+    name: '复杂流程图',
+    type: 'flowchart',
+    icon: '📈',
+    description: '包含子图和并行处理的复杂流程',
+    code: `flowchart TD
+    A[开始] --> B{条件1}
+    B -->|是| C[操作1]
+    B -->|否| D[操作2]
+    
+    subgraph 并行处理
+      C --> E[操作3]
+      D --> F[操作4]
+    end
+    
+    E --> G{条件2}
+    F --> G
+    G -->|是| H[结束]
+    G -->|否| I[重新开始]
+    I --> B`
+  },
+  {
     name: '用户登录序列图',
     type: 'sequenceDiagram',
     icon: '🔐',
@@ -246,6 +267,26 @@ const chartTemplates = [
     S->>D: 验证用户信息
     D-->>S: 返回验证结果
     S-->>U: 登录成功/失败`
+  },
+  {
+    name: '在线购物序列图',
+    type: 'sequenceDiagram',
+    icon: '🛒',
+    description: '用户在线购物流程',
+    code: `sequenceDiagram
+    participant U as 用户
+    participant W as 网站
+    participant P as 支付系统
+    participant L as 物流系统
+    
+    U->>W: 浏览商品
+    W-->>U: 显示商品信息
+    U->>W: 添加购物车
+    U->>W: 下单支付
+    W->>P: 请求支付
+    P-->>W: 支付成功
+    W->>L: 发货通知
+    L-->>U: 物流更新`
   },
   {
     name: '类继承关系图',
@@ -274,6 +315,64 @@ const chartTemplates = [
     Animal <|-- Cat`
   },
   {
+    name: '系统架构类图',
+    type: 'classDiagram',
+    icon: '🏢',
+    description: '系统模块间的类关系',
+    code: `classDiagram
+    class UserService {
+        +User getUserById(id)
+        +void saveUser(user)
+    }
+    
+    class OrderService {
+        +Order createOrder(user, items)
+        +void processPayment(order)
+    }
+    
+    class ProductService {
+        +List<Product> getProducts()
+        +Product getProductById(id)
+    }
+    
+    UserService --> OrderService : 使用
+    OrderService --> ProductService : 依赖`
+  },
+  {
+    name: '订单状态图',
+    type: 'stateDiagram',
+    icon: '🔄',
+    description: '订单状态流转过程',
+    code: `stateDiagram-v2
+    [*] --> 待支付
+    待支付 --> 已支付 : 支付成功
+    待支付 --> 已取消 : 取消订单
+    已支付 --> 已发货 : 发货
+    已支付 --> 退款中 : 申请退款
+    已发货 --> 已完成 : 确认收货
+    已发货 --> 退款中 : 申请退货
+    退款中 --> 已退款 : 退款成功
+    退款中 --> 已支付 : 退款失败
+    已完成 --> [*]
+    已退款 --> [*]
+    已取消 --> [*]`
+  },
+  {
+    name: '用户认证状态图',
+    type: 'stateDiagram',
+    icon: '🔒',
+    description: '用户登录认证状态流转',
+    code: `stateDiagram-v2
+    [*] --> 未登录
+    未登录 --> 登录中 : 输入凭证
+    登录中 --> 已登录 : 验证成功
+    登录中 --> 未登录 : 验证失败
+    已登录 --> 会话过期 : 超时
+    已登录 --> 未登录 : 主动登出
+    会话过期 --> 未登录 : 重新登录
+    会话过期 --> 已登录 : 刷新令牌`
+  },
+  {
     name: '项目甘特图',
     type: 'gantt',
     icon: '📅',
@@ -286,7 +385,183 @@ const chartTemplates = [
     技术设计 :active, des2, after des1, 5d
     section 开发阶段
     前端开发 :dev1, after des2, 10d
-    后端开发 :dev2, after des2, 15d`
+    后端开发 :dev2, after des2, 15d
+    section 测试阶段
+    单元测试 :test1, after dev1, 5d
+    集成测试 :test2, after dev2, 7d`
+  },
+  {
+    name: '产品发布甘特图',
+    type: 'gantt',
+    icon: '🚀',
+    description: '产品发布里程碑计划',
+    code: `gantt
+    title 产品发布计划
+    dateFormat YYYY-MM-DD
+    section 研发阶段
+    原型设计 :milestone, m1, 2024-01-01, 0d
+    核心功能开发 :dev, after m1, 30d
+    测试优化 :test, after dev, 15d
+    section 发布阶段
+    内测发布 :crit, alpha, after test, 7d
+    公测发布 :beta, after alpha, 14d
+    正式发布 :milestone, release, after beta, 0d`
+  },
+  {
+    name: '销售数据饼图',
+    type: 'pie',
+    icon: '🥧',
+    description: '销售数据分布情况',
+    code: `pie title 2024年销售数据分布
+    "电子产品" : 42
+    "服装鞋帽" : 28
+    "家居用品" : 15
+    "图书文具" : 10
+    "其他" : 5`
+  },
+  {
+    name: '用户满意度饼图',
+    type: 'pie',
+    icon: '😊',
+    description: '用户满意度调查结果',
+    code: `pie title 用户满意度调查
+    "非常满意" : 65
+    "满意" : 25
+    "一般" : 7
+    "不满意" : 3`
+  },
+  {
+    name: '用户购物旅程图',
+    type: 'userJourney',
+    icon: '👤',
+    description: '用户在线购物完整旅程',
+    code: `journey
+    title 用户购物旅程
+    section 浏览阶段
+      浏览商品: 5: 用户
+      查看详情: 4: 用户
+      比较价格: 3: 用户
+    section 决策阶段
+      添加购物车: 5: 用户
+      查看评价: 4: 用户
+      咨询客服: 3: 客服
+    section 购买阶段
+      下单支付: 5: 用户
+      等待发货: 4: 系统
+      确认收货: 3: 用户`
+  },
+  {
+    name: '产品使用旅程图',
+    type: 'userJourney',
+    icon: '📱',
+    description: '用户使用产品完整流程',
+    code: `journey
+    title 产品使用旅程
+    section 注册阶段
+      下载安装: 5: 用户
+      注册账号: 4: 用户
+      完善信息: 3: 用户
+    section 使用阶段
+      探索功能: 5: 用户
+      日常使用: 4: 用户
+      遇到问题: 3: 用户
+    section 支持阶段
+      寻求帮助: 5: 用户
+      解决问题: 4: 客服
+      继续使用: 3: 用户`
+  },
+  {
+    name: 'Git分支管理图',
+    type: 'gitGraph',
+    icon: '📚',
+    description: 'Git分支开发流程',
+    code: `gitGraph
+    commit
+    branch develop
+    checkout develop
+    commit
+    commit
+    checkout main
+    commit
+    checkout develop
+    commit
+    checkout main
+    merge develop
+    commit
+    branch feature/login
+    checkout feature/login
+    commit
+    commit
+    checkout develop
+    merge feature/login
+    checkout main
+    merge develop`
+  },
+  {
+    name: '功能开发Git图',
+    type: 'gitGraph',
+    icon: '💻',
+    description: '功能开发分支管理',
+    code: `gitGraph
+    commit id: "初始提交"
+    branch feature/user-auth
+    checkout feature/user-auth
+    commit id: "用户认证功能"
+    commit id: "权限管理"
+    branch feature/payment
+    checkout feature/payment
+    commit id: "支付接口"
+    commit id: "支付回调"
+    checkout feature/user-auth
+    commit id: "用户资料管理"
+    checkout main
+    merge feature/user-auth
+    merge feature/payment
+    commit id: "版本发布"`
+  },
+  {
+    name: '产品功能思维导图',
+    type: 'mindmap',
+    icon: '🧠',
+    description: '产品功能结构思维导图',
+    code: `mindmap
+      root((产品功能))
+        用户管理
+          注册登录
+          个人资料
+          权限管理
+        内容管理
+          文章发布
+          图片上传
+          评论系统
+        系统设置
+          基础配置
+          安全管理
+          日志监控`
+  },
+  {
+    name: '项目规划思维导图',
+    type: 'mindmap',
+    icon: '📋',
+    description: '项目规划结构思维导图',
+    code: `mindmap
+      root((项目规划))
+        需求分析
+          用户需求
+          功能需求
+          技术需求
+        设计阶段
+          架构设计
+          界面设计
+          数据库设计
+        开发阶段
+          前端开发
+          后端开发
+          测试开发
+        部署阶段
+          环境配置
+          数据迁移
+          上线发布`
   }
 ]
 

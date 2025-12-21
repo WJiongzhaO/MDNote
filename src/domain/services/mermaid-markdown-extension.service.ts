@@ -40,24 +40,47 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
         };
       }
     },
-    renderer: async (token: any) => {
-      console.log('Mermaid扩展渲染器被调用');
+    renderer: (token: any) => {
+      console.log('Mermaid扩展渲染器被调用（占位符方案）');
       console.log('Token信息:', token);
       
-      if (this.mermaidRenderer && token?.diagram) {
-        console.log('使用Mermaid渲染器渲染图表');
-        try {
-          const result = await this.mermaidRenderer.renderDiagram(token.diagram, this.renderOptions);
-          console.log('Mermaid扩展渲染成功，结果长度:', result.length);
-          return result;
-        } catch (error) {
-          console.error('Mermaid扩展渲染失败:', error);
-          return this.createErrorFallback(token.diagram, error as Error);
-        }
+      if (token?.diagram) {
+        // 使用占位符方案，避免异步Promise问题
+        // 占位符包含data属性存储Mermaid代码，由前端JavaScript异步渲染
+        const diagramId = 'mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const encodedDiagram = this.encodeDiagram(token.diagram);
+        
+        return `
+          <div 
+            class="mermaid-asset-placeholder" 
+            data-asset-type="mermaid"
+            data-asset-id="${diagramId}"
+            data-diagram="${encodedDiagram}"
+            style="
+              border: 1px solid #e0e0e0;
+              border-radius: 4px;
+              padding: 1rem;
+              margin: 1rem 0;
+              background-color: #f8f9fa;
+              position: relative;
+              min-height: 200px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div class="mermaid-loading" style="
+              text-align: center;
+              color: #666;
+            ">
+              <div style="margin-bottom: 0.5rem;">🔄 正在渲染Mermaid图表...</div>
+              <div style="font-size: 0.8rem; opacity: 0.7;">请稍候</div>
+            </div>
+          </div>
+        `;
       }
       
-      // 如果没有渲染器，返回原始代码块
-      console.log('没有Mermaid渲染器，返回原始代码块');
+      // 如果没有图表代码，返回原始代码块
       const text = token?.text || '';
       return `\n<pre><code class=\"language-mermaid\">${this.escapeHtml(text)}</code></pre>\n`;
     }
@@ -99,5 +122,12 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  /**
+   * 编码Mermaid代码（用于HTML属性）
+   */
+  private encodeDiagram(diagram: string): string {
+    return btoa(encodeURIComponent(diagram));
   }
 }

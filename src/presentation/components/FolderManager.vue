@@ -425,7 +425,11 @@ const createDocumentInFolder = () => {
   }
 };
 
-const formatDate = (date: Date): string => {
+const formatDate = (date: Date | undefined): string => {
+  if (!date) {
+    return '未知时间';
+  }
+  
   const now = new Date();
   const diffTime = Math.abs(now.getTime() - date.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

@@ -9,6 +9,8 @@ import { KatexMathRenderer } from '../../domain/services/katex-math-renderer.ser
 import { MermaidRendererService } from '../../domain/services/mermaid-renderer.service';
 import { MermaidMarkdownExtension } from '../../domain/services/mermaid-markdown-extension.service';
 import { MarkdownProcessorInitializer } from '../../domain/services/markdown-processor-initializer.service';
+import { AssetRendererService } from '../../domain/services/asset-renderer.service';
+import { InMemoryAssetManager } from '../../infrastructure/services/asset-manager.service';
 import { ApplicationService } from '../../application/services/application.service';
 import { DocumentUseCases } from '../../application/usecases/document.usecases';
 import { FolderUseCases } from '../../application/usecases/folder.usecases';
@@ -48,6 +50,30 @@ export class ApplicationModule {
 
     container.bind<MarkdownProcessorInitializer>(TYPES.MarkdownProcessorInitializer)
       .to(MarkdownProcessorInitializer);
+
+    // 配置资源管理服务
+    container.bind(TYPES.AssetManager)
+      .toSingleton(InMemoryAssetManager);
+
+    // 配置资源渲染服务（延迟初始化依赖）
+    // 先创建实例，然后在配置完成后设置依赖
+    const assetRenderer = new AssetRendererService();
+    container.bind(AssetRendererService)
+      .toConstantValue(assetRenderer);
+    
+    // 在配置完成后设置依赖（使用Promise确保顺序）
+    Promise.resolve().then(() => {
+      try {
+        const mermaidRenderer = container.get<MermaidRendererService>(TYPES.MermaidRenderer);
+        const assetManager = container.get(TYPES.AssetManager);
+        console.log('[ApplicationModule] 设置AssetRenderer依赖...');
+        assetRenderer.setMermaidRenderer(mermaidRenderer);
+        assetRenderer.setAssetManager(assetManager);
+        console.log('[ApplicationModule] AssetRenderer依赖设置完成');
+      } catch (error) {
+        console.error('[ApplicationModule] 设置AssetRenderer依赖失败:', error);
+      }
+    });
 
     // 配置应用服务
     container.bind<ApplicationService>(TYPES.ApplicationService)

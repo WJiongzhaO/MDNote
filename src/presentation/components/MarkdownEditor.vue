@@ -18,6 +18,14 @@
         >
           📊 Mermaid编辑器
         </button>
+        <!-- 添加公式编辑器按钮 -->
+        <button 
+          class="toolbar-btn" 
+          @click="openFormulaEditor"
+          title="编辑数学公式"
+        >
+          📐 公式编辑器
+        </button>
       </div>
     </div>
 
@@ -86,13 +94,45 @@
         />
       </div>
     </div>
+
+    <!-- 公式编辑器模态框 -->
+    <div v-if="showFormulaEditor" class="modal-overlay" @click="closeFormulaEditor" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    ">
+      <div class="modal-content" @click.stop style="
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 90vw;
+        max-height: 90vh;
+        overflow: auto;
+      ">
+        <FormulaEditor
+          :latex-code="currentFormulaCode"
+          :formula-type="currentFormulaType"
+          @save="handleFormulaSave"
+          @close="closeFormulaEditor"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import MermaidEditor from './MermaidEditor.vue';
+import FormulaEditor from './FormulaEditor.vue';
 import type { DocumentResponse } from '../../application';
+import { useAssetRenderer } from '../composables/useAssetRenderer';
 
 interface Props {
   document: DocumentResponse | null;
@@ -112,11 +152,19 @@ const renderedContent = ref('');
 const hasChanges = ref(false);
 const previewElement = ref<HTMLDivElement>();
 
+// 资源渲染器
+const { useAutoRender, triggerRender } = useAssetRenderer();
+
 // Mermaid编辑器相关状态
 const showMermaidEditor = ref(false);
 const currentMermaidCode = ref('');
 const currentSelectionStart = ref(0);
 const currentSelectionEnd = ref(0);
+
+// 公式编辑器相关状态
+const showFormulaEditor = ref(false);
+const currentFormulaCode = ref('');
+const currentFormulaType = ref<'inline' | 'block'>('inline');
 
 let debounceTimer: number | null = null;
 let lastSavedTitle = '';
@@ -184,6 +232,11 @@ const renderContent = async () => {
       renderedContent.value = await props.renderMarkdown(content.value);
       await nextTick();
       adjustPreviewHeight();
+      
+      // 渲染所有资源占位符（Mermaid图表等）
+      if (previewElement.value) {
+        await triggerRender(previewElement);
+      }
     } catch (error) {
       console.error('Failed to render markdown:', error);
       renderedContent.value = '<p>渲染错误</p>';
@@ -192,6 +245,7 @@ const renderContent = async () => {
     renderedContent.value = '';
   }
 };
+
 
 const syncScroll = (event: Event) => {
   const textarea = event.target as HTMLTextAreaElement;
@@ -213,6 +267,11 @@ const adjustPreviewHeight = () => {
 };
 
 onMounted(() => {
+  // 设置自动渲染
+  if (previewElement.value) {
+    useAutoRender(previewElement);
+  }
+  
   if (content.value) {
     renderContent();
   }
@@ -339,6 +398,141 @@ const handleMermaidSave = (mermaidCode: string) => {
 const closeMermaidEditor = () => {
   showMermaidEditor.value = false;
   currentMermaidCode.value = '';
+  currentSelectionStart.value = 0;
+  currentSelectionEnd.value = 0;
+};
+
+// 公式编辑器相关方法
+const openFormulaEditor = () => {
+  const textarea = document.querySelector('.markdown-textarea') as HTMLTextAreaElement;
+  if (!textarea) return;
+  
+  // 获取当前选择范围
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  
+  // 尝试提取公式代码
+  const formulaCode = extractFormulaCode(content.value, start, end);
+  currentFormulaCode.value = formulaCode;
+  
+  // 确定公式类型 - 更精确的判断逻辑
+  currentFormulaType.value = determineFormulaType(content.value, start, end);
+  
+  currentSelectionStart.value = start;
+  currentSelectionEnd.value = end;
+  showFormulaEditor.value = true;
+};
+
+const extractFormulaCode = (content: string, start: number, end: number): string => {
+  // 实现公式提取逻辑
+  if (start !== end) {
+    const selectedText = content.substring(start, end);
+    // 检查是否为块级公式
+    if (selectedText.trim().startsWith('$$') && selectedText.trim().endsWith('$$')) {
+      return selectedText.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
+    }
+    // 检查是否为行内公式
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
+        !selectedText.trim().startsWith('$$')) {
+      return selectedText.replace(/^\$/, '').replace(/\$$/, '').trim();
+    }
+    return selectedText;
+  }
+  
+  // 如果没有选中文本，尝试查找光标位置附近的公式
+  const textBefore = content.substring(0, start);
+  const textAfter = content.substring(start);
+  
+  // 检查行内公式
+  const inlineMatch = textBefore.match(/\$([^$]*)$/) && textAfter.match(/^([^$]*)\$/);
+  if (inlineMatch) {
+    const beforeMatch = textBefore.match(/\$([^$]*)$/);
+    const afterMatch = textAfter.match(/^([^$]*)\$/);
+    if (beforeMatch && afterMatch) {
+      return (beforeMatch[1] + afterMatch[1]).trim();
+    }
+  }
+  
+  // 检查块级公式
+  const blockMatch = textBefore.match(/\$\$([\s\S]*)$/) && textAfter.match(/^([\s\S]*)\$\$/);
+  if (blockMatch) {
+    const beforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
+    const afterMatch = textAfter.match(/^([\s\S]*)\$\$/);
+    if (beforeMatch && afterMatch) {
+      return (beforeMatch[1] + afterMatch[1]).trim();
+    }
+  }
+  
+  return '';
+};
+
+const determineFormulaType = (content: string, start: number, end: number): 'inline' | 'block' => {
+  if (start !== end) {
+    const selectedText = content.substring(start, end);
+    // 检查是否为块级公式（以$$开头和结尾）
+    if (selectedText.trim().startsWith('$$') && selectedText.trim().endsWith('$$')) {
+      return 'block';
+    }
+    // 检查是否为行内公式（以$开头和结尾，但不是$$）
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
+        !selectedText.trim().startsWith('$$')) {
+      return 'inline';
+    }
+  }
+  
+  // 如果没有选中文本，检查光标位置附近的公式类型
+  const textBefore = content.substring(0, start);
+  const textAfter = content.substring(start);
+  
+  // 检查行内公式
+  const inlineMatch = textBefore.match(/\$([^$]*)$/) && textAfter.match(/^([^$]*)\$/);
+  if (inlineMatch) {
+    return 'inline';
+  }
+  
+  // 检查块级公式
+  const blockMatch = textBefore.match(/\$\$([\s\S]*)$/) && textAfter.match(/^([\s\S]*)\$\$/);
+  if (blockMatch) {
+    return 'block';
+  }
+  
+  // 默认返回行内公式
+  return 'inline';
+};
+
+const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inline' | 'block' }) => {
+  if (!content.value) return;
+  
+  const textarea = document.querySelector('.markdown-textarea') as HTMLTextAreaElement;
+  if (!textarea) return;
+  
+  const start = currentSelectionStart.value;
+  const end = currentSelectionEnd.value;
+  
+  let newContent = content.value;
+  const formulaType = formulaData.formulaType;
+  
+  // 根据公式类型格式化代码
+  const formattedFormula = formulaType === 'block' 
+    ? `$$${formulaData.latexCode}$$` 
+    : `$${formulaData.latexCode}$`;
+  
+  // 替换或插入公式
+  if (start !== end) {
+    newContent = content.value.substring(0, start) + formattedFormula + content.value.substring(end);
+  } else {
+    newContent = content.value.substring(0, start) + formattedFormula + content.value.substring(start);
+  }
+  
+  content.value = newContent;
+  checkChanges();
+  renderContent();
+  showFormulaEditor.value = false;
+};
+
+const closeFormulaEditor = () => {
+  showFormulaEditor.value = false;
+  currentFormulaCode.value = '';
   currentSelectionStart.value = 0;
   currentSelectionEnd.value = 0;
 };

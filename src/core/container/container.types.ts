@@ -22,6 +22,7 @@ export const TYPES = {
   
   // 基础设施
   StorageAdapter: Symbol.for('StorageAdapter'),
+  AssetManager: Symbol.for('AssetManager'),
   
   // 事件总线
   EventBus: Symbol.for('EventBus'),
