@@ -18,6 +18,10 @@ export class InversifyContainer implements ServiceContainer {
     return this.container.get<T>(serviceIdentifier);
   }
 
+  isBound(serviceIdentifier: symbol): boolean {
+    return this.container.isBound(serviceIdentifier);
+  }
+
   bind<T>(serviceIdentifier: symbol): any {
     // 检查是否已经存在绑定
     if (this.container.isBound(serviceIdentifier)) {

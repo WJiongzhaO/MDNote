@@ -53,10 +53,10 @@ export class AssetRendererService implements AssetRenderer {
   renderMermaidPlaceholder(diagram: string, assetId?: string): string {
     const id = assetId || `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const encodedDiagram = this.encodeDiagram(diagram);
-    
+
     return `
-      <div 
-        class="mermaid-asset-placeholder" 
+      <div
+        class="mermaid-asset-placeholder"
         data-asset-type="mermaid"
         data-asset-id="${id}"
         data-diagram="${encodedDiagram}"
@@ -89,10 +89,8 @@ export class AssetRendererService implements AssetRenderer {
    */
   async renderAllPlaceholders(container: HTMLElement): Promise<void> {
     const placeholders = container.querySelectorAll('.mermaid-asset-placeholder[data-asset-type="mermaid"]');
-    console.log('[AssetRenderer] 找到占位符数量:', placeholders.length);
-    
+
     if (placeholders.length === 0) {
-      console.log('[AssetRenderer] 没有找到需要渲染的占位符');
       return;
     }
 
@@ -110,13 +108,12 @@ export class AssetRendererService implements AssetRenderer {
         return;
       }
     }
-    
-    const renderPromises = Array.from(placeholders).map(placeholder => 
+
+    const renderPromises = Array.from(placeholders).map(placeholder =>
       this.renderMermaidPlaceholderAsync(placeholder as HTMLElement)
     );
 
     await Promise.allSettled(renderPromises);
-    console.log('[AssetRenderer] 所有占位符渲染完成');
   }
 
   /**
@@ -125,8 +122,6 @@ export class AssetRendererService implements AssetRenderer {
   async renderMermaidPlaceholderAsync(placeholder: HTMLElement): Promise<void> {
     const diagram = this.decodeDiagram(placeholder.getAttribute('data-diagram') || '');
     const assetId = placeholder.getAttribute('data-asset-id') || '';
-
-    console.log('[AssetRenderer] 开始渲染占位符:', assetId, '代码长度:', diagram.length);
 
     if (!diagram) {
       console.error('[AssetRenderer] Mermaid代码为空');
@@ -141,7 +136,6 @@ export class AssetRendererService implements AssetRenderer {
     }
 
     try {
-      console.log('[AssetRenderer] 调用Mermaid渲染器...');
       // 渲染Mermaid图表
       const svg = await this.mermaidRenderer.renderDiagram(diagram, {
         theme: 'default',
@@ -149,8 +143,6 @@ export class AssetRendererService implements AssetRenderer {
         fontFamily: 'inherit'
       });
 
-      console.log('[AssetRenderer] Mermaid渲染成功，SVG长度:', svg.length);
-      
       // 替换占位符内容
       placeholder.innerHTML = `
         <div class="mermaid-container" style="
@@ -167,12 +159,10 @@ export class AssetRendererService implements AssetRenderer {
           </div>
         </div>
       `;
-      
+
       // 移除占位符类，添加已渲染类
       placeholder.classList.remove('mermaid-asset-placeholder');
       placeholder.classList.add('mermaid-asset-rendered');
-      
-      console.log('[AssetRenderer] 占位符已替换为渲染结果');
 
       // 可选：保存渲染结果到资源管理器
       if (assetId && this.assetManager) {
@@ -195,7 +185,7 @@ export class AssetRendererService implements AssetRenderer {
    */
   private showError(placeholder: HTMLElement, message: string): void {
     const diagram = this.decodeDiagram(placeholder.getAttribute('data-diagram') || '');
-    
+
     placeholder.innerHTML = `
       <div class="mermaid-error" style="
         border: 1px solid #ff6b6b;

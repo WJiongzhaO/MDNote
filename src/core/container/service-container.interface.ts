@@ -4,6 +4,7 @@
 export interface ServiceContainer {
   get<T>(serviceIdentifier: symbol): T;
   bind<T>(serviceIdentifier: symbol): BindingToSyntax<T>;
+  isBound?(serviceIdentifier: symbol): boolean;
 }
 
 export interface BindingToSyntax<T> {

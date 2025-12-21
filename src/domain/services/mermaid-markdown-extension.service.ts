@@ -1,15 +1,15 @@
 import { injectable } from 'inversify';
-import type { 
-  MarkdownExtension, 
+import type {
+  MarkdownExtension,
   MermaidRenderer,
-  MermaidRenderOptions 
+  MermaidRenderOptions
 } from './markdown-processor.interface';
 
 @injectable()
 export class MermaidMarkdownExtension implements MarkdownExtension {
   name = 'mermaid';
   priority = 90; // 在数学公式之后处理
-  
+
   private mermaidRenderer?: MermaidRenderer;
   private renderOptions: MermaidRenderOptions = {};
 
@@ -24,13 +24,13 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
   tokenizer = {
     name: 'mermaid',
     level: 'block',
-    start(src: string) { 
-      return src.match(/^```mermaid\s*\n/)?.index; 
+    start(src: string) {
+      return src.match(/^```mermaid\s*\n/)?.index;
     },
     tokenizer(src: string) {
       const rule = /^```mermaid\s*\n([\s\S]*?)\n```/;
       const match = rule.exec(src);
-      
+
       if (match) {
         return {
           type: 'mermaid',
@@ -41,18 +41,16 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
       }
     },
     renderer: (token: any) => {
-      console.log('Mermaid扩展渲染器被调用（占位符方案）');
-      console.log('Token信息:', token);
-      
+
       if (token?.diagram) {
         // 使用占位符方案，避免异步Promise问题
         // 占位符包含data属性存储Mermaid代码，由前端JavaScript异步渲染
         const diagramId = 'mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const encodedDiagram = this.encodeDiagram(token.diagram);
-        
+
         return `
-          <div 
-            class="mermaid-asset-placeholder" 
+          <div
+            class="mermaid-asset-placeholder"
             data-asset-type="mermaid"
             data-asset-id="${diagramId}"
             data-diagram="${encodedDiagram}"
@@ -79,7 +77,7 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
           </div>
         `;
       }
-      
+
       // 如果没有图表代码，返回原始代码块
       const text = token?.text || '';
       return `\n<pre><code class=\"language-mermaid\">${this.escapeHtml(text)}</code></pre>\n`;

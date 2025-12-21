@@ -25,16 +25,11 @@ export class MermaidRendererService implements MermaidRenderer {
     }
 
     try {
-      console.log('开始初始化Mermaid渲染器...');
-      
       // 动态加载Mermaid库
-      console.log('动态导入Mermaid库...');
       const mermaidModule = await import('mermaid');
       const mermaid = mermaidModule.default;
-      console.log('Mermaid库导入成功');
-      
+
       // 配置Mermaid
-      console.log('配置Mermaid选项...');
       mermaid.initialize({
         startOnLoad: false,
         theme: this.defaultOptions.theme,
@@ -55,7 +50,6 @@ export class MermaidRendererService implements MermaidRenderer {
 
       this.isInitialized = true;
       this.mermaidInstance = mermaid;
-      console.log('Mermaid渲染器初始化完成');
     } catch (error) {
       console.error('Mermaid初始化失败:', error);
       console.error('错误详情:', {
@@ -68,68 +62,51 @@ export class MermaidRendererService implements MermaidRenderer {
   }
 
   async renderDiagram(diagram: string, options: MermaidRenderOptions = {}): Promise<string> {
-    console.log('Mermaid渲染器开始渲染图表');
-    console.log('输入代码:', diagram);
-    
     if (!this.isInitialized) {
-      console.log('Mermaid渲染器未初始化，开始初始化...');
       await this.initialize();
     }
 
     try {
       // 合并配置
       const renderOptions = { ...this.defaultOptions, ...options };
-      
+
       // 生成唯一的ID
       const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
-      console.log('生成图表ID:', id);
-      
+
       // 检查mermaid实例是否可用
       if (!this.mermaidInstance) {
         throw new Error('Mermaid库未加载，请检查依赖配置');
       }
-      
+
       // 渲染图表
-      console.log('开始调用mermaid.render...');
-      
       // 对于Mermaid 11.x版本，使用更兼容的API调用方式
       let svg: string;
-      
+
       try {
         // 方法1: 使用render方法并处理Promise
-        console.log('调用mermaid.render方法...');
         const result = await this.mermaidInstance.render(id, diagram);
-        console.log('Mermaid渲染结果类型:', typeof result);
-        console.log('Mermaid渲染结果:', result);
-        
+
         // 检查返回结果格式
         if (!result) {
           throw new Error('Mermaid渲染返回了空结果');
         }
-        
+
         // 根据Mermaid API，render方法可能返回包含svg属性的对象或直接返回字符串
         if (typeof result === 'string') {
           svg = result;
-          console.log('结果直接是字符串');
         } else if (result.svg && typeof result.svg === 'string') {
           svg = result.svg;
-          console.log('结果包含svg属性');
         } else if (result.bindFunctions) {
           // Mermaid 11.x可能返回包含bindFunctions的对象
           svg = result.svg || '';
-          console.log('结果包含bindFunctions');
         } else if (result instanceof Promise) {
           // 如果返回的是Promise，等待它完成
-          console.log('结果是一个Promise，等待完成...');
           const resolvedResult = await result;
-          console.log('Promise解析后的结果:', resolvedResult);
-          
+
           // 递归处理嵌套的Promise
           if (resolvedResult instanceof Promise) {
-            console.log('解析后的结果仍然是Promise，继续等待...');
             const deeplyResolved = await resolvedResult;
-            console.log('深度解析后的结果:', deeplyResolved);
-            
+
             if (typeof deeplyResolved === 'string') {
               svg = deeplyResolved;
             } else if (deeplyResolved.svg && typeof deeplyResolved.svg === 'string') {
@@ -154,40 +131,34 @@ export class MermaidRendererService implements MermaidRenderer {
         }
       } catch (renderError) {
         console.error('Mermaid render方法失败:', renderError);
-        
+
         // 方法2: 尝试使用parse方法作为备选
         try {
-          console.log('尝试使用parse方法...');
           this.mermaidInstance.parse(diagram); // 验证语法
-          
+
           // 如果语法正确，使用innerHTML方式渲染
           const tempDiv = document.createElement('div');
           tempDiv.className = 'mermaid';
           tempDiv.textContent = diagram;
-          
+
           // 让Mermaid处理DOM元素
           this.mermaidInstance.run({ nodes: [tempDiv] });
-          
+
           svg = tempDiv.innerHTML;
-          console.log('使用parse/run方法渲染成功');
         } catch (parseError) {
           console.error('备选渲染方法也失败:', parseError);
           throw renderError; // 抛出原始错误
         }
       }
-      
+
       if (typeof svg !== 'string') {
         console.error('Mermaid返回的SVG不是字符串:', typeof svg, svg);
         throw new Error('Mermaid渲染返回了非字符串结果');
       }
-      
-      console.log('Mermaid渲染成功，SVG长度:', svg.length);
-      console.log('SVG内容预览:', svg.substring(0, 100) + '...');
-      
+
       // 包装SVG以便样式控制
       const wrappedSvg = this.wrapSvg(svg, renderOptions);
-      console.log('包装后的SVG长度:', wrappedSvg.length);
-      
+
       return wrappedSvg;
     } catch (error) {
       console.error('Mermaid图表渲染失败:', error);
@@ -196,7 +167,7 @@ export class MermaidRendererService implements MermaidRenderer {
         stack: error.stack,
         name: error.name
       });
-      
+
       // 返回错误信息，但保持文档可读性
       return this.createErrorFallback(diagram, error as Error);
     }
@@ -220,7 +191,7 @@ export class MermaidRendererService implements MermaidRenderer {
       'zenuml',
       'sankey'
     ];
-    
+
     return supportedTypes.includes(diagramType.toLowerCase());
   }
 

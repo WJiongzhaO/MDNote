@@ -1,0 +1,1221 @@
+# 知识管理上下文（Knowledge Management Bounded Context）设计文档
+
+## 1. 上下文边界定义
+
+### 1.1 Knowledge Management 上下文概述
+
+**知识管理上下文**（Knowledge Management Bounded Context）是 MDNote 系统中负责知识片段（Knowledge Fragment）管理的核心上下文。该上下文专注于：
+
+- **知识片段的生命周期管理**：创建、更新、删除、查询
+- **知识片段的复用机制**：支持在多个文档中引用同一片段
+- **双向引用关系维护**：片段知道哪些文档引用了它，文档知道引用了哪些片段
+- **知识片段的组织与检索**：通过标签、标题、内容进行搜索和管理
+
+### 1.2 上下文边界
+
+#### 1.2.1 核心职责
+
+**Knowledge Management 上下文负责**：
+- ✅ 知识片段的聚合根管理（KnowledgeFragment）
+- ✅ 知识片段的 AST 结构存储和解析
+- ✅ 知识片段的资源依赖管理（assets）
+- ✅ 反向引用列表的维护
+- ✅ 知识片段的标签管理和搜索
+- ✅ 片段更新时的同步通知机制
+
+**Knowledge Management 上下文不负责**：
+- ❌ 文档的创建和管理（由 Document Core 负责）
+- ❌ Markdown 的渲染和预览（由 Document Core 负责）
+- ❌ 图片的存储和路径管理（由 Infrastructure 层负责）
+- ❌ 文档内容的编辑界面（由 Presentation 层负责）
+
+#### 1.2.2 与 Document Core 的协作方式
+
+**协作模式**：**共享内核（Shared Kernel）模式**
+
+两个上下文通过以下方式协作：
+
+1. **引用语法约定**：
+   - Document Core 在文档内容中使用 `{{ref:fragmentId}}` 语法引用知识片段
+   - Knowledge Management 提供引用解析服务（FragmentReferenceParser）
+
+2. **服务依赖**：
+   - Document Core 依赖 Knowledge Management 的 `FragmentReferenceResolver` 服务
+   - Document Core 依赖 Knowledge Management 的 `FragmentReferenceRegistrationService` 服务
+   - Knowledge Management 依赖 Document Core 的 `DocumentRepository` 接口
+
+3. **事件通知机制**：
+   - 当知识片段更新时，Knowledge Management 通过 `FragmentReferenceSyncService` 通知 Document Core
+   - Document Core 监听片段更新事件，自动刷新引用该片段的文档预览
+
+4. **数据一致性**：
+   - 引用关系在 Document 和 KnowledgeFragment 两个聚合中都有记录
+   - 通过领域服务确保双向引用的一致性
+
+### 1.3 上下文交互图
+
+```mermaid
+graph TB
+    subgraph "Knowledge Management Context"
+        KM[KnowledgeFragment<br/>聚合根]
+        KMR[KnowledgeFragmentRepository]
+        FRP[FragmentReferenceParser]
+        FRR[FragmentReferenceResolver]
+        FRRS[FragmentReferenceRegistrationService]
+        FRS[FragmentReferenceSyncService]
+    end
+    
+    subgraph "Document Core Context"
+        DC[Document<br/>聚合根]
+        DCR[DocumentRepository]
+        MP[MarkdownProcessor]
+        DU[DocumentUseCases]
+    end
+    
+    subgraph "Infrastructure Layer"
+        IMG[ImageStorageService]
+        FS[FileSystem]
+    end
+    
+    subgraph "Presentation Layer"
+        ME[MarkdownEditor]
+        KFS[KnowledgeFragmentSidebar]
+    end
+    
+    %% Knowledge Management 内部关系
+    KM --> KMR
+    FRP --> KM
+    FRR --> KMR
+    FRR --> IMG
+    FRRS --> KMR
+    FRRS --> DCR
+    FRS --> KMR
+    FRS --> DCR
+    
+    %% Document Core 内部关系
+    DC --> DCR
+    DU --> DCR
+    DU --> MP
+    DU --> FRR
+    
+    %% 跨上下文协作
+    FRRS -.->|注册引用| DC
+    FRRS -.->|添加反向引用| KM
+    FRS -.->|同步更新| DC
+    MP -.->|解析引用| FRR
+    
+    %% 表现层交互
+    ME --> DU
+    ME --> FRRS
+    KFS --> KM
+    KFS --> FRS
+    
+    %% 基础设施
+    KMR --> FS
+    DCR --> FS
+    IMG --> FS
+```
+
+### 1.4 上下文边界说明
+
+**边界规则**：
+
+1. **聚合边界**：
+   - KnowledgeFragment 是 Knowledge Management 的聚合根
+   - Document 是 Document Core 的聚合根
+   - 两个聚合通过引用关系关联，但不直接访问对方的内部状态
+
+2. **服务边界**：
+   - FragmentReferenceParser、FragmentReferenceResolver 属于 Knowledge Management
+   - MarkdownProcessor 属于 Document Core
+   - 两个上下文通过服务接口协作，不直接依赖对方的实现
+
+3. **数据边界**：
+   - 知识片段数据存储在 `data/fragments/` 目录
+   - 文档数据存储在 `data/documents/` 目录
+   - 两个上下文的数据物理隔离，通过服务层交互
+
+---
+
+## 2. KnowledgeFragment 聚合根设计
+
+### 2.1 聚合根概述
+
+**KnowledgeFragment** 是知识管理上下文的聚合根，负责管理知识片段的所有业务逻辑和状态。
+
+### 2.2 核心属性
+
+```typescript
+export class KnowledgeFragment {
+  // 聚合标识
+  private readonly id: KnowledgeFragmentId;
+  
+  // 基本信息
+  private title: KnowledgeFragmentTitle;
+  private tags: KnowledgeFragmentTags;
+  
+  // 内容结构
+  private nodes: ASTNode[];  // AST 结构
+  
+  // 资源依赖
+  private assetDependencies: KnowledgeFragmentAssetDependencies;
+  
+  // 引用关系
+  private sourceDocumentId?: string;  // 源文档ID（创建片段时的文档）
+  private referencedDocuments: FragmentReference[];  // 反向引用列表
+  
+  // 时间戳
+  private readonly createdAt: Date;
+  private updatedAt: Date;
+}
+```
+
+### 2.3 属性详细说明
+
+#### 2.3.1 AST 结构（nodes）
+
+**类型**：`ASTNode[]`
+
+**说明**：
+- 知识片段的内容以 AST（抽象语法树）形式存储
+- 支持多种节点类型：段落、标题、列表、代码块、图片、Mermaid图表等
+- AST 结构便于内容的解析、渲染和修改
+
+**节点类型**：
+```typescript
+enum NodeType {
+  PARAGRAPH = 'paragraph',
+  HEADING = 'heading',
+  LIST = 'list',
+  CODE_BLOCK = 'code_block',
+  IMAGE = 'image',
+  // ... 其他类型
+}
+```
+
+**优势**：
+- 结构化存储，便于内容分析和处理
+- 支持内容的增量更新
+- 便于实现内容的版本对比
+
+#### 2.3.2 资源依赖（assetDependencies）
+
+**类型**：`KnowledgeFragmentAssetDependencies`
+
+**说明**：
+- 记录片段中引用的所有资源（图片、Mermaid图表等）
+- 自动从 AST 节点中提取资源依赖
+- 用于资源管理和清理
+
+**依赖类型**：
+- 图片资源：`./assets/image.png`
+- Mermaid图表：通过 `assetId` 标识
+
+**自动更新机制**：
+```typescript
+private updateAssetDependencies(): void {
+  const dependencies: string[] = [];
+  
+  const extractDependencies = (node: ASTNode): void => {
+    if (node.type === NodeType.IMAGE) {
+      dependencies.push(imageNode.assetId);
+    }
+    if (node.type === NodeType.CODE_BLOCK && codeBlock.isMermaid()) {
+      dependencies.push(codeBlock.assetId);
+    }
+    // 递归处理子节点
+    node.children?.forEach(extractDependencies);
+  };
+  
+  this.nodes.forEach(extractDependencies);
+  this.assetDependencies = { value: dependencies };
+}
+```
+
+#### 2.3.3 反向引用列表（referencedDocuments）
+
+**类型**：`FragmentReference[]`
+
+**说明**：
+- 记录所有引用该片段的文档
+- 支持数据库文档和外部文件
+- 包含引用状态（已连接/已断开）
+
+**引用信息结构**：
+```typescript
+interface FragmentReference {
+  documentId: string;        // 文档ID（可能是 file: 前缀的外部文件）
+  documentTitle: string;      // 文档标题
+  referencedAt: Date;        // 引用时间
+  isConnected: boolean;      // 是否还接受片段修改
+}
+```
+
+**业务规则**：
+- 片段更新时，只同步到 `isConnected = true` 的引用
+- 用户编辑引用内容后，引用自动断开（`isConnected = false`）
+- 支持手动重新连接引用
+
+### 2.4 核心方法
+
+#### 2.4.1 工厂方法
+
+```typescript
+static create(
+  title: KnowledgeFragmentTitle,
+  nodes: ASTNode[] = [],
+  tags: string[] = []
+): KnowledgeFragment {
+  const now = new Date();
+  const id = crypto.randomUUID();
+  
+  return new KnowledgeFragment(
+    { value: id },
+    title,
+    { value: tags },
+    nodes,
+    { value: [] },  // 资源依赖自动计算
+    now,
+    now,
+    undefined,
+    []
+  );
+}
+```
+
+#### 2.4.2 内容更新方法
+
+```typescript
+updateNodes(nodes: ASTNode[]): void {
+  this.nodes = nodes;
+  this.updateAssetDependencies();  // 自动更新资源依赖
+  this.updatedAt = new Date();
+}
+```
+
+#### 2.4.3 引用管理方法
+
+```typescript
+// 添加引用文档
+addReferencedDocument(documentId: string, documentTitle: string): void {
+  const existingIndex = this.referencedDocuments.findIndex(
+    ref => ref.documentId === documentId
+  );
+  if (existingIndex === -1) {
+    this.referencedDocuments.push({
+      documentId,
+      documentTitle,
+      referencedAt: new Date(),
+      isConnected: true
+    });
+    this.updatedAt = new Date();
+  }
+}
+
+// 移除引用文档
+removeReferencedDocument(documentId: string): void {
+  const index = this.referencedDocuments.findIndex(
+    ref => ref.documentId === documentId
+  );
+  if (index !== -1) {
+    this.referencedDocuments.splice(index, 1);
+    this.updatedAt = new Date();
+  }
+}
+
+// 断开引用连接
+disconnectReference(documentId: string): void {
+  const reference = this.referencedDocuments.find(
+    ref => ref.documentId === documentId
+  );
+  if (reference) {
+    reference.isConnected = false;
+    this.updatedAt = new Date();
+  }
+}
+
+// 获取已连接的引用
+getConnectedReferences(): FragmentReference[] {
+  return this.referencedDocuments.filter(ref => ref.isConnected);
+}
+```
+
+### 2.5 聚合根类图
+
+```mermaid
+classDiagram
+    class KnowledgeFragment {
+        -id: KnowledgeFragmentId
+        -title: KnowledgeFragmentTitle
+        -tags: KnowledgeFragmentTags
+        -nodes: ASTNode[]
+        -assetDependencies: KnowledgeFragmentAssetDependencies
+        -sourceDocumentId: string?
+        -referencedDocuments: FragmentReference[]
+        -createdAt: Date
+        -updatedAt: Date
+        
+        +create(title, nodes, tags): KnowledgeFragment
+        +updateTitle(title): void
+        +updateNodes(nodes): void
+        +updateTags(tags): void
+        +addReferencedDocument(docId, docTitle): void
+        +removeReferencedDocument(docId): void
+        +disconnectReference(docId): void
+        +connectReference(docId): void
+        +getConnectedReferences(): FragmentReference[]
+        +toMarkdown(): string
+        +toJSON(): string
+        +fromJSON(json): KnowledgeFragment
+    }
+    
+    class ASTNode {
+        <<interface>>
+        +type: NodeType
+        +children: ASTNode[]
+        +toMarkdown(): string
+        +toJSON(): object
+    }
+    
+    class FragmentReference {
+        +documentId: string
+        +documentTitle: string
+        +referencedAt: Date
+        +isConnected: boolean
+    }
+    
+    class KnowledgeFragmentId {
+        +value: string
+    }
+    
+    class KnowledgeFragmentTitle {
+        +value: string
+    }
+    
+    class KnowledgeFragmentTags {
+        +value: string[]
+    }
+    
+    class KnowledgeFragmentAssetDependencies {
+        +value: string[]
+    }
+    
+    KnowledgeFragment "1" *-- "*" ASTNode
+    KnowledgeFragment "1" *-- "*" FragmentReference
+    KnowledgeFragment --> KnowledgeFragmentId
+    KnowledgeFragment --> KnowledgeFragmentTitle
+    KnowledgeFragment --> KnowledgeFragmentTags
+    KnowledgeFragment --> KnowledgeFragmentAssetDependencies
+```
+
+---
+
+## 3. 双向引用机制设计
+
+### 3.1 机制概述
+
+双向引用机制确保：
+- **正向引用**：文档通过 `{{ref:fragmentId}}` 语法引用知识片段
+- **反向引用**：知识片段记录所有引用它的文档
+- **自动同步**：片段更新时，自动通知所有已连接的引用文档
+
+### 3.2 引用语法设计
+
+#### 3.2.1 引用标志格式
+
+**基本格式**：
+```
+{{ref:fragmentId}}
+{{ref:fragmentId:linked}}      // 已连接（默认）
+{{ref:fragmentId:detached}}    // 已断开
+```
+
+**示例**：
+```markdown
+这是一个段落。
+
+{{ref:abc-123-def}}
+
+这是另一个段落。
+```
+
+#### 3.2.2 引用状态
+
+- **linked（已连接）**：片段更新时，文档内容自动同步
+- **detached（已断开）**：片段更新时，文档内容不受影响
+
+### 3.3 双向引用维护机制
+
+#### 3.3.1 引用注册流程
+
+当文档中插入 `{{ref:fragmentId}}` 时：
+
+1. **解析引用标志**：`FragmentReferenceParser` 解析文档内容，提取所有引用
+2. **注册正向引用**：在 Document 聚合中添加引用信息
+3. **注册反向引用**：在 KnowledgeFragment 聚合中添加引用文档信息
+
+#### 3.3.2 引用同步流程
+
+当知识片段更新时：
+
+1. **获取已连接引用**：从 KnowledgeFragment 获取所有 `isConnected = true` 的引用
+2. **通知引用文档**：通过 `FragmentReferenceSyncService` 通知所有引用文档
+3. **更新文档引用信息**：更新 Document 中的片段标题等信息
+4. **刷新预览**：Document Core 自动刷新文档预览
+
+### 3.4 领域服务设计
+
+#### 3.4.1 FragmentReferenceParser（引用解析器）
+
+**职责**：解析文档中的引用标志
+
+```typescript
+@injectable()
+export class FragmentReferenceParser {
+  private readonly REF_PATTERN = /\{\{ref:([a-zA-Z0-9-]+)(?::(linked|detached))?\}\}/g;
+  
+  parseReferences(content: string): FragmentReferenceMatch[] {
+    // 解析所有引用标志
+    // 返回引用信息（fragmentId、位置、状态等）
+  }
+  
+  extractFragmentIds(content: string): string[] {
+    // 提取所有引用的片段ID
+  }
+}
+```
+
+#### 3.4.2 FragmentReferenceRegistrationService（引用注册服务）
+
+**职责**：注册和管理引用关系
+
+```typescript
+@injectable()
+export class FragmentReferenceRegistrationService {
+  // 注册引用（双向）
+  async registerReference(
+    documentId: string,
+    fragmentId: string,
+    position: number,
+    length: number
+  ): Promise<void> {
+    // 1. 在 Document 中添加引用信息
+    document.addFragmentReference(fragmentId, fragmentTitle, position, length);
+    
+    // 2. 在 KnowledgeFragment 中添加反向引用
+    fragment.addReferencedDocument(documentId, documentTitle);
+    
+    // 3. 保存两个聚合
+    await this.documentRepository.save(document);
+    await this.fragmentRepository.save(fragment);
+  }
+  
+  // 取消注册引用
+  async unregisterReference(
+    documentId: string,
+    fragmentId: string
+  ): Promise<void> {
+    // 从两个聚合中移除引用关系
+  }
+}
+```
+
+#### 3.4.3 FragmentReferenceSyncService（引用同步服务）
+
+**职责**：同步片段更新到所有引用文档
+
+```typescript
+@injectable()
+export class FragmentReferenceSyncService {
+  async syncFragmentUpdate(fragmentId: string): Promise<void> {
+    // 1. 获取片段
+    const fragment = await this.fragmentRepository.findById({ value: fragmentId });
+    
+    // 2. 获取所有已连接的引用
+    const connectedReferences = fragment.getConnectedReferences();
+    
+    // 3. 更新每个引用文档
+    for (const ref of connectedReferences) {
+      if (ref.documentId.startsWith('file:')) {
+        // 外部文件：更新文件缓存
+        await this.syncExternalFile(ref.documentId, fragmentId, fragmentMarkdown);
+      } else {
+        // 数据库文档：更新文档引用信息
+        const document = await this.documentRepository.findById({ value: ref.documentId });
+        // 更新文档中的片段标题等信息
+        // 注意：文档内容中保持引用标志，不替换为实际内容
+        await this.documentRepository.save(document);
+      }
+    }
+  }
+}
+```
+
+**设计要点**：
+- 只同步已连接的引用（`isConnected = true`）
+- 文档内容中保持引用标志 `{{ref:fragmentId}}`，不替换为实际内容
+- 实际内容替换在预览/导出时通过 `FragmentReferenceResolver` 进行
+
+#### 3.4.4 FragmentReferenceResolver（引用解析服务）
+
+**职责**：在预览/导出时，将引用标志替换为片段内容
+
+```typescript
+@injectable()
+export class FragmentReferenceResolver {
+  async resolveReferences(content: string, documentId: string): Promise<string> {
+    // 1. 解析所有引用标志
+    const references = this.parser.parseReferences(content);
+    
+    // 2. 从后往前替换，避免索引偏移
+    for (let i = references.length - 1; i >= 0; i--) {
+      const ref = references[i];
+      
+      // 3. 获取片段内容
+      const fragment = await this.fragmentRepository.findById({ value: ref.fragmentId });
+      
+      // 4. 处理图片路径（复制到文档的assets目录）
+      let fragmentMarkdown = fragment.toMarkdown();
+      // ... 处理图片路径 ...
+      
+      // 5. 替换引用标志为片段内容
+      resolvedContent = this.replaceAt(
+        resolvedContent,
+        ref.startIndex,
+        ref.endIndex,
+        fragmentMarkdown
+      );
+    }
+    
+    return resolvedContent;
+  }
+}
+```
+
+### 3.5 双向引用机制类图
+
+```mermaid
+classDiagram
+    class FragmentReferenceParser {
+        -REF_PATTERN: RegExp
+        +parseReferences(content): FragmentReferenceMatch[]
+        +extractFragmentIds(content): string[]
+    }
+    
+    class FragmentReferenceRegistrationService {
+        -documentRepository: DocumentRepository
+        -fragmentRepository: KnowledgeFragmentRepository
+        -parser: FragmentReferenceParser
+        +registerReference(docId, fragId, pos, len): Promise~void~
+        +unregisterReference(docId, fragId): Promise~void~
+        +registerReferencesFromContent(docId, content): Promise~void~
+    }
+    
+    class FragmentReferenceSyncService {
+        -documentRepository: DocumentRepository
+        -fragmentRepository: KnowledgeFragmentRepository
+        -parser: FragmentReferenceParser
+        +syncFragmentUpdate(fragmentId): Promise~void~
+        +getDocumentsToSync(fragmentId): Promise~string[]~
+    }
+    
+    class FragmentReferenceResolver {
+        -fragmentRepository: KnowledgeFragmentRepository
+        -imageStorage: ImageStorageService
+        -parser: FragmentReferenceParser
+        +resolveReferences(content, docId): Promise~string~
+        +resolveReference(fragId, docId): Promise~string~
+    }
+    
+    class Document {
+        +addFragmentReference(fragId, title, pos, len): void
+        +removeFragmentReference(fragId): void
+        +getFragmentReferences(): DocumentFragmentReference[]
+    }
+    
+    class KnowledgeFragment {
+        +addReferencedDocument(docId, docTitle): void
+        +removeReferencedDocument(docId): void
+        +getConnectedReferences(): FragmentReference[]
+    }
+    
+    FragmentReferenceParser --> FragmentReferenceMatch
+    FragmentReferenceRegistrationService --> Document
+    FragmentReferenceRegistrationService --> KnowledgeFragment
+    FragmentReferenceSyncService --> Document
+    FragmentReferenceSyncService --> KnowledgeFragment
+    FragmentReferenceResolver --> KnowledgeFragment
+```
+
+---
+
+## 4. 用例 7：建立双向引用详细设计
+
+### 4.1 用例描述
+
+**用例名称**：建立双向引用
+
+**参与者**：用户
+
+**前置条件**：
+- 用户已创建知识片段
+- 用户正在编辑文档
+
+**后置条件**：
+- 文档中插入了引用标志 `{{ref:fragmentId}}`
+- 知识片段的反向引用列表已更新
+- 文档的引用信息已记录
+- 片段管理界面显示引用文档数量
+
+**主要流程**：
+1. 用户在文档中插入知识片段引用
+2. 系统解析引用标志 `{{ref:fragmentId}}`
+3. 系统注册正向引用（Document → KnowledgeFragment）
+4. 系统注册反向引用（KnowledgeFragment → Document）
+5. 系统更新片段管理界面，显示引用文档数量
+
+### 4.2 序列图
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Editor as MarkdownEditor
+    participant UC as DocumentUseCases
+    participant Parser as FragmentReferenceParser
+    participant RegService as FragmentReferenceRegistrationService
+    participant DocRepo as DocumentRepository
+    participant FragRepo as KnowledgeFragmentRepository
+    participant Document as Document实体
+    participant Fragment as KnowledgeFragment实体
+    participant Sidebar as KnowledgeFragmentSidebar
+    participant UI as 片段管理界面
+
+    User->>Editor: 插入知识片段引用
+    Editor->>Editor: 插入 {{ref:fragmentId}} 到内容
+    
+    Note over Editor: 内容变化触发引用注册
+    Editor->>UC: updateDocument(id, title, content)
+    
+    UC->>Parser: parseReferences(content)
+    Parser-->>UC: FragmentReferenceMatch[]
+    
+    loop 每个引用
+        UC->>RegService: registerReference(docId, fragId, pos, len)
+        
+        RegService->>DocRepo: findById(docId)
+        DocRepo-->>RegService: Document实体
+        
+        RegService->>FragRepo: findById(fragId)
+        FragRepo-->>RegService: KnowledgeFragment实体
+        
+        RegService->>Document: addFragmentReference(fragId, title, pos, len)
+        Document-->>RegService: 已添加引用信息
+        
+        RegService->>Fragment: addReferencedDocument(docId, docTitle)
+        Fragment-->>RegService: 已添加反向引用
+        
+        RegService->>DocRepo: save(document)
+        RegService->>FragRepo: save(fragment)
+    end
+    
+    RegService-->>UC: 注册完成
+    UC-->>Editor: DocumentResponse
+    
+    Note over Editor: 通知片段管理界面更新
+    Editor->>Sidebar: fragment-updated 事件
+    Sidebar->>FragRepo: findById(fragmentId)
+    FragRepo-->>Sidebar: KnowledgeFragment实体
+    Sidebar->>Fragment: getReferencedDocuments()
+    Fragment-->>Sidebar: FragmentReference[]
+    Sidebar->>UI: 更新引用文档数量显示
+    UI-->>User: 显示引用数量
+```
+
+### 4.3 正向渲染流程
+
+**正向渲染**：在预览/导出时，将引用标志替换为片段内容
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Editor as MarkdownEditor
+    participant UC as DocumentUseCases
+    participant Resolver as FragmentReferenceResolver
+    participant Parser as FragmentReferenceParser
+    participant FragRepo as KnowledgeFragmentRepository
+    participant Fragment as KnowledgeFragment实体
+    participant ImageStorage as ImageStorageService
+    participant Processor as MarkdownProcessor
+    participant Preview as 预览界面
+
+    User->>Editor: 切换到预览模式
+    Editor->>UC: renderMarkdown(content, documentId)
+    
+    UC->>Resolver: resolveReferences(content, documentId)
+    
+    Resolver->>Parser: parseReferences(content)
+    Parser-->>Resolver: FragmentReferenceMatch[]
+    
+    loop 每个引用（从后往前）
+        Resolver->>FragRepo: findById(fragmentId)
+        FragRepo-->>Resolver: KnowledgeFragment实体
+        
+        Resolver->>Fragment: toMarkdown()
+        Fragment-->>Resolver: fragmentMarkdown
+        
+        Resolver->>ImageStorage: copyImagesFromFragmentToDocument(fragId, docId, paths)
+        ImageStorage-->>Resolver: pathMap
+        
+        Resolver->>Resolver: 替换图片路径
+        Resolver->>Resolver: 替换引用标志为片段内容
+    end
+    
+    Resolver-->>UC: resolvedContent（已替换引用标志）
+    
+    UC->>Processor: processMarkdown(resolvedContent)
+    Processor-->>UC: HTML字符串
+    
+    UC-->>Editor: renderedContent
+    Editor->>Preview: 更新预览内容
+    Preview-->>User: 显示片段内容
+```
+
+### 4.4 反向引用注册流程
+
+**反向引用注册**：在片段中添加引用文档信息
+
+```mermaid
+sequenceDiagram
+    participant RegService as FragmentReferenceRegistrationService
+    participant DocRepo as DocumentRepository
+    participant FragRepo as KnowledgeFragmentRepository
+    participant Document as Document实体
+    participant Fragment as KnowledgeFragment实体
+
+    RegService->>DocRepo: findById(documentId)
+    DocRepo-->>RegService: Document实体
+    
+    RegService->>FragRepo: findById(fragmentId)
+    FragRepo-->>RegService: KnowledgeFragment实体
+    
+    RegService->>Document: getTitle()
+    Document-->>RegService: documentTitle
+    
+    RegService->>Fragment: getTitle()
+    Fragment-->>RegService: fragmentTitle
+    
+    RegService->>Document: addFragmentReference(fragId, fragTitle, pos, len)
+    Note over Document: 在 Document 的 fragmentReferences 数组中<br/>添加引用信息
+    
+    RegService->>Fragment: addReferencedDocument(docId, docTitle)
+    Note over Fragment: 在 KnowledgeFragment 的<br/>referencedDocuments 数组中<br/>添加反向引用信息
+    
+    RegService->>DocRepo: save(document)
+    RegService->>FragRepo: save(fragment)
+    
+    Note over Fragment: 片段的反向引用列表已更新
+```
+
+### 4.5 片段管理界面更新流程
+
+**界面更新**：片段管理界面显示引用文档数量
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Sidebar as KnowledgeFragmentSidebar
+    participant UC as KnowledgeFragmentUseCases
+    participant FragRepo as KnowledgeFragmentRepository
+    participant Fragment as KnowledgeFragment实体
+    participant UI as 片段管理界面
+
+    Note over Sidebar: 引用注册完成后触发
+    Sidebar->>Sidebar: 接收 fragment-updated 事件
+    
+    Sidebar->>UC: getFragment(fragmentId)
+    UC->>FragRepo: findById(fragmentId)
+    FragRepo-->>UC: KnowledgeFragment实体
+    UC->>Fragment: getReferencedDocuments()
+    Fragment-->>UC: FragmentReference[]
+    UC-->>Sidebar: KnowledgeFragmentResponse
+    
+    Sidebar->>UI: 更新引用文档数量
+    Note over UI: 显示引用数量：<br/>"被 3 个文档引用"
+    UI-->>User: 界面已更新
+```
+
+### 4.6 完整交互流程
+
+**完整流程**：从插入引用到界面更新的完整交互
+
+```mermaid
+graph TB
+    A[用户在文档中插入片段引用] --> B[插入 {{ref:fragmentId}}]
+    B --> C[内容变化触发更新]
+    C --> D[FragmentReferenceParser 解析引用]
+    D --> E[FragmentReferenceRegistrationService 注册引用]
+    E --> F[Document 添加正向引用]
+    E --> G[KnowledgeFragment 添加反向引用]
+    F --> H[保存 Document]
+    G --> I[保存 KnowledgeFragment]
+    H --> J[触发 fragment-updated 事件]
+    I --> J
+    J --> K[KnowledgeFragmentSidebar 接收事件]
+    K --> L[刷新片段列表]
+    L --> M[显示引用文档数量]
+    
+    style A fill:#e1f5ff
+    style M fill:#c8e6c9
+```
+
+---
+
+## 5. 质量属性分析
+
+### 5.1 一致性（Consistency）
+
+#### 5.1.1 数据一致性保障
+
+**问题**：双向引用关系需要在 Document 和 KnowledgeFragment 两个聚合中保持一致。
+
+**解决方案**：
+
+1. **事务性操作**：
+   - `FragmentReferenceRegistrationService` 确保正向引用和反向引用在同一事务中完成
+   - 如果任一操作失败，整个注册过程回滚
+
+2. **聚合边界保护**：
+   - Document 和 KnowledgeFragment 不直接访问对方的内部状态
+   - 通过领域服务（FragmentReferenceRegistrationService）协调两个聚合
+
+3. **一致性检查**：
+   ```typescript
+   // 在引用注册时进行一致性检查
+   async registerReference(...): Promise<void> {
+     // 1. 验证片段存在
+     const fragment = await this.fragmentRepository.findById({ value: fragmentId });
+     if (!fragment) {
+       throw new Error(`Fragment ${fragmentId} not found`);
+     }
+     
+     // 2. 验证文档存在
+     const document = await this.documentRepository.findById({ value: documentId });
+     if (!document) {
+       throw new Error(`Document ${documentId} not found`);
+     }
+     
+     // 3. 同时更新两个聚合
+     document.addFragmentReference(...);
+     fragment.addReferencedDocument(...);
+     
+     // 4. 同时保存
+     await Promise.all([
+       this.documentRepository.save(document),
+       this.fragmentRepository.save(fragment)
+     ]);
+   }
+   ```
+
+#### 5.1.2 引用状态一致性
+
+**问题**：引用状态（isConnected）需要在 Document 和 KnowledgeFragment 中保持一致。
+
+**解决方案**：
+- 引用状态以 KnowledgeFragment 中的 `referencedDocuments[].isConnected` 为准
+- Document 中的 `fragmentReferences[].isConnected` 作为缓存，用于快速查询
+- 片段更新时，同步更新 Document 中的引用状态
+
+### 5.2 可维护性（Maintainability）
+
+#### 5.2.1 代码组织
+
+**分层架构**：
+```
+Knowledge Management Context
+├── Domain Layer
+│   ├── entities/
+│   │   └── knowledge-fragment.entity.ts (聚合根)
+│   ├── services/
+│   │   ├── fragment-reference-parser.service.ts
+│   │   ├── fragment-reference-resolver.service.ts
+│   │   ├── fragment-reference-registration.service.ts
+│   │   └── fragment-reference-sync.service.ts
+│   └── repositories/
+│       └── knowledge-fragment.repository.interface.ts
+├── Application Layer
+│   └── usecases/
+│       └── knowledge-fragment.usecases.ts
+└── Infrastructure Layer
+    └── repositories/
+        └── file-system.knowledge-fragment.repository.impl.ts
+```
+
+**设计原则**：
+- **单一职责**：每个服务只负责一个明确的职责
+- **依赖倒置**：Domain 层定义接口，Infrastructure 层实现
+- **开闭原则**：通过接口扩展，无需修改现有代码
+
+#### 5.2.2 扩展性
+
+**引用形态扩展**：
+- 当前支持 `linked` 和 `detached` 两种形态
+- 未来可以扩展更多形态（如 `readonly`、`editable` 等）
+- 通过 `FragmentReferenceMode` 枚举管理，易于扩展
+
+**存储扩展**：
+- 当前使用文件系统存储
+- 通过 Repository 接口抽象，可以轻松切换到数据库存储
+- 不影响 Domain 层和 Application 层代码
+
+#### 5.2.3 可测试性
+
+**单元测试**：
+- Domain 层实体可以完全脱离 Infrastructure 层进行测试
+- 领域服务可以通过 Mock Repository 进行测试
+- 引用解析逻辑可以独立测试
+
+**集成测试**：
+- 通过依赖注入，可以注入测试用的 Repository 实现
+- 可以测试完整的引用注册和同步流程
+
+### 5.3 性能（Performance）
+
+#### 5.3.1 引用解析性能
+
+**优化策略**：
+- 引用解析使用正则表达式，性能高效
+- 解析结果可以缓存，避免重复解析
+- 批量处理多个引用，减少数据库查询
+
+#### 5.3.2 同步更新性能
+
+**优化策略**：
+- 片段更新时，只同步已连接的引用（`isConnected = true`）
+- 异步处理同步更新，不阻塞用户操作
+- 批量更新多个文档，减少数据库操作次数
+
+**代码示例**：
+```typescript
+async syncFragmentUpdate(fragmentId: string): Promise<void> {
+  const fragment = await this.fragmentRepository.findById({ value: fragmentId });
+  const connectedReferences = fragment.getConnectedReferences();
+  
+  // 只处理已连接的引用
+  if (connectedReferences.length === 0) {
+    return;
+  }
+  
+  // 异步批量更新
+  const updatePromises = connectedReferences.map(ref => 
+    this.updateDocumentReference(ref.documentId, fragmentId)
+  );
+  
+  await Promise.all(updatePromises);
+}
+```
+
+### 5.4 可靠性（Reliability）
+
+#### 5.4.1 错误处理
+
+**异常处理策略**：
+- 引用注册失败时，回滚所有操作
+- 片段同步失败时，记录错误但不影响其他引用
+- 提供详细的错误信息，便于问题排查
+
+#### 5.4.2 数据恢复
+
+**恢复机制**：
+- 引用关系数据持久化到文件系统
+- 支持从备份恢复引用关系
+- 提供引用关系修复工具（未来扩展）
+
+---
+
+## 6. 与"知识复用"机制的对应关系
+
+### 6.1 知识复用机制概述
+
+**知识复用**是 MDNote 系统的核心价值主张，允许用户：
+- 创建可复用的知识片段
+- 在多个文档中引用同一片段
+- 片段更新时自动同步到所有引用文档
+
+### 6.2 机制映射关系
+
+#### 6.2.1 知识片段创建 → KnowledgeFragment 聚合根
+
+**对应关系**：
+- **分析模型**：知识片段是知识复用的基本单元
+- **设计模型**：KnowledgeFragment 聚合根管理片段的完整生命周期
+
+**实现**：
+```typescript
+// 创建知识片段
+const fragment = KnowledgeFragment.create(
+  { value: title },
+  nodes,
+  tags
+);
+```
+
+#### 6.2.2 引用语法 → FragmentReferenceParser
+
+**对应关系**：
+- **分析模型**：文档通过特殊语法引用知识片段
+- **设计模型**：FragmentReferenceParser 解析 `{{ref:fragmentId}}` 语法
+
+**实现**：
+```typescript
+// 解析引用标志
+const references = parser.parseReferences(content);
+// 返回: [{ fragmentId: 'abc-123', startIndex: 10, endIndex: 25, ... }]
+```
+
+#### 6.2.3 正向引用 → Document 聚合根
+
+**对应关系**：
+- **分析模型**：文档记录引用了哪些片段
+- **设计模型**：Document 聚合根维护 `fragmentReferences` 列表
+
+**实现**：
+```typescript
+// 文档中添加引用信息
+document.addFragmentReference(
+  fragmentId,
+  fragmentTitle,
+  position,
+  length
+);
+```
+
+#### 6.2.4 反向引用 → KnowledgeFragment 聚合根
+
+**对应关系**：
+- **分析模型**：片段记录哪些文档引用了它
+- **设计模型**：KnowledgeFragment 聚合根维护 `referencedDocuments` 列表
+
+**实现**：
+```typescript
+// 片段中添加反向引用
+fragment.addReferencedDocument(documentId, documentTitle);
+```
+
+#### 6.2.5 自动同步 → FragmentReferenceSyncService
+
+**对应关系**：
+- **分析模型**：片段更新时自动同步到所有引用文档
+- **设计模型**：FragmentReferenceSyncService 实现同步逻辑
+
+**实现**：
+```typescript
+// 同步片段更新
+await syncService.syncFragmentUpdate(fragmentId);
+// 自动更新所有已连接的引用文档
+```
+
+#### 6.2.6 内容渲染 → FragmentReferenceResolver
+
+**对应关系**：
+- **分析模型**：预览/导出时，引用标志替换为片段内容
+- **设计模型**：FragmentReferenceResolver 实现内容替换逻辑
+
+**实现**：
+```typescript
+// 解析并替换引用标志
+const resolvedContent = await resolver.resolveReferences(content, documentId);
+// 返回: 引用标志已替换为片段内容的 Markdown
+```
+
+### 6.3 知识复用机制完整流程
+
+```mermaid
+graph LR
+    A[创建知识片段] --> B[KnowledgeFragment 聚合根]
+    B --> C[在文档中插入引用]
+    C --> D[FragmentReferenceParser 解析]
+    D --> E[FragmentReferenceRegistrationService 注册]
+    E --> F[Document 添加正向引用]
+    E --> G[KnowledgeFragment 添加反向引用]
+    H[片段更新] --> I[FragmentReferenceSyncService 同步]
+    I --> J[更新所有引用文档]
+    K[预览/导出] --> L[FragmentReferenceResolver 解析]
+    L --> M[替换为片段内容]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff9c4
+    style E fill:#c8e6c9
+    style I fill:#ffccbc
+    style L fill:#f3e5f5
+```
+
+---
+
+## 7. 总结
+
+### 7.1 设计要点总结
+
+1. **上下文边界清晰**：
+   - Knowledge Management 上下文专注于知识片段管理
+   - 与 Document Core 通过服务接口协作，保持松耦合
+
+2. **聚合根设计合理**：
+   - KnowledgeFragment 作为聚合根，管理片段的完整生命周期
+   - 包含 AST 结构、资源依赖、反向引用等核心属性
+
+3. **双向引用机制完善**：
+   - 正向引用：Document → KnowledgeFragment
+   - 反向引用：KnowledgeFragment → Document
+   - 通过领域服务确保引用关系的一致性
+
+4. **质量属性保障**：
+   - **一致性**：通过事务性操作和一致性检查保障
+   - **可维护性**：清晰的分层架构和职责分离
+   - **性能**：异步处理和批量操作优化
+   - **可靠性**：完善的错误处理和数据恢复机制
+
+### 7.2 与知识复用机制的对应
+
+- ✅ 知识片段创建 → KnowledgeFragment 聚合根
+- ✅ 引用语法解析 → FragmentReferenceParser
+- ✅ 正向引用维护 → Document 聚合根
+- ✅ 反向引用维护 → KnowledgeFragment 聚合根
+- ✅ 自动同步机制 → FragmentReferenceSyncService
+- ✅ 内容渲染机制 → FragmentReferenceResolver
+
+### 7.3 未来扩展方向
+
+1. **引用关系可视化**：图形化显示片段和文档之间的引用关系
+2. **引用统计**：统计片段被引用次数、最常用片段等
+3. **智能推荐**：根据文档内容推荐相关片段
+4. **引用版本管理**：支持引用关系的版本历史
+5. **批量操作**：批量断开/连接引用、批量更新等
+
+---
+
+## 附录：关键代码位置
+
+### Domain 层
+- `src/domain/entities/knowledge-fragment.entity.ts` - KnowledgeFragment 聚合根
+- `src/domain/services/fragment-reference-parser.service.ts` - 引用解析器
+- `src/domain/services/fragment-reference-resolver.service.ts` - 引用解析服务
+- `src/domain/services/fragment-reference-registration.service.ts` - 引用注册服务
+- `src/domain/services/fragment-reference-sync.service.ts` - 引用同步服务
+- `src/domain/repositories/knowledge-fragment.repository.interface.ts` - 仓储接口
+
+### Application 层
+- `src/application/usecases/knowledge-fragment.usecases.ts` - 知识片段用例
+- `src/application/dto/knowledge-fragment.dto.ts` - 知识片段 DTO
+
+### Infrastructure 层
+- `src/infrastructure/repositories/file-system.knowledge-fragment.repository.impl.ts` - 文件系统仓储实现
+
+### Presentation 层
+- `src/presentation/components/KnowledgeFragmentSidebar.vue` - 片段管理界面
+- `src/presentation/composables/useKnowledgeFragments.ts` - 片段组合式函数
+
+---
+
+**文档版本**：v1.0  
+**最后更新**：2024年  
+**作者**：成员 B

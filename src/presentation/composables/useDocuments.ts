@@ -160,9 +160,9 @@ export function useDocuments() {
     }
   };
 
-  const renderMarkdown = async (content: string) => {
+  const renderMarkdown = async (content: string, documentId?: string) => {
     try {
-      return await documentUseCases.renderMarkdown(content);
+      return await documentUseCases.renderMarkdown(content, documentId);
     } catch (err) {
       console.error('Error rendering markdown:', err);
       return '';

@@ -21,13 +21,13 @@ export function useAssetRenderer() {
     try {
       const container = InversifyContainer.getInstance();
       assetRenderer = container.get<AssetRendererService>(AssetRendererService);
-      
+
       // 如果渲染器还没有初始化依赖，等待一下
       if (!assetRenderer) {
         await new Promise(resolve => setTimeout(resolve, 100));
         assetRenderer = container.get<AssetRendererService>(AssetRendererService);
       }
-      
+
       return assetRenderer;
     } catch (error) {
       console.error('初始化资源渲染器失败:', error);
@@ -40,7 +40,7 @@ export function useAssetRenderer() {
    */
   const renderPlaceholders = async (container: HTMLElement | Ref<HTMLElement | undefined>) => {
     const renderer = await initializeRenderer();
-    
+
     if (!renderer) {
       console.warn('资源渲染器未初始化，尝试直接渲染...');
       // 如果渲染器未初始化，尝试直接使用Mermaid渲染
@@ -48,8 +48,8 @@ export function useAssetRenderer() {
       return;
     }
 
-    const element = container instanceof HTMLElement 
-      ? container 
+    const element = container instanceof HTMLElement
+      ? container
       : container.value;
 
     if (!element) {
@@ -57,10 +57,8 @@ export function useAssetRenderer() {
       return;
     }
 
-    console.log('开始渲染占位符，容器:', element);
     const placeholders = element.querySelectorAll('.mermaid-asset-placeholder[data-asset-type="mermaid"]');
-    console.log('找到占位符数量:', placeholders.length);
-    
+
     await renderer.renderAllPlaceholders(element);
   };
 
@@ -68,8 +66,8 @@ export function useAssetRenderer() {
    * 直接渲染占位符（备用方案）
    */
   const renderPlaceholdersDirectly = async (container: HTMLElement | Ref<HTMLElement | undefined>) => {
-    const element = container instanceof HTMLElement 
-      ? container 
+    const element = container instanceof HTMLElement
+      ? container
       : container.value;
 
     if (!element) {
@@ -77,13 +75,12 @@ export function useAssetRenderer() {
     }
 
     const placeholders = element.querySelectorAll('.mermaid-asset-placeholder[data-asset-type="mermaid"]');
-    console.log('直接渲染模式：找到占位符数量:', placeholders.length);
 
     // 尝试从容器获取MermaidRenderer
     try {
       const container = InversifyContainer.getInstance();
       const mermaidRenderer = container.get(TYPES.MermaidRenderer);
-      
+
       if (mermaidRenderer) {
         for (const placeholder of Array.from(placeholders)) {
           const diagram = decodeDiagram(placeholder.getAttribute('data-diagram') || '');
@@ -94,7 +91,7 @@ export function useAssetRenderer() {
                 securityLevel: 'loose',
                 fontFamily: 'inherit'
               });
-              
+
               placeholder.innerHTML = `
                 <div class="mermaid-container" style="
                   background-color: transparent;
@@ -110,7 +107,7 @@ export function useAssetRenderer() {
                   </div>
                 </div>
               `;
-              
+
               placeholder.classList.remove('mermaid-asset-placeholder');
               placeholder.classList.add('mermaid-asset-rendered');
             } catch (error) {
@@ -141,7 +138,7 @@ export function useAssetRenderer() {
   const useAutoRender = (containerRef: Ref<HTMLElement | undefined>) => {
     onMounted(async () => {
       await nextTick();
-      
+
       // 延迟一点时间确保DOM完全渲染
       setTimeout(async () => {
         await renderPlaceholders(containerRef);

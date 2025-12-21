@@ -1,16 +1,16 @@
 import { injectable } from 'inversify';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import type { 
-  MarkdownProcessor, 
-  MarkdownExtension, 
-  TemplateProcessor, 
-  MathRenderer, 
+import type {
+  MarkdownProcessor,
+  MarkdownExtension,
+  TemplateProcessor,
+  MathRenderer,
   MermaidRenderer,
-  DocumentProcessor, 
-  ProcessedDocument, 
-  DocumentMetadata, 
-  DocumentProcessingOptions 
+  DocumentProcessor,
+  ProcessedDocument,
+  DocumentMetadata,
+  DocumentProcessingOptions
 } from './markdown-processor.interface';
 
 // Mermaid图表缓存接口
@@ -42,12 +42,12 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   private templateProcessor?: TemplateProcessor;
   private mathRenderer?: MathRenderer;
   private mermaidRenderer?: MermaidRenderer;
-  
+
   // Mermaid图表缓存
   private mermaidCache: Map<string, MermaidCacheEntry> = new Map();
   private cacheMaxSize = 100; // 最大缓存条目数
   private cacheTimeout = 5 * 60 * 1000; // 缓存超时时间（5分钟）
-  
+
   // 图表存储管理
   private chartStorage: Map<string, ChartStorageEntry> = new Map();
 
@@ -92,7 +92,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
         }
       }
     });
-    
+
     // 默认注册Mermaid扩展（使用占位符方案）
     this.registerExtension({
       name: 'mermaid',
@@ -100,13 +100,13 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
       tokenizer: {
         name: 'mermaid',
         level: 'block',
-        start(src: string) { 
-          return src.match(/^```mermaid\s*\n/)?.index; 
+        start(src: string) {
+          return src.match(/^```mermaid\s*\n/)?.index;
         },
         tokenizer(src: string) {
           const rule = /^```mermaid\s*\n([\s\S]*?)\n```/;
           const match = rule.exec(src);
-          
+
           if (match) {
             return {
               type: 'mermaid',
@@ -122,10 +122,10 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
             // 占位符包含data属性存储Mermaid代码，由前端JavaScript异步渲染
             const diagramId = 'mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
             const encodedDiagram = this.encodeDiagram(token.diagram);
-            
+
             return `
-              <div 
-                class="mermaid-asset-placeholder" 
+              <div
+                class="mermaid-asset-placeholder"
                 data-asset-type="mermaid"
                 data-asset-id="${diagramId}"
                 data-diagram="${encodedDiagram}"
@@ -152,7 +152,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
               </div>
             `;
           }
-          
+
           // 如果没有图表代码，返回原始代码块
           const text = token?.text || '';
           return `\n<pre><code class=\"language-mermaid\">${this.escapeHtml(text)}</code></pre>\n`;
@@ -162,9 +162,6 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   }
 
   async processMarkdown(content: string): Promise<string> {
-    console.log('Markdown处理器开始处理内容');
-    console.log('输入内容长度:', content.length);
-    
     // 预处理扩展
     let processedContent = content;
     for (const extension of this.getExtensionsByPriority()) {
@@ -179,9 +176,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
     }
 
     // Markdown 转换
-    console.log('开始Markdown转换...');
     let html = marked(processedContent) as string;
-    console.log('Markdown转换完成，HTML长度:', html.length);
 
     // 后处理扩展
     for (const extension of this.getExtensionsByPriority()) {
@@ -191,19 +186,17 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
     }
 
     // 安全清理
-    console.log('开始HTML安全清理...');
     const result = DOMPurify.sanitize(html);
-    console.log('HTML安全清理完成，结果长度:', result.length);
-    
+
     return result;
   }
 
   async processDocument(content: string, options: DocumentProcessingOptions = {}): Promise<ProcessedDocument> {
-    const { 
-      variables = {}, 
-      templateEngine = false, 
-      mathRendering = true, 
-      sanitize = true 
+    const {
+      variables = {},
+      templateEngine = false,
+      mathRendering = true,
+      sanitize = true
     } = options;
 
     let processedContent = content;
@@ -223,9 +216,9 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
 
     // 提取元数据
     const metadata = this.extractMetadata(content);
-    
+
     // 提取变量
-    const extractedVariables = this.templateProcessor ? 
+    const extractedVariables = this.templateProcessor ?
       this.templateProcessor.extractVariables(content) : [];
 
     // 提取引用（未来功能）
@@ -301,7 +294,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   private extractMetadata(content: string): DocumentMetadata {
     const title = this.extractTitle(content);
     const slug = this.generateSlug(title);
-    
+
     // 计算字数
     const textContent = content.replace(/[#*`~\[\]()]/g, '').replace(/\s+/g, ' ');
     const wordCount = textContent.split(' ').filter(word => word.length > 0).length;
@@ -368,7 +361,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
     try {
       console.log('开始异步渲染Mermaid图表:', cacheKey);
       const svg = await this.mermaidRenderer.renderDiagram(diagram, options);
-      
+
       // 更新缓存
       this.mermaidCache.set(cacheKey, {
         diagram,
@@ -376,13 +369,13 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
         timestamp: Date.now(),
         options
       });
-      
+
       // 清理过期的缓存
       this.cleanupCache();
-      
+
       // 更新DOM中的占位符
       this.updateMermaidPlaceholder(cacheKey, svg);
-      
+
       console.log('Mermaid图表异步渲染完成:', cacheKey);
     } catch (error) {
       console.error('Mermaid异步渲染失败:', error);
@@ -425,21 +418,21 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   private cleanupCache(): void {
     const now = Date.now();
     const expiredKeys: string[] = [];
-    
+
     // 清理过期缓存
     for (const [key, entry] of this.mermaidCache.entries()) {
       if (now - entry.timestamp > this.cacheTimeout) {
         expiredKeys.push(key);
       }
     }
-    
+
     expiredKeys.forEach(key => this.mermaidCache.delete(key));
-    
+
     // 清理超出大小的缓存
     if (this.mermaidCache.size > this.cacheMaxSize) {
       const entries = Array.from(this.mermaidCache.entries());
       entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
+
       const excess = entries.length - this.cacheMaxSize;
       for (let i = 0; i < excess; i++) {
         this.mermaidCache.delete(entries[i][0]);
@@ -459,7 +452,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
         ...chartData.metadata
       }
     };
-    
+
     this.chartStorage.set(id, entry);
     return id;
   }
@@ -471,7 +464,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   updateChart(id: string, updates: Partial<ChartStorageEntry>): boolean {
     const entry = this.chartStorage.get(id);
     if (!entry) return false;
-    
+
     Object.assign(entry, updates);
     entry.metadata.updated = Date.now();
     return true;
@@ -488,12 +481,12 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   searchCharts(query: string, type?: string): ChartStorageEntry[] {
     return this.getAllCharts().filter(chart => {
       const matchesType = !type || chart.type === type;
-      const matchesQuery = !query || 
+      const matchesQuery = !query ||
         chart.content.toLowerCase().includes(query.toLowerCase()) ||
         chart.metadata.title?.toLowerCase().includes(query.toLowerCase()) ||
         chart.metadata.description?.toLowerCase().includes(query.toLowerCase()) ||
         chart.metadata.tags?.some(tag => tag.toLowerCase().includes(query.toLowerCase()));
-      
+
       return matchesType && matchesQuery;
     });
   }

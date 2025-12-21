@@ -54,6 +54,13 @@ export class Application {
   }
 
   /**
+   * 获取知识片段用例实例
+   */
+  getKnowledgeFragmentUseCases() {
+    return this.applicationService.getKnowledgeFragmentUseCases();
+  }
+
+  /**
    * 获取应用实例（单例模式）
    */
   private static instance: Application;

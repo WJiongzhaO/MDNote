@@ -1,5 +1,5 @@
 import { Folder } from '../entities/folder.entity';
-import { FolderId, FolderName, ParentFolderId } from '../types/folder.types';
+import { FolderId, ParentFolderId } from '../types/folder.types';
 
 export interface FolderRepository {
   save(folder: Folder): Promise<void>;

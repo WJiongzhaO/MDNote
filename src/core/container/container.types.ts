@@ -5,6 +5,7 @@ export const TYPES = {
   // 仓储接口
   DocumentRepository: Symbol.for('DocumentRepository'),
   FolderRepository: Symbol.for('FolderRepository'),
+  KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
   
   // 领域服务
   MarkdownProcessor: Symbol.for('MarkdownProcessor'),
@@ -14,11 +15,17 @@ export const TYPES = {
   MermaidRenderer: Symbol.for('MermaidRenderer'),
   MermaidMarkdownExtension: Symbol.for('MermaidMarkdownExtension'),
   MarkdownProcessorInitializer: Symbol.for('MarkdownProcessorInitializer'),
+  FragmentReferenceParser: Symbol.for('FragmentReferenceParser'),
+  FragmentReferenceResolver: Symbol.for('FragmentReferenceResolver'),
+  FragmentReferenceRegistrationService: Symbol.for('FragmentReferenceRegistrationService'),
+  FragmentReferenceSyncService: Symbol.for('FragmentReferenceSyncService'),
+  ImageStorageService: Symbol.for('ImageStorageService'),
   
   // 应用服务
   ApplicationService: Symbol.for('ApplicationService'),
   DocumentUseCases: Symbol.for('DocumentUseCases'),
   FolderUseCases: Symbol.for('FolderUseCases'),
+  KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
   
   // 基础设施
   StorageAdapter: Symbol.for('StorageAdapter'),

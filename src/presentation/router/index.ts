@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import NewAppLayout from '../components/NewAppLayout.vue';
 import AppLayout from '../components/AppLayout.vue';
 import FolderManager from '../components/FolderManager.vue';
 import { Application } from '../../core/application';
@@ -7,16 +8,13 @@ import { Application } from '../../core/application';
 const application = new Application();
 const applicationService = application.getApplicationService();
 
-// 在控制台显示环境信息（开发时有用）
-console.log('🚀 MD Note 启动信息: 依赖注入架构已启用');
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
       name: 'app',
-      component: AppLayout,
+      component: NewAppLayout,
       props: { applicationService }
     },
     {

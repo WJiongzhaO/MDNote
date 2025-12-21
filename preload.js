@@ -24,7 +24,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
     write: (filename, data) => ipcRenderer.invoke('file:write', filename, data),
     delete: (filename) => ipcRenderer.invoke('file:delete', filename),
     exists: (filename) => ipcRenderer.invoke('file:exists', filename),
-    list: (pattern) => ipcRenderer.invoke('file:list', pattern)
+    list: (pattern) => ipcRenderer.invoke('file:list', pattern),
+    copy: (sourcePath, destPath) => ipcRenderer.invoke('file:copy', sourcePath, destPath),
+    mkdir: (dirPath) => ipcRenderer.invoke('file:mkdir', dirPath),
+    writeBinary: (filePath, buffer) => ipcRenderer.invoke('file:write-binary', filePath, buffer),
+    readBinary: (filePath) => ipcRenderer.invoke('file:read-binary', filePath),
+    existsPath: (filePath) => ipcRenderer.invoke('file:exists-path', filePath),
+    getStats: (filePath) => ipcRenderer.invoke('file:get-stats', filePath),
+    getFullPath: (relativePath) => ipcRenderer.invoke('file:get-full-path', relativePath),
+    getDataPath: () => ipcRenderer.invoke('file:get-data-path'),
+    getCustomDataPath: () => ipcRenderer.invoke('file:get-custom-data-path'),
+    setCustomDataPath: (customPath) => ipcRenderer.invoke('file:set-custom-data-path', customPath),
+    resetDataPath: () => ipcRenderer.invoke('file:reset-data-path'),
+    readDirectory: (dirPath) => ipcRenderer.invoke('file:read-directory', dirPath),
+    readFileContent: (filePath) => ipcRenderer.invoke('file:read-file-content', filePath),
+    writeFileContent: (filePath, content) => ipcRenderer.invoke('file:write-file-content', filePath, content),
+    deleteNode: (nodePath) => ipcRenderer.invoke('file:delete-node', nodePath),
+    saveLastOpenedFolder: (folderPath) => ipcRenderer.invoke('file:save-last-opened-folder', folderPath),
+    getLastOpenedFolder: () => ipcRenderer.invoke('file:get-last-opened-folder'),
+    saveFileCache: (filePath, cacheData) => ipcRenderer.invoke('file:save-file-cache', filePath, cacheData),
+    getFileCache: (filePath) => ipcRenderer.invoke('file:get-file-cache', filePath),
+    deleteFileCache: (filePath) => ipcRenderer.invoke('file:delete-file-cache', filePath)
+  },
+  dialog: {
+    openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
+    openFile: () => ipcRenderer.invoke('dialog:open-file')
+  },
+  menu: {
+    onNewFile: (callback) => ipcRenderer.on('menu:new-file', callback),
+    onNewFolder: (callback) => ipcRenderer.on('menu:new-folder', callback),
+    onOpenFile: (callback) => ipcRenderer.on('menu:open-file', callback),
+    onOpenFolder: (callback) => ipcRenderer.on('menu:open-folder', callback),
+    onSave: (callback) => ipcRenderer.on('menu:save', callback)
+  },
+  // 监听主进程消息
+  on: (channel, callback) => {
+    const handler = (_, ...args) => callback(...args);
+    ipcRenderer.on(channel, handler);
+    return () => ipcRenderer.removeListener(channel, handler);
   }
 });
 

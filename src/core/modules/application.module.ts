@@ -14,7 +14,14 @@ import { InMemoryAssetManager } from '../../infrastructure/services/asset-manage
 import { ApplicationService } from '../../application/services/application.service';
 import { DocumentUseCases } from '../../application/usecases/document.usecases';
 import { FolderUseCases } from '../../application/usecases/folder.usecases';
+import { KnowledgeFragmentUseCases } from '../../application/usecases/knowledge-fragment.usecases';
 import { StorageAdapter } from '../../infrastructure/storage.adapter';
+import { FileSystemAssetManager } from '../../infrastructure/services/file-system-asset-manager.service';
+import { FragmentReferenceParser } from '../../domain/services/fragment-reference-parser.service';
+import { FragmentReferenceResolver } from '../../domain/services/fragment-reference-resolver.service';
+import { FragmentReferenceRegistrationService } from '../../domain/services/fragment-reference-registration.service';
+import { FragmentReferenceSyncService } from '../../domain/services/fragment-reference-sync.service';
+import { FileSystemImageStorageService } from '../../infrastructure/services/image-storage.service';
 
 /**
  * 应用模块配置 - 负责配置应用层的依赖关系
@@ -27,6 +34,9 @@ export class ApplicationModule {
     
     container.bind<FolderRepository>(TYPES.FolderRepository)
       .toConstantValue(StorageAdapter.createFolderRepository());
+
+    container.bind(TYPES.KnowledgeFragmentRepository)
+      .toConstantValue(StorageAdapter.createKnowledgeFragmentRepository());
 
     // 配置领域服务（暂时保持单例模式，后续重构）
     container.bind<MarkdownProcessor>(TYPES.MarkdownProcessor)
@@ -51,9 +61,9 @@ export class ApplicationModule {
     container.bind<MarkdownProcessorInitializer>(TYPES.MarkdownProcessorInitializer)
       .to(MarkdownProcessorInitializer);
 
-    // 配置资源管理服务
+    // 配置资源管理服务（使用文件系统存储）
     container.bind(TYPES.AssetManager)
-      .toSingleton(InMemoryAssetManager);
+      .toSingleton(FileSystemAssetManager);
 
     // 配置资源渲染服务（延迟初始化依赖）
     // 先创建实例，然后在配置完成后设置依赖
@@ -66,10 +76,8 @@ export class ApplicationModule {
       try {
         const mermaidRenderer = container.get<MermaidRendererService>(TYPES.MermaidRenderer);
         const assetManager = container.get(TYPES.AssetManager);
-        console.log('[ApplicationModule] 设置AssetRenderer依赖...');
         assetRenderer.setMermaidRenderer(mermaidRenderer);
         assetRenderer.setAssetManager(assetManager);
-        console.log('[ApplicationModule] AssetRenderer依赖设置完成');
       } catch (error) {
         console.error('[ApplicationModule] 设置AssetRenderer依赖失败:', error);
       }
@@ -84,6 +92,25 @@ export class ApplicationModule {
 
     container.bind<FolderUseCases>(TYPES.FolderUseCases)
       .to(FolderUseCases);
+
+    container.bind<KnowledgeFragmentUseCases>(TYPES.KnowledgeFragmentUseCases)
+      .to(KnowledgeFragmentUseCases);
+
+    // 配置引用相关服务
+    container.bind<FragmentReferenceParser>(TYPES.FragmentReferenceParser)
+      .to(FragmentReferenceParser);
+
+    container.bind(TYPES.ImageStorageService)
+      .toSingleton(FileSystemImageStorageService);
+
+    container.bind<FragmentReferenceResolver>(TYPES.FragmentReferenceResolver)
+      .to(FragmentReferenceResolver);
+
+    container.bind<FragmentReferenceRegistrationService>(TYPES.FragmentReferenceRegistrationService)
+      .to(FragmentReferenceRegistrationService);
+
+    container.bind<FragmentReferenceSyncService>(TYPES.FragmentReferenceSyncService)
+      .to(FragmentReferenceSyncService);
 
     // 配置处理器之间的依赖关系
     this.configureProcessorDependencies(container);
