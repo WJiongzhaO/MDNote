@@ -61,6 +61,13 @@ export class Application {
   }
 
   /**
+   * 获取Git用例实例
+   */
+  getGitUseCases() {
+    return this.container.get(Symbol.for('GitUseCases'));
+  }
+
+  /**
    * 获取应用实例（单例模式）
    */
   private static instance: Application;

@@ -6,6 +6,7 @@ export const TYPES = {
   DocumentRepository: Symbol.for('DocumentRepository'),
   FolderRepository: Symbol.for('FolderRepository'),
   KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
+  GitRepository: Symbol.for('GitRepository'),
   
   // 领域服务
   MarkdownProcessor: Symbol.for('MarkdownProcessor'),
@@ -26,6 +27,7 @@ export const TYPES = {
   DocumentUseCases: Symbol.for('DocumentUseCases'),
   FolderUseCases: Symbol.for('FolderUseCases'),
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
+  GitUseCases: Symbol.for('GitUseCases'),
   
   // 基础设施
   StorageAdapter: Symbol.for('StorageAdapter'),

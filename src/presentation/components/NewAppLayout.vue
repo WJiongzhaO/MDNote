@@ -30,11 +30,11 @@
           @fragment-updated="handleFragmentUpdated"
         />
 
-        <!-- Git历史侧边栏（占位） -->
-        <div v-if="activeSidebar === 'git-history'" class="git-history-placeholder">
-          <h3>Git历史</h3>
-          <p>功能开发中...</p>
-        </div>
+        <!-- Git 侧边栏 -->
+        <GitPanel
+          v-if="activeSidebar === 'git-history'"
+          :repo-path="dataPath"
+        />
       </ResizableSidebar>
 
       <!-- 主编辑区域 -->
@@ -61,6 +61,7 @@ import { useFolders } from '../composables/useFolders';
 import MarkdownEditor from './MarkdownEditor.vue';
 import FileExplorer from './FileExplorer.vue';
 import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue';
+import GitPanel from './git/GitPanel.vue';
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue';
 import ResizableSidebar from './ResizableSidebar.vue';
 import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-fragment.dto';
@@ -92,6 +93,7 @@ const markdownEditorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
 const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSidebar> | null>(null);
 const currentFilePath = ref<string>('');
 const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
+const dataPath = ref<string>(''); // Git 仓库路径 - 从 Electron API 获取
 
 
 // 处理选择文件（从文件资源管理器）
@@ -125,6 +127,22 @@ const handleSelectFile = async (filePath: string) => {
 const handleOpenLocalFolder = async (folderPath: string) => {
   lastOpenedFolderPath.value = folderPath;
 
+  // 更新 Git 仓库路径为当前打开的文件夹
+  dataPath.value = folderPath;
+  console.log('[NewAppLayout] handleOpenLocalFolder - dataPath updated to:', folderPath);
+
+  // 关键：同步更新主进程的 dataPath
+  try {
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI && electronAPI.file && electronAPI.file.setCustomDataPath) {
+      console.log('[NewAppLayout] Calling setCustomDataPath with:', folderPath);
+      await electronAPI.file.setCustomDataPath(folderPath);
+      console.log('[NewAppLayout] setCustomDataPath success');
+    }
+  } catch (error) {
+    console.error('[NewAppLayout] Error setting custom data path:', error);
+  }
+
   // 保存上次打开的文件夹
   try {
     const electronAPI = (window as any).electronAPI;
@@ -141,6 +159,11 @@ const handleOpenLocalFolder = async (folderPath: string) => {
     activeSidebar.value = 'folders';
   }
 };
+
+// 监听 dataPath 变化
+watch(dataPath, (newPath) => {
+  console.log('[NewAppLayout] dataPath changed:', newPath);
+});
 
 // 切换侧边栏时，如果切换回文件夹，恢复之前打开的文件夹
 const handleSwitchSidebar = async (type: SidebarType) => {
@@ -265,6 +288,38 @@ const handleFragmentUpdated = async (fragmentId: string) => {
 
 // 监听菜单事件
 onMounted(async () => {
+  console.log('[NewAppLayout] onMounted - Initializing...');
+
+  // 获取真实的 dataPath（可能是用户上次打开的文件夹）
+  try {
+    const electronAPI = (window as any).electronAPI;
+
+    // 优先尝试获取自定义路径（用户上次打开的文件夹）
+    if (electronAPI && electronAPI.file && electronAPI.file.getCustomDataPath) {
+      const customPath = await electronAPI.file.getCustomDataPath();
+      if (customPath) {
+        console.log('[NewAppLayout] Found custom data path:', customPath);
+        dataPath.value = customPath;
+      } else {
+        console.log('[NewAppLayout] No custom data path, using default');
+        // 如果没有自定义路径，获取默认路径
+        if (electronAPI.file.getDataPath) {
+          const path = await electronAPI.file.getDataPath();
+          dataPath.value = path;
+          console.log('[NewAppLayout] Using default data path:', path);
+        }
+      }
+    } else if (electronAPI && electronAPI.file && electronAPI.file.getDataPath) {
+      const path = await electronAPI.file.getDataPath();
+      dataPath.value = path;
+      console.log('[NewAppLayout] Using data path from getDataPath:', path);
+    }
+
+    console.log('[NewAppLayout] Final initialized dataPath:', dataPath.value);
+  } catch (error) {
+    console.error('[NewAppLayout] Error getting dataPath:', error);
+  }
+
   await loadFolders();
   await loadDocumentsByFolder(null);
 
@@ -293,6 +348,19 @@ onMounted(async () => {
         }
       }
     });
+  }
+
+  // 获取数据路径（用于Git仓库）
+  try {
+    if (electronAPI && electronAPI.file && electronAPI.file.getDataPath) {
+      const path = await electronAPI.file.getDataPath();
+      if (path) {
+        dataPath.value = path;
+      }
+    }
+  } catch (error) {
+    console.error('Error getting data path:', error);
+    // 使用默认路径
   }
 
   // 尝试加载上次打开的文件夹
@@ -431,17 +499,6 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   display: flex;
   overflow: hidden;
   min-height: 0;
-}
-
-.git-history-placeholder {
-  padding: 40px 20px;
-  text-align: center;
-  color: #666;
-}
-
-.git-history-placeholder h3 {
-  margin-bottom: 12px;
-  color: #333;
 }
 
 .error-toast {

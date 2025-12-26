@@ -27,6 +27,26 @@ test.describe('Electron App Tests', () => {
 
     const window = mainWindow;
 
+    // 监听控制台消息以捕获错误
+    const consoleLogs: string[] = [];
+    const consoleErrors: string[] = [];
+
+    window.on('console', msg => {
+      const text = msg.text();
+      consoleLogs.push(`[${msg.type()}] ${text}`);
+      if (msg.type() === 'error') {
+        consoleErrors.push(text);
+        console.error('Browser Console Error:', text);
+      } else {
+        console.log('Browser Console:', text);
+      }
+    });
+
+    window.on('pageerror', error => {
+      consoleErrors.push(`Page Error: ${error.message}`);
+      console.error('Page Error:', error.message, error.stack);
+    });
+
     console.log('窗口URL:', window.url());
 
     // 等待窗口加载完成，更智能的等待
@@ -59,8 +79,25 @@ test.describe('Electron App Tests', () => {
 
     // 等待Vue应用加载完成
     if (appExists > 0) {
-      await window.waitForSelector('#app', { state: 'visible', timeout: 15000 });
-      console.log('#app元素可见');
+      try {
+        await window.waitForSelector('#app', { state: 'visible', timeout: 5000 });
+        console.log('#app元素可见');
+      } catch (error) {
+        // 即使超时也继续，打印所有控制台消息
+        console.error('#app 元素不可见，打印所有控制台消息:');
+        consoleLogs.forEach(log => console.log(log));
+        consoleErrors.forEach(err => console.error(err));
+
+        // 检查页面是否有错误
+        const pageErrors = await window.evaluate(() => {
+          return (window as any).lastError || null;
+        });
+        if (pageErrors) {
+          console.error('页面错误:', pageErrors);
+        }
+
+        throw error;
+      }
 
       // 检查Vue应用是否有实际内容
       const appContent = await window.locator('#app').innerHTML();
@@ -75,6 +112,15 @@ test.describe('Electron App Tests', () => {
       return document.body && document.body.innerText.trim().length > 0;
     });
     console.log('页面是否有文本内容:', hasContent);
+
+    // 打印所有捕获的错误
+    if (consoleErrors.length > 0) {
+      console.error('\n=== 捕获到的控制台错误 ===');
+      consoleErrors.forEach((err, i) => {
+        console.error(`错误 ${i + 1}:`, err);
+      });
+      console.error('========================\n');
+    }
 
     // 截图用于调试
     await window.screenshot({ path: 'test-results/electron/app-screenshot.png' });

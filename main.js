@@ -2,6 +2,7 @@
 const { app, BrowserWindow, ipcMain, Menu, dialog, protocol } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { registerGitIpcHandlers } = require('./git-ipc-handlers');
 
 // 使用 electron-is-dev@2.0.0（CommonJS 版本）
 const isDev = require('electron-is-dev');
@@ -483,18 +484,24 @@ ipcMain.handle('file:get-full-path', async (event, relativePath) => {
 
 // 获取数据目录的完整路径
 ipcMain.handle('file:get-data-path', async () => {
-  return getDataPath();
+  const path = getDataPath();
+  console.log('[Main Process] file:get-data-path called, returning:', path);
+  return path;
 });
 
 // 获取自定义数据路径（如果已设置）
 ipcMain.handle('file:get-custom-data-path', async () => {
   const config = loadConfig();
-  return config.customDataPath || null;
+  const customPath = config.customDataPath || null;
+  console.log('[Main Process] file:get-custom-data-path called, returning:', customPath);
+  return customPath;
 });
 
 // 设置自定义数据路径
 ipcMain.handle('file:set-custom-data-path', async (_event, customPath) => {
   try {
+    console.log('[Main Process] file:set-custom-data-path called with:', customPath);
+
     if (!customPath || !fs.existsSync(customPath)) {
       throw new Error('Invalid path or path does not exist');
     }
@@ -507,15 +514,17 @@ ipcMain.handle('file:set-custom-data-path', async (_event, customPath) => {
 
     // 更新 dataPath 变量
     dataPath = customPath;
+    console.log('[Main Process] dataPath updated to:', dataPath);
 
     // 确保数据目录存在
     if (!fs.existsSync(dataPath)) {
       fs.mkdirSync(dataPath, { recursive: true });
     }
 
+    console.log('[Main Process] Custom data path set successfully:', customPath);
     return { success: true, path: customPath };
   } catch (error) {
-    console.error('Error setting custom data path:', error);
+    console.error('[Main Process] Error setting custom data path:', error);
     return { success: false, error: error.message };
   }
 });
@@ -736,3 +745,8 @@ ipcMain.handle('file:delete-file-cache', async (event, filePath) => {
     return { success: false, error: error.message };
   }
 });
+
+// ==================== Git IPC 处理器 ====================
+// 注册所有 Git 相关的 IPC 处理器
+// 传递一个函数，这样 Git handlers 可以动态获取最新的 dataPath
+registerGitIpcHandlers(ipcMain, () => dataPath);
