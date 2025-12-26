@@ -332,8 +332,8 @@ const handleEditorInput = async (event: Event) => {
   }
   renderTimer = setTimeout(() => {
     renderContent();
-    // 重新应用标注（保持标注显示）
-    applyEditorAnnotations();
+    // 不要在用户输入时重新应用标注，因为这会重新渲染innerHTML导致失去焦点
+    // 标注只在编辑器失去焦点时应用
   }, 150);
   debouncedSave();
 };
@@ -692,9 +692,9 @@ const applyEditorAnnotations = async () => {
       console.log('[标注] 没有标注，使用纯文本HTML');
     }
 
-    // 恢复光标位置
+    // 恢复光标位置（仅当编辑器仍然有焦点时）
     await nextTick();
-    if (cursorPosition > 0 && editor.textContent) {
+    if (cursorPosition > 0 && editor.textContent && document.activeElement === editor) {
       try {
         const range = document.createRange();
         const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
@@ -1130,8 +1130,12 @@ const handleMermaidSave = (mermaidCode: string) => {
 
   content.value = newContent;
 
-  // 更新编辑器显示（始终应用标注）
-  applyEditorAnnotations();
+  // 更新编辑器显示（只在编辑器没有焦点时应用标注）
+  if (!isEditorFocused.value) {
+    applyEditorAnnotations();
+  } else {
+    editor.textContent = content.value;
+  }
 
   checkChanges();
   renderContent();
@@ -1276,8 +1280,12 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
 
   content.value = newContent;
 
-  // 更新编辑器显示（始终应用标注）
-  applyEditorAnnotations();
+  // 更新编辑器显示（只在编辑器没有焦点时应用标注）
+  if (!isEditorFocused.value) {
+    applyEditorAnnotations();
+  } else {
+    editor.textContent = content.value;
+  }
 
   checkChanges();
   renderContent();
@@ -1620,30 +1628,15 @@ const handleInsertFragmentAtPosition = async (fragmentId: string, position: numb
       }
     }
 
-    // 设置光标位置
+    // 更新编辑器内容（在聚焦之前应用标注，避免焦点丢失）
     await nextTick();
-    editor.focus();
-
-    // 更新编辑器内容（始终应用标注）
-    await applyEditorAnnotations();
-
-    // 设置光标位置（简化版，在contenteditable中设置光标位置比较复杂）
-    const newPosition = cursorPosition + referenceTag.length + 4; // +4 for \n\n
-    try {
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection && editor.textContent) {
-        const textNode = editor.firstChild;
-        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-          const offset = Math.min(newPosition, textNode.textContent?.length || 0);
-          range.setStart(textNode, offset);
-          range.collapse(true);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-      }
-    } catch (e) {
-      // 忽略光标设置错误
+    // 不要在这里调用 focus()，让用户自然地保持焦点
+    // 只在编辑器没有焦点时才应用标注
+    if (!isEditorFocused.value) {
+      await applyEditorAnnotations();
+    } else {
+      // 如果编辑器有焦点，只设置纯文本内容
+      editor.textContent = content.value;
     }
 
     // 触发内容更新和重新渲染
@@ -1651,13 +1644,6 @@ const handleInsertFragmentAtPosition = async (fragmentId: string, position: numb
     renderContent();
     await nextTick();
     debouncedSave();
-
-    // 更新编辑器显示
-    if (isEditorFocused.value) {
-      editor.textContent = content.value;
-    } else {
-      applyEditorAnnotations();
-    }
   } catch (error) {
     console.error('Error inserting fragment:', error);
     alert('插入知识片段失败：' + (error instanceof Error ? error.message : '未知错误'));
@@ -1718,19 +1704,6 @@ const getSelectedText = () => {
 const handleEditorClick = async (event: MouseEvent) => {
   const editor = editorElement.value;
   if (!editor) return;
-
-  // 如果编辑器处于焦点状态，先应用标注以便识别引用
-  if (isEditorFocused.value) {
-    // 先保存当前内容
-    const currentText = editor.textContent || '';
-    if (currentText !== content.value) {
-      content.value = currentText;
-    }
-    // 临时应用标注
-    await applyEditorAnnotations();
-    // 等待DOM更新
-    await nextTick();
-  }
 
   // 获取点击位置的元素
   const target = event.target as HTMLElement;
@@ -1871,11 +1844,15 @@ const switchReferenceMode = async (newMode: 'linked' | 'detached' | 'clean') => 
     content.value = newContent;
     referenceContextMenu.value.visible = false;
 
-    // 更新编辑器显示（始终应用标注）
+    // 更新编辑器显示（只在编辑器没有焦点时应用标注）
     await nextTick();
     const editor = editorElement.value;
     if (editor) {
-      await applyEditorAnnotations();
+      if (!isEditorFocused.value) {
+        await applyEditorAnnotations();
+      } else {
+        editor.textContent = content.value;
+      }
     }
 
     checkChanges();

@@ -269,6 +269,7 @@ const discardSelectedChanges = async () => {
 const handleViewDiff = async (commit: any) => {
   try {
     // 获取提交与其父提交之间的差异
+    // 如果是第一次提交（没有父提交），后端会自动使用空树作为对比基准
     const diff = await compareCommits(`${commit.hash}^`, commit.hash);
     if (diff) {
       currentDiff.value = diff;

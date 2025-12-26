@@ -59,9 +59,12 @@ defineEmits<{
   'load-more': [];
 }>();
 
-const formatDate = (date: Date) => {
+const formatDate = (date: Date | string) => {
+  // 处理 Electron IPC 传输后 Date 被转换为字符串的情况
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
+  const diff = now.getTime() - dateObj.getTime();
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -72,7 +75,7 @@ const formatDate = (date: Date) => {
   if (hours < 24) return `${hours} 小时前`;
   if (days < 7) return `${days} 天前`;
 
-  return date.toLocaleDateString('zh-CN');
+  return dateObj.toLocaleDateString('zh-CN');
 };
 </script>
 

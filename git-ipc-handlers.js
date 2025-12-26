@@ -128,7 +128,7 @@ function registerGitIpcHandlers(ipcMain, getDataPath) {
       const branches = await git.branch();
 
       return branches.all.map(name => ({
-        name,
+        name: name || '',
         isCurrent: name === branches.current,
         isRemote: false,
         commit: '',
@@ -152,7 +152,8 @@ function registerGitIpcHandlers(ipcMain, getDataPath) {
       }
 
       const result = await git.commit(message);
-      return result.commit;
+      // 确保只返回可序列化的commit hash字符串
+      return result.commit || '';
     } catch (error) {
       console.error('[Git] Commit error:', error);
       throw error;
@@ -200,12 +201,12 @@ function registerGitIpcHandlers(ipcMain, getDataPath) {
       });
 
       return log.all.map(commit => ({
-        hash: commit.hash,
-        shortHash: commit.hash.substring(0, 7),
-        author: commit.author_name,
-        message: commit.message,
-        date: new Date(commit.date),
-        files: commit.files || [],
+        hash: commit.hash || '',
+        shortHash: commit.hash ? commit.hash.substring(0, 7) : '',
+        author: commit.author_name || '',
+        message: commit.message || '',
+        date: commit.date ? new Date(commit.date) : new Date(),
+        files: Array.isArray(commit.files) ? commit.files : [],
       }));
     } catch (error) {
       console.error('[Git] GetLog error:', error);
@@ -234,12 +235,12 @@ function registerGitIpcHandlers(ipcMain, getDataPath) {
       const commit = log.all[0];
 
       return {
-        hash: commit.hash,
-        shortHash: commit.hash.substring(0, 7),
-        author: commit.author_name,
-        message: commit.message,
-        date: new Date(commit.date),
-        files: commit.files || [],
+        hash: commit.hash || '',
+        shortHash: commit.hash ? commit.hash.substring(0, 7) : '',
+        author: commit.author_name || '',
+        message: commit.message || '',
+        date: commit.date ? new Date(commit.date) : new Date(),
+        files: Array.isArray(commit.files) ? commit.files : [],
       };
     } catch (error) {
       console.error('[Git] GetCommit error:', error);
@@ -263,12 +264,12 @@ function registerGitIpcHandlers(ipcMain, getDataPath) {
       const log = await git.log({ file: filePath, maxCount: limit });
 
       return log.all.map(commit => ({
-        hash: commit.hash,
-        shortHash: commit.hash.substring(0, 7),
-        author: commit.author_name,
-        message: commit.message,
-        date: new Date(commit.date),
-        files: commit.files || [],
+        hash: commit.hash || '',
+        shortHash: commit.hash ? commit.hash.substring(0, 7) : '',
+        author: commit.author_name || '',
+        message: commit.message || '',
+        date: commit.date ? new Date(commit.date) : new Date(),
+        files: Array.isArray(commit.files) ? commit.files : [],
       }));
     } catch (error) {
       console.error('[Git] GetFileHistory error:', error);
@@ -300,7 +301,24 @@ function registerGitIpcHandlers(ipcMain, getDataPath) {
       const args = [fromHash, toHash];
       if (file) args.push(file);
 
-      const diffText = await git.diff(args);
+      let diffText;
+      try {
+        diffText = await git.diff(args);
+      } catch (diffError) {
+        // 如果对比失败，检查是否是因为第一次提交（没有父提交）
+        // 第一次提交使用空树作为对比基准
+        if (fromHash.endsWith('^') || fromHash === `${toHash}^`) {
+          console.log('[Git] First commit detected, using empty tree as baseline');
+          // Git 的空树 hash
+          const emptyTreeHash = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+          const emptyArgs = [emptyTreeHash, toHash];
+          if (file) emptyArgs.push(file);
+          diffText = await git.diff(emptyArgs);
+        } else {
+          throw diffError;
+        }
+      }
+
       return parseDiff(diffText, file || '');
     } catch (error) {
       console.error('[Git] GetDiffBetweenCommits error:', error);
@@ -487,8 +505,8 @@ function registerGitIpcHandlers(ipcMain, getDataPath) {
       const git = getGitInstance(getCurrentDataPath());
       const remotes = await git.getRemotes(true);
       return remotes.map(r => ({
-        name: r.name,
-        url: r.refs.fetch || '',
+        name: r.name || '',
+        url: r.refs && r.refs.fetch ? r.refs.fetch : '',
       }));
     } catch (error) {
       console.error('[Git] GetRemotes error:', error);
