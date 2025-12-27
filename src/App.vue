@@ -18,7 +18,8 @@ provide(TYPES.MermaidRenderer, mermaidRenderer);
 onMounted(async () => {
   try {
     // 初始化应用服务（包括Mermaid渲染器）
-    const app = new Application();
+    // 使用单例模式，避免重复创建实例
+    const app = Application.getInstance();
     await app.start();
 
     // 获取依赖注入服务并更新响应式变量

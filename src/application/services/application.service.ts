@@ -1,5 +1,6 @@
 import { injectable, inject } from 'inversify';
 import { TYPES } from '../../core/container/container.types';
+import { InversifyContainer } from '../../core/container/inversify.container';
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
 import type { FolderRepository } from '../../domain/repositories/folder.repository.interface';
 import type { MermaidRenderer } from '../../domain/services/mermaid-renderer.service';
@@ -51,8 +52,9 @@ export class ApplicationService {
   }
 
   getDocumentUseCases(): DocumentUseCases {
-    // 使用新的可扩展处理器
-    return new DocumentUseCases(this.documentRepository, this.extensibleMarkdownProcessor);
+    // 从容器获取单例实例，确保使用的是同一个实例（已配置好模板处理器）
+    const container = InversifyContainer.getInstance();
+    return container.get<DocumentUseCases>(TYPES.DocumentUseCases);
   }
 
   getFolderUseCases(): FolderUseCases {

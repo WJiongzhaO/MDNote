@@ -144,7 +144,7 @@ export class DocumentUseCases {
     }));
   }
 
-  async renderMarkdown(content: string, documentId?: string): Promise<string> {
+  async renderMarkdown(content: string, documentId?: string, variables?: Record<string, any>): Promise<string> {
     // 如果有documentId，先解析引用标志并替换为片段内容
     let processedContent = content;
     if (documentId && !documentId.startsWith('fragment:')) {
@@ -152,11 +152,11 @@ export class DocumentUseCases {
       if (!this.referenceResolver) {
         await this.initReferenceResolver();
       }
-      
+
       if (this.referenceResolver) {
         try {
           // 对于外部文件，使用文件路径作为documentId
-          const actualDocId = documentId.startsWith('file:') 
+          const actualDocId = documentId.startsWith('file:')
             ? documentId.substring(5) // 移除 'file:' 前缀，使用实际文件路径
             : documentId;
           processedContent = await this.referenceResolver.resolveReferences(content, actualDocId);
@@ -167,8 +167,8 @@ export class DocumentUseCases {
       }
     }
 
-    // 转换为HTML
-    let html = await this.markdownProcessor.processMarkdown(processedContent);
+    // 转换为HTML（传递变量）
+    let html = await this.markdownProcessor.processMarkdown(processedContent, variables || {});
 
     // 如果有documentId，处理图片路径（转换为app://协议）
     if (documentId) {

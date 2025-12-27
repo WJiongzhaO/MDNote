@@ -35,6 +35,14 @@
           v-if="activeSidebar === 'git-history'"
           :repo-path="dataPath"
         />
+
+        <!-- 变量管理侧边栏 -->
+        <VariableSidebar
+          v-if="activeSidebar === 'variables'"
+          ref="variableSidebarRef"
+          @variable-updated="handleVariableUpdated"
+          @variable-insert="handleInsertVariable"
+        />
       </ResizableSidebar>
 
       <!-- 主编辑区域 -->
@@ -54,13 +62,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { ref, onMounted, computed, nextTick, watch, provide } from 'vue';
 import { Application } from '../../core/application';
 import { useDocuments } from '../composables/useDocuments';
 import { useFolders } from '../composables/useFolders';
 import MarkdownEditor from './MarkdownEditor.vue';
 import FileExplorer from './FileExplorer.vue';
 import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue';
+import VariableSidebar from './VariableSidebar.vue';
 import GitPanel from './git/GitPanel.vue';
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue';
 import ResizableSidebar from './ResizableSidebar.vue';
@@ -91,14 +100,24 @@ const selectedFolderId = ref<string | null>(null);
 const fileExplorerRef = ref<InstanceType<typeof FileExplorer> | null>(null);
 const markdownEditorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
 const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSidebar> | null>(null);
+const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null);
 const currentFilePath = ref<string>('');
 const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
 const dataPath = ref<string>(''); // Git 仓库路径 - 从 Electron API 获取
+
+// 为VariableSidebar提供依赖
+const currentDocumentContent = ref('');
+const currentDocumentPath = ref<string>('');
+
+provide('currentDocumentPath', currentDocumentPath);
+provide('currentDocumentContent', currentDocumentContent);
 
 
 // 处理选择文件（从文件资源管理器）
 const handleSelectFile = async (filePath: string) => {
   currentFilePath.value = filePath;
+  currentDocumentPath.value = filePath; // 更新供VariableSidebar使用
+
   // 清空当前文档（因为选择了外部文件）
   currentDocument.value = null;
 
@@ -107,6 +126,9 @@ const handleSelectFile = async (filePath: string) => {
     if (electronAPI && electronAPI.file && electronAPI.file.readFileContent) {
       const content = await electronAPI.file.readFileContent(filePath);
       const fileName = filePath.split(/[/\\]/).pop() || '未命名';
+
+      // 更新currentDocumentContent供VariableSidebar使用
+      currentDocumentContent.value = content || '';
 
       // 直接设置编辑器内容（不依赖document对象）
       if (markdownEditorRef.value) {
@@ -269,6 +291,10 @@ const handleUpdateDocument = async (id: string, title: string, content: string) 
     title,
     content
   });
+
+  // 同步更新currentDocumentContent，供VariableSidebar使用
+  currentDocumentContent.value = content;
+  currentDocumentPath.value = id;
 };
 
 // 处理知识片段更新事件
@@ -463,6 +489,38 @@ const handleInsertFragment = async (fragmentId: string) => {
     const editor = markdownEditorRef.value as any;
     if (editor && typeof editor.handleInsertFragment === 'function') {
       await editor.handleInsertFragment(fragmentId);
+    }
+  }
+};
+
+// 变量相关事件处理
+const handleVariableUpdated = async (updatedContent: string) => {
+  // 当变量更新时，更新编辑器内容
+  currentDocumentContent.value = updatedContent;
+
+  if (markdownEditorRef.value) {
+    const editor = markdownEditorRef.value as any;
+    // 更新编辑器内容
+    if (editor && editor.setContent) {
+      const currentDoc = currentDocument.value;
+      if (currentDoc) {
+        // 如果是数据库文档，更新标题和内容
+        editor.setContent(currentDoc.title, updatedContent, currentDocumentPath.value);
+      } else if (currentFilePath.value) {
+        // 如果是外部文件，只更新内容
+        const fileName = currentFilePath.value.split(/[/\\]/).pop() || '未命名';
+        editor.setContent(fileName, updatedContent, currentFilePath.value);
+      }
+    }
+  }
+};
+
+const handleInsertVariable = async (variableName: string) => {
+  if (markdownEditorRef.value) {
+    const editor = markdownEditorRef.value as any;
+    if (editor && editor.insertText) {
+      const variablePlaceholder = `{{${variableName}}}`;
+      editor.insertText(variablePlaceholder);
     }
   }
 };

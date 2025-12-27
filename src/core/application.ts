@@ -11,10 +11,15 @@ import { ApplicationService } from '../application/services/application.service'
 export class Application {
   private container: ServiceContainer;
   private applicationService: ApplicationService;
+  private static isConfigured = false;  // 添加配置标志，避免重复配置
 
   constructor() {
     this.container = InversifyContainer.getInstance();
-    this.configure();
+    // 只在第一次配置，避免 HMR 导致的重复绑定
+    if (!Application.isConfigured) {
+      this.configure();
+      Application.isConfigured = true;
+    }
     this.applicationService = this.container.get<ApplicationService>(TYPES.ApplicationService);
   }
 
@@ -65,6 +70,13 @@ export class Application {
    */
   getGitUseCases() {
     return this.container.get(Symbol.for('GitUseCases'));
+  }
+
+  /**
+   * 获取变量系统用例实例
+   */
+  getVariableUseCases() {
+    return this.container.get(TYPES.VariableUseCases);
   }
 
   /**

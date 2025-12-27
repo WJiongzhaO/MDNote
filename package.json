@@ -18,6 +18,7 @@
     "docxtemplater": "^3.67.5",
     "dompurify": "^3.3.1",
     "electron-is-dev": "^2.0.0",
+    "gray-matter": "^4.0.3",
     "inversify": "^7.10.8",
     "jszip": "^3.10.1",
     "katex": "^0.16.11",
@@ -28,7 +29,8 @@
     "puppeteer": "^23.0.0",
     "reflect-metadata": "^0.2.2",
     "simple-git": "^3.30.0",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@electron/remote": "^2.1.2",

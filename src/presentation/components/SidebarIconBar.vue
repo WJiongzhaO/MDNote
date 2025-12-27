@@ -15,7 +15,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-export type SidebarType = 'folders' | 'fragments' | 'git-history' | null;
+export type SidebarType = 'folders' | 'fragments' | 'git-history' | 'variables' | null;
 
 interface SidebarItem {
   id: SidebarType;
@@ -34,6 +34,7 @@ const emit = defineEmits<{
 const sidebarItems: SidebarItem[] = [
   { id: 'folders', icon: '📁', title: '文件夹' },
   { id: 'fragments', icon: '📚', title: '知识片段库' },
+  { id: 'variables', icon: '📝', title: '变量管理' },
   { id: 'git-history', icon: '🕒', title: 'Git历史' }
 ];
 

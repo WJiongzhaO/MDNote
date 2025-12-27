@@ -26,6 +26,13 @@ import { FragmentReferenceSyncService } from '../../domain/services/fragment-ref
 import { FileSystemImageStorageService } from '../../infrastructure/services/image-storage.service';
 import { ElectronGitRepository } from '../../infrastructure/repositories/git/ElectronGitRepository';
 
+// 变量系统服务
+import { SimpleTemplateProcessor } from '../../domain/services/simple-template-processor.service';
+import { FrontmatterParser } from '../../domain/services/frontmatter-parser.service';
+import { FolderVariableResolver } from '../../domain/services/folder-variable-resolver.service';
+import { VariableMerger } from '../../domain/services/variable-merger.service';
+import { VariableUseCases } from '../../application/usecases/variable.usecases';
+
 /**
  * 应用模块配置 - 负责配置应用层的依赖关系
  */
@@ -45,9 +52,9 @@ export class ApplicationModule {
     container.bind<MarkdownProcessor>(TYPES.MarkdownProcessor)
       .toConstantValue(MarkdownProcessor.getInstance());
 
-    // 配置新的可扩展处理器
+    // 配置新的可扩展处理器（使用单例确保只有一个实例）
     container.bind<ExtensibleMarkdownProcessor>(TYPES.ExtensibleMarkdownProcessor)
-      .to(ExtensibleMarkdownProcessor);
+      .toSingleton(ExtensibleMarkdownProcessor);
 
     container.bind<HandlebarsTemplateProcessor>(TYPES.TemplateProcessor)
       .to(HandlebarsTemplateProcessor);
@@ -62,7 +69,7 @@ export class ApplicationModule {
       .to(MermaidMarkdownExtension);
 
     container.bind<MarkdownProcessorInitializer>(TYPES.MarkdownProcessorInitializer)
-      .to(MarkdownProcessorInitializer);
+      .toSingleton(MarkdownProcessorInitializer);
 
     // 配置资源管理服务（使用文件系统存储）
     container.bind(TYPES.AssetManager)
@@ -86,12 +93,12 @@ export class ApplicationModule {
       }
     });
 
-    // 配置应用服务
+    // 配置应用服务（使用单例确保只有一个实例）
     container.bind<ApplicationService>(TYPES.ApplicationService)
-      .to(ApplicationService);
+      .toSingleton(ApplicationService);
 
     container.bind<DocumentUseCases>(TYPES.DocumentUseCases)
-      .to(DocumentUseCases);
+      .toSingleton(DocumentUseCases);
 
     container.bind<FolderUseCases>(TYPES.FolderUseCases)
       .to(FolderUseCases);
@@ -122,6 +129,22 @@ export class ApplicationModule {
 
     container.bind<FragmentReferenceSyncService>(TYPES.FragmentReferenceSyncService)
       .to(FragmentReferenceSyncService);
+
+    // 配置变量系统服务
+    container.bind<SimpleTemplateProcessor>(TYPES.SimpleTemplateProcessor)
+      .toSingleton(SimpleTemplateProcessor);
+
+    container.bind<FrontmatterParser>(TYPES.FrontmatterParser)
+      .toSingleton(FrontmatterParser);
+
+    container.bind<FolderVariableResolver>(TYPES.FolderVariableResolver)
+      .toSingleton(FolderVariableResolver);
+
+    container.bind<VariableMerger>(TYPES.VariableMerger)
+      .toSingleton(VariableMerger);
+
+    container.bind<VariableUseCases>(TYPES.VariableUseCases)
+      .toSingleton(VariableUseCases);
 
     // 配置处理器之间的依赖关系
     this.configureProcessorDependencies(container);

@@ -21,13 +21,20 @@ export const TYPES = {
   FragmentReferenceRegistrationService: Symbol.for('FragmentReferenceRegistrationService'),
   FragmentReferenceSyncService: Symbol.for('FragmentReferenceSyncService'),
   ImageStorageService: Symbol.for('ImageStorageService'),
-  
+
+  // 变量系统领域服务
+  SimpleTemplateProcessor: Symbol.for('SimpleTemplateProcessor'),
+  FrontmatterParser: Symbol.for('FrontmatterParser'),
+  FolderVariableResolver: Symbol.for('FolderVariableResolver'),
+  VariableMerger: Symbol.for('VariableMerger'),
+
   // 应用服务
   ApplicationService: Symbol.for('ApplicationService'),
   DocumentUseCases: Symbol.for('DocumentUseCases'),
   FolderUseCases: Symbol.for('FolderUseCases'),
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
   GitUseCases: Symbol.for('GitUseCases'),
+  VariableUseCases: Symbol.for('VariableUseCases'),
   
   // 基础设施
   StorageAdapter: Symbol.for('StorageAdapter'),

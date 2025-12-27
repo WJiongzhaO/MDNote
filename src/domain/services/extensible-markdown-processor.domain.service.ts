@@ -51,7 +51,16 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   // 图表存储管理
   private chartStorage: Map<string, ChartStorageEntry> = new Map();
 
+  // 用于调试的单例ID
+  private static instanceCounter = 0;
+  private readonly instanceId: number;
+
   constructor() {
+    // 分配实例ID用于调试
+    ExtensibleMarkdownProcessor.instanceCounter++;
+    this.instanceId = ExtensibleMarkdownProcessor.instanceCounter;
+    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId} created`);
+
     this.configureMarked();
     this.registerDefaultExtensions();
   }
@@ -161,7 +170,7 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
     });
   }
 
-  async processMarkdown(content: string): Promise<string> {
+  async processMarkdown(content: string, variables: Record<string, any> = {}): Promise<string> {
     // 预处理扩展
     let processedContent = content;
     for (const extension of this.getExtensionsByPriority()) {
@@ -170,9 +179,11 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
       }
     }
 
-    // 模板处理
+    // 模板处理（使用传入的变量）
     if (this.templateProcessor) {
-      processedContent = await this.templateProcessor.processTemplate(processedContent, {});
+      processedContent = await this.templateProcessor.processTemplate(processedContent, variables);
+    } else {
+      console.warn(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId}: Template processor not configured, variables will not be replaced`);
     }
 
     // Markdown 转换
@@ -266,14 +277,17 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
 
   setTemplateProcessor(processor: TemplateProcessor): void {
     this.templateProcessor = processor;
+    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId}: Template processor configured`);
   }
 
   setMathRenderer(renderer: MathRenderer): void {
     this.mathRenderer = renderer;
+    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId}: Math renderer configured`);
   }
 
   setMermaidRenderer(renderer: MermaidRenderer): void {
     this.mermaidRenderer = renderer;
+    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId}: Mermaid renderer configured`);
   }
 
   private getExtensionsByPriority(): MarkdownExtension[] {

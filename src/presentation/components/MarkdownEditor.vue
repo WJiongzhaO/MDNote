@@ -212,7 +212,7 @@ import { TYPES } from '../../core/container/container.types';
 
 interface Props {
   document: DocumentResponse | null;
-  renderMarkdown: (content: string, documentId?: string) => Promise<string>;
+  renderMarkdown: (content: string, documentId?: string, variables?: Record<string, any>) => Promise<string>;
 }
 
 interface Emits {
@@ -224,7 +224,9 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const title = ref('');
-const content = ref(''); // 原始 Markdown 内容（包含引用标志）
+const content = ref(''); // 原始 Markdown 内容（包含 frontmatter 和正文）
+const frontmatter = ref(''); // frontmatter 部分
+const mainContent = ref(''); // 正文内容（不包含 frontmatter）
 const renderedContent = ref(''); // 预览渲染内容
 const hasChanges = ref(false);
 const isEditorFocused = ref(false); // 编辑器是否获得焦点
@@ -249,6 +251,37 @@ const currentSelectionEnd = ref(0);
 const showFormulaEditor = ref(false);
 const currentFormulaCode = ref('');
 const currentFormulaType = ref<'inline' | 'block'>('inline');
+
+/**
+ * 分离 frontmatter 和正文内容
+ */
+const splitContent = (fullContent: string) => {
+  const trimmed = fullContent.trimStart();
+  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n?/;
+  const match = trimmed.match(frontmatterRegex);
+
+  if (match) {
+    return {
+      frontmatter: match[0],
+      mainContent: trimmed.substring(match[0].length)
+    };
+  }
+
+  return {
+    frontmatter: '',
+    mainContent: trimmed
+  };
+};
+
+/**
+ * 合并 frontmatter 和正文内容
+ */
+const mergeContent = (fm: string, main: string) => {
+  if (fm && fm.trim()) {
+    return fm + '\n' + main;
+  }
+  return main;
+};
 
 // 引用文档对话框相关状态
 const showReferenceDialog = ref(false);
@@ -316,8 +349,11 @@ const handleEditorInput = async (event: Event) => {
   if (!editor) return;
 
   // 获取纯文本内容（移除所有HTML标签）
-  const newContent = getTextContent(editor);
-  content.value = newContent;
+  const newMainContent = getTextContent(editor);
+  mainContent.value = newMainContent;
+
+  // 更新完整内容（frontmatter + mainContent）
+  content.value = mergeContent(frontmatter.value, mainContent.value);
 
   // 检测引用标志是否被修改
   if (props.document && lastContent) {
@@ -451,14 +487,14 @@ const handlePaste = async (event: ClipboardEvent) => {
 // 应用编辑器标注（高亮引用标志、代码块等）
 const applyEditorAnnotations = async () => {
   const editor = editorElement.value;
-  if (!editor || !content.value) {
-    if (editor && !content.value) {
+  if (!editor || !mainContent.value) {
+    if (editor && !mainContent.value) {
       editor.textContent = '';
     }
     return;
   }
 
-  console.log('[标注] 开始应用编辑器标注，内容长度:', content.value.length);
+  console.log('[标注] 开始应用编辑器标注，内容长度:', mainContent.value.length);
 
   try {
     // 保存当前光标位置
@@ -473,10 +509,10 @@ const applyEditorAnnotations = async () => {
       cursorPosition = preRange.toString().length;
     }
 
-    // 解析引用标志
+    // 解析引用标志（基于正文内容）
     const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
     const parser = new FragmentReferenceParser();
-    const references = parser.parseReferences(content.value);
+    const references = parser.parseReferences(mainContent.value);
     console.log('[标注] 解析到引用数量:', references.length, references);
 
     // 解析代码块（包括mermaid）
@@ -486,16 +522,16 @@ const applyEditorAnnotations = async () => {
     const formulaRegex = /\$\$[\s\S]*?\$\$/g;
 
     let match: RegExpExecArray | null;
-    while ((match = mermaidRegex.exec(content.value)) !== null) {
+    while ((match = mermaidRegex.exec(mainContent.value)) !== null) {
       codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'mermaid' });
     }
-    while ((match = codeRegex.exec(content.value)) !== null) {
+    while ((match = codeRegex.exec(mainContent.value)) !== null) {
       // 跳过已经匹配的mermaid块
       if (!codeBlocks.some(cb => cb.start === match!.index)) {
         codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'code' });
       }
     }
-    while ((match = formulaRegex.exec(content.value)) !== null) {
+    while ((match = formulaRegex.exec(mainContent.value)) !== null) {
       codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'formula' });
     }
 
@@ -565,7 +601,7 @@ const applyEditorAnnotations = async () => {
             mode: mode,
             start: ref.startIndex,
             end: ref.endIndex,
-            text: content.value.substring(ref.startIndex, ref.endIndex)
+            text: mainContent.value.substring(ref.startIndex, ref.endIndex)
           });
       }
     });
@@ -588,12 +624,12 @@ const applyEditorAnnotations = async () => {
     annotations.forEach(ann => {
       // 添加标注前的文本
       if (ann.start > lastIndex) {
-        const text = content.value.substring(lastIndex, ann.start);
+        const text = mainContent.value.substring(lastIndex, ann.start);
         annotatedHtml += escapeHtml(text);
       }
 
       // 添加标注
-      const text = content.value.substring(ann.start, ann.end);
+      const text = mainContent.value.substring(ann.start, ann.end);
       let className = '';
       let title = '';
 
@@ -663,8 +699,8 @@ const applyEditorAnnotations = async () => {
     });
 
     // 添加剩余的文本
-    if (lastIndex < content.value.length) {
-      annotatedHtml += escapeHtml(content.value.substring(lastIndex));
+    if (lastIndex < mainContent.value.length) {
+      annotatedHtml += escapeHtml(mainContent.value.substring(lastIndex));
     }
 
     // 更新编辑器内容
@@ -688,7 +724,7 @@ const applyEditorAnnotations = async () => {
       }
     } else {
       // 即使没有标注，也使用innerHTML以确保格式正确
-      editor.innerHTML = escapeHtml(content.value).replace(/\n/g, '<br>');
+      editor.innerHTML = escapeHtml(mainContent.value).replace(/\n/g, '<br>');
       console.log('[标注] 没有标注，使用纯文本HTML');
     }
 
@@ -726,7 +762,7 @@ const applyEditorAnnotations = async () => {
   } catch (error) {
     console.error('Error applying editor annotations:', error);
     // 出错时显示纯文本（转义HTML）
-    editor.innerHTML = escapeHtml(content.value).replace(/\n/g, '<br>');
+    editor.innerHTML = escapeHtml(mainContent.value).replace(/\n/g, '<br>');
   }
 };
 
@@ -939,19 +975,63 @@ const getReferenceMetadata = async (docId?: string): Promise<Array<{ fragmentId:
 // 渲染预览内容
 const renderContent = async () => {
   // 只要有内容就渲染，即使是空字符串也要渲染（可能是新文件）
-  if (content.value !== undefined && content.value !== null) {
+  if (mainContent.value !== undefined && mainContent.value !== null) {
     try {
       // 传递documentId以处理图片路径（如果有document）
       // 对于外部文件，传递文件路径（不带file:前缀，因为renderMarkdown会处理）
       let docId: string | undefined;
+      let docPath: string | undefined;
       if (props.document) {
         docId = props.document.id;
+        docPath = props.document.id; // 数据库文档使用ID作为路径
       } else if (currentFilePath.value) {
         // 对于外部文件，直接使用文件路径
         docId = currentFilePath.value;
+        docPath = currentFilePath.value;
       }
 
-      renderedContent.value = await props.renderMarkdown(content.value, docId);
+      // 获取合并后的变量（document + folder + global）
+      let variables: Record<string, any> = {};
+      try {
+        const application = Application.getInstance();
+        const variableUseCases = application.getVariableUseCases();
+
+        // 获取完整内容（包含frontmatter）
+        const fullContent = content.value || '';
+
+        const result = await variableUseCases.getVariables({
+          documentPath: docPath,
+          documentContent: fullContent
+        });
+
+        variables = result.variables;
+        console.log('[renderContent] Variables for replacement:', variables);
+      } catch (error) {
+        console.warn('Failed to get variables:', error);
+        // 如果获取变量失败，使用空对象
+        variables = {};
+      }
+
+      // 在渲染前直接在文本层面替换变量
+      let processedContent = mainContent.value;
+
+      // 匹配 {{variableName}} 格式
+      const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
+
+      processedContent = processedContent.replace(variablePattern, (match, varName) => {
+        if (variables.hasOwnProperty(varName)) {
+          const value = variables[varName];
+          console.log(`[renderContent] Replacing {{${varName}}} with ${value}`);
+          return String(value);
+        }
+        console.log(`[renderContent] Variable ${varName} not found, keeping ${match}`);
+        return match; // 变量不存在，保持原样
+      });
+
+      console.log('[renderContent] Content before markdown:', processedContent.substring(0, 100));
+
+      // 渲染已替换变量的内容（不传递变量给 markdown 处理器）
+      renderedContent.value = await props.renderMarkdown(processedContent, docId);
       await nextTick();
       adjustPreviewHeight();
 
@@ -1670,13 +1750,20 @@ const setContent = (newTitle: string, newContent: string, filePath?: string) => 
   if (filePath) {
     currentFilePath.value = filePath;
   }
+
+  // 分离 frontmatter 和正文
+  const { frontmatter: fm, mainContent: main } = splitContent(newContent || '');
+  frontmatter.value = fm;
+  mainContent.value = main;
+
   // 使用nextTick确保DOM更新后再渲染
   nextTick(() => {
     renderContent();
     const editor = editorElement.value;
     if (editor) {
+      // 在编辑器中只显示正文内容（不包含 frontmatter）
       if (isEditorFocused.value) {
-        editor.textContent = content.value;
+        editor.textContent = mainContent.value;
       } else {
         applyEditorAnnotations();
       }
@@ -1689,7 +1776,14 @@ const refreshContent = () => {
   renderContent();
 };
 
-const getContent = () => content.value;
+const getContent = () => {
+  // 获取编辑器当前内容
+  const editor = editorElement.value;
+  const currentMainContent = editor ? editor.textContent || '' : mainContent.value;
+
+  // 合并 frontmatter 和正文
+  return mergeContent(frontmatter.value, currentMainContent);
+};
 
 // 获取选中的文本（供外部调用）
 const getSelectedText = () => {

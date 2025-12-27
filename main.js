@@ -239,6 +239,33 @@ function createWindow() {
     });
   });
 
+  // 将渲染进程的控制台输出重定向到主进程终端
+  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const prefix = level === 1 ? '[Renderer Error]' :
+                   level === 2 ? '[Renderer Warning]' :
+                   level === 3 ? '[Renderer Info]' :
+                   level === 4 ? '[Renderer Debug]' : '[Renderer Log]';
+
+    console.log(`${prefix} ${message}`);
+    if (line) {
+      console.log(`    at ${sourceId}:${line}`);
+    }
+  });
+
+  // 监听所有控制台消息，包括错误和警告
+  win.webContents.on('did-finish-load', () => {
+    console.log('[Main Process] Window finished loading');
+  });
+
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('[Main Process] Failed to load:', errorCode, errorDescription, validatedURL);
+  });
+
+  // 监听渲染进程的未捕获异常
+  win.webContents.on('render-process-gone', (event, details) => {
+    console.error('[Main Process] Render process gone:', details);
+  });
+
   if (isDev) {
     win.loadURL('http://localhost:5173');
     win.webContents.openDevTools();

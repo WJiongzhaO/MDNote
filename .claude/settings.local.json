@@ -27,7 +27,9 @@
       "Bash(npm run test:electron:*)",
       "Bash(powershell:*)",
       "Bash(timeout:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "mcp__zai-mcp-server__analyze_image"
     ]
   }
 }
