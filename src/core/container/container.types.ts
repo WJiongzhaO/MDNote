@@ -7,7 +7,7 @@ export const TYPES = {
   FolderRepository: Symbol.for('FolderRepository'),
   KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
   GitRepository: Symbol.for('GitRepository'),
-  
+
   // 领域服务
   MarkdownProcessor: Symbol.for('MarkdownProcessor'),
   ExtensibleMarkdownProcessor: Symbol.for('ExtensibleMarkdownProcessor'),
@@ -27,7 +27,7 @@ export const TYPES = {
   FrontmatterParser: Symbol.for('FrontmatterParser'),
   FolderVariableResolver: Symbol.for('FolderVariableResolver'),
   VariableMerger: Symbol.for('VariableMerger'),
-  
+
   // 应用服务
   ApplicationService: Symbol.for('ApplicationService'),
   DocumentUseCases: Symbol.for('DocumentUseCases'),
@@ -36,16 +36,23 @@ export const TYPES = {
   GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
-  
+
   // 导出服务
   ExportFactory: Symbol.for('ExportFactory'),
-  
+
   // 基础设施
   StorageAdapter: Symbol.for('StorageAdapter'),
   AssetManager: Symbol.for('AssetManager'),
-  
+
   // 事件总线
   EventBus: Symbol.for('EventBus'),
+
+  // 文件打开策略
+  FileOpenerManager: Symbol.for('FileOpenerManager'),
+  MarkdownFileOpenerStrategy: Symbol.for('MarkdownFileOpenerStrategy'),
+  TextFileOpenerStrategy: Symbol.for('TextFileOpenerStrategy'),
+  JsonFileOpenerStrategy: Symbol.for('JsonFileOpenerStrategy'),
+  ImageFileOpenerStrategy: Symbol.for('ImageFileOpenerStrategy'),
 } as const;
 
 export interface ServiceContainer {

@@ -3,13 +3,18 @@
  * 用于处理导出过程中的图片、公式等资源
  */
 
+// 类型守卫函数：确保值是字符串类型
+function isString(value: unknown): value is string {
+  return typeof value === 'string' && value !== null && value !== undefined;
+}
+
 /**
  * 将图片路径转换为 base64 data URL
  */
 export async function convertImageToBase64(imagePath: string): Promise<string | null> {
   try {
     const electronAPI = (window as any).electronAPI;
-    
+
     // 如果已经是 base64 或 data URL，直接返回
     if (imagePath.startsWith('data:') || imagePath.startsWith('base64:')) {
       return imagePath;
@@ -23,7 +28,7 @@ export async function convertImageToBase64(imagePath: string): Promise<string | 
         if (filePath.startsWith('file://')) {
           filePath = filePath.substring(7); // 移除 'file://' 前缀
         }
-        
+
         const buffer = await electronAPI.file.readBinary(filePath);
         if (buffer) {
           // 检测图片类型
@@ -85,7 +90,10 @@ function arrayBufferToBase64(buffer: ArrayBuffer | Uint8Array, mimeType: string)
   // 将字节数组转换为 base64 字符串
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+    const byte = bytes[i];
+    if (byte !== undefined) {
+      binary += String.fromCharCode(byte);
+    }
   }
   const base64 = btoa(binary);
   return `data:${mimeType};base64,${base64}`;
@@ -142,24 +150,32 @@ export async function processImagesInHTML(html: string, documentId?: string): Pr
 
   // 收集所有需要处理的图片
   const imageMatches: Array<{ fullMatch: string; attributes: string; src: string }> = [];
-  let match;
-  
+  let match: RegExpExecArray | null;
+
   while ((match = imgRegex.exec(html)) !== null) {
     const fullMatch = match[0];
     const attributes = match[1];
-    const src = match[2];
+    const srcValue = match[2];
+
+    // 确保 src 存在且是字符串（使用类型守卫）
+    if (!isString(srcValue)) {
+      continue;
+    }
 
     // 跳过已经是 base64 的图片
-    if (src.startsWith('data:') || src.startsWith('base64:')) {
+    if (srcValue.startsWith('data:') || srcValue.startsWith('base64:')) {
       continue;
     }
 
     // 跳过 http/https 链接（如果是外部链接，保持原样）
-    if (src.startsWith('http://') || src.startsWith('https://')) {
+    if (srcValue.startsWith('http://') || srcValue.startsWith('https://')) {
       continue;
     }
 
-    imageMatches.push({ fullMatch, attributes, src });
+    // 此时 srcValue 已经被类型守卫确认为 string 类型
+    // 由于 TypeScript 的类型收窄可能不够，使用类型断言
+    // @ts-ignore - 类型守卫已经确保了 srcValue 是 string 类型
+    imageMatches.push({ fullMatch, attributes, src: srcValue });
   }
 
   // 处理每个图片
@@ -180,11 +196,14 @@ export async function processImagesInHTML(html: string, documentId?: string): Pr
       if (src.startsWith('./assets/') && documentId && electronAPI?.file?.getFullPath) {
         try {
           const fileName = src.replace('./assets/', '');
+          if (!fileName) {
+            return;
+          }
           let relativePath: string;
 
           // 判断文档类型
-          const isExternalFile = documentId.startsWith('file:') || 
-                                 documentId.includes('/') || 
+          const isExternalFile = documentId.startsWith('file:') ||
+                                 documentId.includes('/') ||
                                  documentId.includes('\\') ||
                                  (documentId.length > 0 && (documentId[1] === ':' || documentId.startsWith('/')));
 
@@ -193,18 +212,36 @@ export async function processImagesInHTML(html: string, documentId?: string): Pr
             if (filePath.startsWith('file:')) {
               filePath = filePath.substring(5);
             }
-            const pathParts = filePath.split(/[/\\]/);
-            pathParts.pop();
-            const fileDir = pathParts.join('/');
+
+            // 判断是文件路径还是目录路径
+            const commonExtensions = ['.md', '.txt', '.json', '.html', '.htm', '.css', '.js', '.ts', '.vue', '.jsx', '.tsx'];
+            const isFilePath = commonExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
+
+            let fileDir: string;
+            if (isFilePath) {
+              // 是文件路径，提取文件所在目录
+              const pathParts = filePath.split(/[/\\]/);
+              pathParts.pop();
+              fileDir = pathParts.join('/');
+            } else {
+              // 已经是目录路径，直接使用
+              fileDir = filePath;
+            }
+
             relativePath = `${fileDir}/assets/${fileName}`;
           } else if (documentId.startsWith('fragment:')) {
             const fragmentId = documentId.substring(9);
             relativePath = `fragments/assets/${fragmentId}/${fileName}`;
+            // 知识片段使用全局路径
+            if (electronAPI.fragment && electronAPI.fragment.getFullPath) {
+              imagePath = await electronAPI.fragment.getFullPath(relativePath);
+            } else {
+              imagePath = await electronAPI.file.getFullPath(relativePath);
+            }
           } else {
             relativePath = `documents/${documentId}/assets/${fileName}`;
+            imagePath = await electronAPI.file.getFullPath(relativePath);
           }
-
-          imagePath = await electronAPI.file.getFullPath(relativePath);
         } catch (error) {
           console.warn('Failed to get full path for image:', src, error);
         }
@@ -236,7 +273,7 @@ export function getKaTeXStyles(): string {
   return `
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
   `;
-  
+
   // 如果需要内联 CSS（离线支持），可以读取 node_modules/katex/dist/katex.min.css
   // 但会增加 HTML 文件大小，这里使用 CDN 更合适
 }

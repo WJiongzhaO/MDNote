@@ -176,10 +176,10 @@ const handleRename = () => {
 
 const createNewFile = async () => {
   if (!newFileName.value.trim()) return;
-  
+
   const parentPath = contextMenuParentPath.value || currentPath.value;
   const filePath = `${parentPath}/${newFileName.value}`;
-  
+
   try {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.file && electronAPI.file.writeFileContent) {
@@ -196,10 +196,10 @@ const createNewFile = async () => {
 
 const createNewFolder = async () => {
   if (!newFolderName.value.trim()) return;
-  
+
   const parentPath = contextMenuParentPath.value || currentPath.value;
   const folderPath = `${parentPath}/${newFolderName.value}`;
-  
+
   try {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.file) {
@@ -233,7 +233,7 @@ const getParentPath = (filePath: string): string => {
 
 const loadFolder = async (folderPath: string) => {
   if (!folderPath) return;
-  
+
   try {
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI || !electronAPI.file || !electronAPI.file.readDirectory) {
@@ -252,7 +252,7 @@ const loadFolder = async (folderPath: string) => {
 
 const buildFileTree = (items: Array<{ name: string; type: 'file' | 'folder'; path: string }>, rootPath: string): FileNode[] => {
   const tree: FileNode[] = [];
-  
+
   // 直接构建树结构（只处理一级）
   for (const item of items) {
     const node: FileNode = {
@@ -271,12 +271,12 @@ const buildFileTree = (items: Array<{ name: string; type: 'file' | 'folder'; pat
 // 加载文件夹的子项
 const loadFolderChildren = async (folderNode: FileNode) => {
   if (folderNode.type !== 'folder' || folderNode.children === undefined) return;
-  
+
   try {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.file && electronAPI.file.readDirectory) {
       const items = await electronAPI.file.readDirectory(folderNode.path);
-      folderNode.children = items.map(item => ({
+      folderNode.children = items.map((item: { name: string; path: string; type: 'file' | 'folder' }) => ({
         name: item.name,
         path: item.path,
         type: item.type,
@@ -306,7 +306,7 @@ let menuHandlers: Array<() => void> = [];
 
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside);
-  
+
   // 尝试加载上次打开的文件夹
   try {
     const electronAPI = (window as any).electronAPI;
@@ -322,18 +322,21 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error loading last opened folder:', error);
   }
-  
+
   // 监听主进程发送的恢复文件夹事件
+  // 注意：恢复文件夹时不应该触发 open-folder 事件，因为这会修改工作目录
+  // 恢复文件夹只是加载文件夹内容，不改变项目的工作目录
   const electronAPI = (window as any).electronAPI;
   if (electronAPI && electronAPI.on) {
     electronAPI.on('app:restore-last-folder', async (folderPath: string) => {
       if (folderPath) {
         await loadFolder(folderPath);
-        emit('open-folder', folderPath);
+        // 不 emit('open-folder')，因为这是恢复操作，不应该修改工作目录
+        // emit('open-folder', folderPath);
       }
     });
   }
-  
+
   // 监听菜单事件（只注册一次）
   if (electronAPI && electronAPI.menu) {
     const newFileHandler = () => {
@@ -350,7 +353,7 @@ onMounted(async () => {
         });
       }
     };
-    
+
     const newFolderHandler = () => {
       if (currentPath.value) {
         handleNewFolder();
@@ -365,7 +368,7 @@ onMounted(async () => {
       }
     };
 
-    const openFolderHandler = async (event: any, folderPath: string) => {
+    const openFolderHandler = async (folderPath?: string) => {
       // folderPath 是从主进程发送过来的
       if (folderPath) {
         await loadFolder(folderPath);
@@ -376,10 +379,10 @@ onMounted(async () => {
     // 注册监听器
     electronAPI.menu.onNewFile(newFileHandler);
     electronAPI.menu.onNewFolder(newFolderHandler);
-    electronAPI.menu.onOpenFolder(openFolderHandler);
-    
+    electronAPI.menu.onOpenFolder(openFolderHandler as any);
+
     // 保存处理器引用以便清理
-    menuHandlers = [newFileHandler, newFolderHandler, openFolderHandler];
+    menuHandlers = [newFileHandler, newFolderHandler, openFolderHandler as any];
   }
 });
 

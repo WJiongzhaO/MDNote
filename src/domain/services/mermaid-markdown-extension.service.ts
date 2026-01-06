@@ -87,7 +87,63 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
   postProcess(html: string): string {
     // 处理内联的Mermaid语法（如果有的话）
     // 这里可以添加对 `mermaid` 内联语法的支持
-    return html;
+    
+    // 移除已经被占位符替换的mermaid代码块
+    // 如果HTML中同时存在占位符和对应的代码块，移除代码块
+    // 注意：在Node.js环境中，document可能不存在，需要检查
+    if (typeof document !== 'undefined') {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      
+      // 查找所有mermaid占位符
+      const placeholders = tempDiv.querySelectorAll('.mermaid-asset-placeholder[data-asset-type="mermaid"]');
+      
+      placeholders.forEach(placeholder => {
+        // 查找占位符后面的代码块（可能是marked默认渲染的）
+        let nextSibling = placeholder.nextElementSibling;
+        while (nextSibling) {
+          // 检查是否是mermaid代码块
+          const codeElement = nextSibling.querySelector('code.language-mermaid, pre code.language-mermaid');
+          if (codeElement) {
+            // 移除这个代码块
+            nextSibling.remove();
+            break;
+          }
+          nextSibling = nextSibling.nextElementSibling;
+        }
+        
+        // 也检查占位符前面的代码块（以防万一）
+        let prevSibling = placeholder.previousElementSibling;
+        while (prevSibling) {
+          const codeElement = prevSibling.querySelector('code.language-mermaid, pre code.language-mermaid');
+          if (codeElement) {
+            prevSibling.remove();
+            break;
+          }
+          prevSibling = prevSibling.previousElementSibling;
+        }
+      });
+      
+      return tempDiv.innerHTML;
+    }
+    
+    // 如果document不存在，使用正则表达式移除重复的代码块
+    // 查找紧跟在占位符后面的mermaid代码块
+    let result = html;
+    
+    // 匹配占位符后面的代码块
+    const placeholderAfterPattern = /(<div[^>]*class="mermaid-asset-placeholder"[^>]*>[\s\S]*?<\/div>)\s*(<pre><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>[\s\S]*?<\/code><\/pre>)/g;
+    result = result.replace(placeholderAfterPattern, '$1');
+    
+    // 匹配占位符前面的代码块
+    const placeholderBeforePattern = /(<pre><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>[\s\S]*?<\/code><\/pre>)\s*(<div[^>]*class="mermaid-asset-placeholder"[^>]*>[\s\S]*?<\/div>)/g;
+    result = result.replace(placeholderBeforePattern, '$2');
+    
+    // 更通用的匹配：查找所有独立的mermaid代码块（不在占位符附近的）
+    // 但保留那些没有对应占位符的代码块（可能是用户故意写的）
+    // 这里我们只移除紧邻占位符的代码块
+    
+    return result;
   }
 
   private createErrorFallback(diagram: string, error: Error): string {

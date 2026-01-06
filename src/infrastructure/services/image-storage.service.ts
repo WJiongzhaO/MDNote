@@ -26,15 +26,55 @@ export class FileSystemImageStorageService implements ImageStorageService {
    * 注意：对于数据库文档，返回相对路径（不含data/前缀），因为dataPath会在主进程中处理
    */
   getDocumentAssetsPath(documentId: string): string {
-    // 如果documentId以file:开头，说明是外部文件，需要提取文件所在目录
+    // 如果documentId以file:开头，说明是外部文件
     if (documentId.startsWith('file:')) {
       const filePath = documentId.substring(5); // 移除 'file:' 前缀
-      // 提取文件所在目录（去掉文件名）
-      const pathParts = filePath.split(/[/\\]/);
-      pathParts.pop(); // 移除文件名
-      const fileDir = pathParts.join('/');
-      return `${fileDir}/${this.ASSETS_DIR}`;
+      console.log('[FileSystemImageStorageService] getDocumentAssetsPath - filePath:', filePath);
+
+      // 判断是文件路径还是目录路径
+      // 如果路径以常见文件扩展名结尾，说明是文件路径，需要提取目录
+      // 否则可能是目录路径，直接使用
+      const commonExtensions = ['.md', '.txt', '.json', '.html', '.htm', '.css', '.js', '.ts', '.vue', '.jsx', '.tsx'];
+      const isFilePath = commonExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
+
+      let fileDir: string;
+      if (isFilePath) {
+        // 是文件路径，提取文件所在目录
+        const pathParts = filePath.split(/[/\\]/);
+        pathParts.pop(); // 移除文件名，保留目录部分
+        fileDir = pathParts.join('/');
+      } else {
+        // 已经是目录路径，直接使用
+        fileDir = filePath;
+      }
+
+      const assetsPath = `${fileDir}/${this.ASSETS_DIR}`;
+      console.log('[FileSystemImageStorageService] getDocumentAssetsPath - assetsPath:', assetsPath);
+      return assetsPath;
     }
+
+    // 如果documentId包含路径分隔符，说明是外部文件路径（没有file:前缀）
+    if (documentId.includes('/') || documentId.includes('\\')) {
+      // 判断是文件路径还是目录路径
+      const commonExtensions = ['.md', '.txt', '.json', '.html', '.htm', '.css', '.js', '.ts', '.vue', '.jsx', '.tsx'];
+      const isFilePath = commonExtensions.some(ext => documentId.toLowerCase().endsWith(ext));
+
+      let fileDir: string;
+      if (isFilePath) {
+        // 是文件路径，提取文件所在目录
+        const pathParts = documentId.split(/[/\\]/);
+        pathParts.pop(); // 移除文件名，保留目录部分
+        fileDir = pathParts.join('/');
+      } else {
+        // 已经是目录路径，直接使用
+        fileDir = documentId;
+      }
+
+      const assetsPath = `${fileDir}/${this.ASSETS_DIR}`;
+      console.log('[FileSystemImageStorageService] getDocumentAssetsPath - external file path, assetsPath:', assetsPath);
+      return assetsPath;
+    }
+
     // 数据库文档：返回相对路径（不含data/前缀）
     return `documents/${documentId}/${this.ASSETS_DIR}`;
   }
@@ -52,10 +92,14 @@ export class FileSystemImageStorageService implements ImageStorageService {
    * 保存图片到文档的assets目录
    */
   async saveImageToDocument(documentId: string, imageFile: File | string): Promise<string> {
+    console.log('[FileSystemImageStorageService] saveImageToDocument called, documentId:', documentId);
     const assetsPath = this.getDocumentAssetsPath(documentId);
-    
+    console.log('[FileSystemImageStorageService] Assets path:', assetsPath);
+
     // 确保目录存在
+    console.log('[FileSystemImageStorageService] Ensuring directory exists:', assetsPath);
     await this.ensureDirectoryExists(assetsPath);
+    console.log('[FileSystemImageStorageService] Directory ensured');
 
     let fileName: string;
     let fileBuffer: Uint8Array;
@@ -63,7 +107,9 @@ export class FileSystemImageStorageService implements ImageStorageService {
     if (imageFile instanceof File) {
       // 浏览器环境：从File对象读取
       fileName = imageFile.name;
+      console.log('[FileSystemImageStorageService] Reading file:', fileName, 'size:', imageFile.size);
       fileBuffer = new Uint8Array(await imageFile.arrayBuffer());
+      console.log('[FileSystemImageStorageService] File buffer size:', fileBuffer.length);
     } else {
       // 文件路径：需要读取文件
       fileName = this.getFileNameFromPath(imageFile);
@@ -74,16 +120,22 @@ export class FileSystemImageStorageService implements ImageStorageService {
     const hash = this.generateHash(fileBuffer);
     const ext = this.getFileExtension(fileName);
     const nameWithoutExt = this.getFileNameWithoutExtension(fileName);
-    
+
     // 新文件名：原文件名_hash值.扩展名
     const uniqueFileName = `${nameWithoutExt}_${hash}${ext}`;
     const filePath = `${assetsPath}/${uniqueFileName}`;
+    console.log('[FileSystemImageStorageService] Full file path:', filePath);
+    console.log('[FileSystemImageStorageService] Unique file name:', uniqueFileName);
 
     // 保存文件
+    console.log('[FileSystemImageStorageService] Writing binary file...');
     await this.writeBinaryFile(filePath, fileBuffer);
+    console.log('[FileSystemImageStorageService] Binary file written successfully');
 
     // 返回相对路径（用于Markdown引用）
-    return `./assets/${uniqueFileName}`;
+    const relativePath = `./assets/${uniqueFileName}`;
+    console.log('[FileSystemImageStorageService] Returning relative path:', relativePath);
+    return relativePath;
   }
 
   /**
@@ -94,7 +146,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
       console.log('=== 开始复制图片 ===');
       console.log('源路径:', sourcePath);
       console.log('目标路径:', destPath);
-      
+
       const electronAPI = (window as any).electronAPI;
       if (!electronAPI || !electronAPI.file) {
         throw new Error('electronAPI is not available');
@@ -104,7 +156,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
       // 对于绝对路径（外部文件），使用 existsPath；对于相对路径，使用 exists
       const isAbsolutePath = sourcePath.includes(':') || sourcePath.startsWith('/');
       let sourceExists = false;
-      
+
       if (isAbsolutePath) {
         // 绝对路径：使用 existsPath
         if (electronAPI.file.existsPath) {
@@ -119,7 +171,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
           sourceExists = await electronAPI.file.exists(sourcePath);
         }
       }
-      
+
       console.log('源文件是否存在:', sourceExists, '(路径类型:', isAbsolutePath ? '绝对路径' : '相对路径', ')');
       if (!sourceExists) {
         console.error('源文件不存在:', sourcePath);
@@ -131,7 +183,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
       const isDestAbsolute = destPath.includes(':') || destPath.startsWith('/');
       let destPathForCopy = destPath;
       let destPathForCheck = destPath;
-      
+
       if (!isDestAbsolute) {
         // 相对路径：需要获取dataPath并构建完整路径用于复制
         const dataPath = await electronAPI.file.getDataPath();
@@ -152,7 +204,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
       console.log('执行文件复制...');
       await electronAPI.file.copy(sourcePath, destPathForCopy);
       console.log('文件复制成功');
-      
+
       // 验证目标文件是否存在
       // 使用相对路径检查（file:exists 期望相对路径）
       if (electronAPI.file.exists) {
@@ -173,7 +225,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
           }
         }
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error copying image:', error);
@@ -200,14 +252,14 @@ export class FileSystemImageStorageService implements ImageStorageService {
 
     // 读取源文件内容
     const fileBuffer = await this.readFileAsBuffer(sourcePath);
-    
+
     // 使用文件内容生成hash值
     const hash = this.generateHash(fileBuffer);
-    
+
     // 获取文件扩展名
     const ext = this.getFileExtension(originalName);
     const nameWithoutExt = this.getFileNameWithoutExtension(originalName);
-    
+
     // 新文件名：原文件名_hash值.扩展名
     const newFileName = `${nameWithoutExt}_${hash}${ext}`;
     const destPath = `${destDir}/${newFileName}`;
@@ -228,7 +280,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
   ): Promise<Map<string, string>> {
     const fragmentAssetsPath = this.getFragmentStoragePath(fragmentId);
     const documentAssetsPath = this.getDocumentAssetsPath(documentId);
-    
+
     // 确保目标目录存在
     await this.ensureDirectoryExists(documentAssetsPath);
 
@@ -237,7 +289,7 @@ export class FileSystemImageStorageService implements ImageStorageService {
     for (const imagePath of imagePaths) {
       // 解析图片路径
       const fileName = this.getFileNameFromPath(imagePath);
-      const sourcePath = imagePath.startsWith('./') 
+      const sourcePath = imagePath.startsWith('./')
         ? `${fragmentAssetsPath}/${fileName}`
         : imagePath;
 
@@ -273,15 +325,40 @@ export class FileSystemImageStorageService implements ImageStorageService {
           if (documentId.startsWith('file:')) {
             // 外部文件：提取文件所在目录
             const filePath = documentId.substring(5); // 移除 'file:' 前缀
-            const pathParts = filePath.split(/[/\\]/);
-            pathParts.pop(); // 移除文件名
-            const fileDir = pathParts.join('/');
+
+            // 判断是文件路径还是目录路径
+            const commonExtensions = ['.md', '.txt', '.json', '.html', '.htm', '.css', '.js', '.ts', '.vue', '.jsx', '.tsx'];
+            const isFilePath = commonExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
+
+            let fileDir: string;
+            if (isFilePath) {
+              // 是文件路径，提取文件所在目录
+              const pathParts = filePath.split(/[/\\]/);
+              pathParts.pop(); // 移除文件名
+              fileDir = pathParts.join('/');
+            } else {
+              // 已经是目录路径，直接使用
+              fileDir = filePath;
+            }
+
             relativePath = `${fileDir}/assets/${fileName}`;
           } else if (documentId.includes('/') || documentId.includes('\\')) {
             // 如果documentId包含路径分隔符，说明是外部文件路径（没有file:前缀）
-            const pathParts = documentId.split(/[/\\]/);
-            pathParts.pop(); // 移除文件名
-            const fileDir = pathParts.join('/');
+            // 判断是文件路径还是目录路径
+            const commonExtensions = ['.md', '.txt', '.json', '.html', '.htm', '.css', '.js', '.ts', '.vue', '.jsx', '.tsx'];
+            const isFilePath = commonExtensions.some(ext => documentId.toLowerCase().endsWith(ext));
+
+            let fileDir: string;
+            if (isFilePath) {
+              // 是文件路径，提取文件所在目录
+              const pathParts = documentId.split(/[/\\]/);
+              pathParts.pop(); // 移除文件名
+              fileDir = pathParts.join('/');
+            } else {
+              // 已经是目录路径，直接使用
+              fileDir = documentId;
+            }
+
             relativePath = `${fileDir}/assets/${fileName}`;
           } else {
             // 数据库文档：使用标准路径（相对于dataPath）
@@ -307,12 +384,16 @@ export class FileSystemImageStorageService implements ImageStorageService {
    */
   private async ensureDirectoryExists(dirPath: string): Promise<void> {
     try {
+      console.log('[FileSystemImageStorageService] ensureDirectoryExists called with path:', dirPath);
       const electronAPI = (window as any).electronAPI;
       if (electronAPI && electronAPI.file) {
         await electronAPI.file.mkdir(dirPath);
+        console.log('[FileSystemImageStorageService] Directory created/verified:', dirPath);
+      } else {
+        console.error('[FileSystemImageStorageService] electronAPI not available');
       }
     } catch (error) {
-      console.error('Error creating directory:', error);
+      console.error('[FileSystemImageStorageService] Error creating directory:', error);
       throw error;
     }
   }
@@ -327,10 +408,37 @@ export class FileSystemImageStorageService implements ImageStorageService {
         throw new Error('electronAPI is not available');
       }
 
-      const buffer = await electronAPI.file.readBinary(filePath);
+      // 如果是相对路径（知识片段路径），需要先转换为绝对路径
+      let absolutePath = filePath;
+      if (filePath.startsWith('fragments/')) {
+        // 知识片段路径：使用 fragment API 或 file API 转换为绝对路径
+        if (electronAPI.fragment && electronAPI.fragment.getFullPath) {
+          absolutePath = await electronAPI.fragment.getFullPath(filePath);
+          // getFullPath 返回的是 app:// 协议URL，需要转换为文件系统路径
+          absolutePath = absolutePath.replace(/^app:\/\//, '').replace(/\//g, '\\');
+        } else {
+          // 降级：使用 file API
+          absolutePath = await electronAPI.file.getFullPath(filePath);
+          // getFullPath 返回的是 app:// 协议URL，需要转换为文件系统路径
+          absolutePath = absolutePath.replace(/^app:\/\//, '').replace(/\//g, '\\');
+        }
+      } else if (!filePath.includes(':') && !filePath.startsWith('/') && !filePath.startsWith('\\')) {
+        // 相对路径（数据库文档路径），需要转换为绝对路径
+        absolutePath = await electronAPI.file.getFullPath(filePath);
+        // getFullPath 返回的是 app:// 协议URL，需要转换为文件系统路径
+        absolutePath = absolutePath.replace(/^app:\/\//, '').replace(/\//g, '\\');
+      } else {
+        // 已经是绝对路径（外部文件），直接使用
+        // 但需要确保路径格式正确（Windows 使用反斜杠）
+        absolutePath = filePath.replace(/\//g, '\\');
+      }
+
+      console.log('[FileSystemImageStorageService] Reading file from:', absolutePath);
+      const buffer = await electronAPI.file.readBinary(absolutePath);
+      console.log('[FileSystemImageStorageService] File read successfully, buffer size:', buffer.length);
       return new Uint8Array(buffer);
     } catch (error) {
-      console.error('Error reading file:', error);
+      console.error('[FileSystemImageStorageService] Error reading file:', error, 'filePath:', filePath);
       throw error;
     }
   }
@@ -340,14 +448,34 @@ export class FileSystemImageStorageService implements ImageStorageService {
    */
   private async writeBinaryFile(filePath: string, buffer: Uint8Array): Promise<void> {
     try {
+      console.log('[FileSystemImageStorageService] writeBinaryFile called with path:', filePath, 'buffer size:', buffer.length);
       const electronAPI = (window as any).electronAPI;
       if (!electronAPI || !electronAPI.file) {
         throw new Error('electronAPI is not available');
       }
 
-      await electronAPI.file.writeBinary(filePath, Array.from(buffer));
+      if (!electronAPI.file.writeBinary) {
+        throw new Error('writeBinary method not available');
+      }
+
+      // 如果是相对路径，需要转换为绝对路径
+      let absolutePath = filePath;
+      if (!filePath.includes(':') && !filePath.startsWith('/') && !filePath.startsWith('\\')) {
+        // 相对路径，需要转换为绝对路径
+        absolutePath = await electronAPI.file.getFullPath(filePath);
+        // getFullPath 返回的是 app:// 协议URL，需要转换为文件系统路径
+        absolutePath = absolutePath.replace(/^app:\/\//, '').replace(/\//g, '\\');
+      } else {
+        // 已经是绝对路径，确保使用正确的路径分隔符（Windows 使用反斜杠）
+        absolutePath = filePath.replace(/\//g, '\\');
+      }
+
+      console.log('[FileSystemImageStorageService] Writing to absolute path:', absolutePath);
+      console.log('[FileSystemImageStorageService] Calling electronAPI.file.writeBinary...');
+      await electronAPI.file.writeBinary(absolutePath, Array.from(buffer));
+      console.log('[FileSystemImageStorageService] writeBinary completed successfully');
     } catch (error) {
-      console.error('Error writing binary file:', error);
+      console.error('[FileSystemImageStorageService] Error writing binary file:', error, 'filePath:', filePath);
       throw error;
     }
   }

@@ -9,18 +9,18 @@
         @blur="updateDocument"
       />
       <div v-else class="title-placeholder">请选择或创建文档</div>
-      
+
       <div v-if="document || currentFilePath" class="editor-toolbar">
-        <button 
-          class="toolbar-btn" 
+        <button
+          class="toolbar-btn"
           @click="openMermaidEditor"
           title="编辑Mermaid图表"
         >
           📊 Mermaid编辑器
         </button>
         <!-- 添加公式编辑器按钮 -->
-        <button 
-          class="toolbar-btn" 
+        <button
+          class="toolbar-btn"
           @click="openFormulaEditor"
           title="编辑数学公式"
         >
@@ -114,7 +114,7 @@
       {{ hasChanges ? '未保存' : '已保存' }}
     </div>
 
-    <!-- 引用形态切换菜单 -->
+    <!-- 引用脱钩菜单 -->
     <div
       v-if="referenceContextMenu.visible"
       class="context-menu"
@@ -122,57 +122,12 @@
       @click.stop
       ref="contextMenuElement"
     >
-      <div class="context-menu-item" @click="switchReferenceMode('linked')">
-        <span class="menu-icon">🔗</span>
-        <span>强引用模式（跟随库更新）</span>
-      </div>
       <div class="context-menu-item" @click="switchReferenceMode('detached')">
         <span class="menu-icon">🔓</span>
-        <span>脱钩模式（可编辑，保留标记）</span>
-      </div>
-      <div class="context-menu-item" @click="switchReferenceMode('clean')">
-        <span class="menu-icon">✂️</span>
-        <span>完全断开（移除标记）</span>
-      </div>
-      <div class="context-menu-divider"></div>
-      <div class="context-menu-item" @click="viewReferenceInfo">
-        <span class="menu-icon">ℹ️</span>
-        <span>查看引用信息</span>
+        <span>脱钩（转为文档内容）</span>
       </div>
     </div>
 
-    <!-- 引用文档列表对话框 -->
-    <div v-if="showReferenceDialog" class="dialog-overlay" @click="showReferenceDialog = false">
-      <div class="dialog" @click.stop>
-        <div class="dialog-header">
-          <h3>引用文档列表</h3>
-          <button class="btn btn-icon" @click="showReferenceDialog = false">✕</button>
-        </div>
-        <div class="dialog-body">
-          <div v-if="referenceDocuments.length === 0" class="empty-state">
-            暂无文档引用此片段
-          </div>
-          <div v-else>
-            <div
-              v-for="doc in referenceDocuments"
-              :key="doc.documentId"
-              class="reference-document-item"
-              :class="{ connected: doc.isConnected, disconnected: !doc.isConnected }"
-              @click="navigateToDocument(doc.documentId)"
-            >
-              <span class="status-indicator" :class="{ connected: doc.isConnected, disconnected: !doc.isConnected }">
-                {{ doc.isConnected ? '🟢' : '🔴' }}
-              </span>
-              <span class="document-title">{{ doc.documentTitle }}</span>
-              <span class="document-status">{{ doc.isConnected ? '(已连接)' : '(已断开)' }}</span>
-            </div>
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn btn-primary" @click="showReferenceDialog = false">关闭</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Mermaid编辑器模态框 -->
     <div v-if="showMermaidEditor" class="modal-overlay" @click="closeMermaidEditor" style="
@@ -248,12 +203,11 @@ import { TYPES } from '../../core/container/container.types';
 
 interface Props {
   document: DocumentResponse | null;
-  renderMarkdown: (content: string, documentId?: string, variables?: Record<string, any>) => Promise<string>;
+  renderMarkdown: (content: string, documentId?: string, variables?: Record<string, any>, fileCache?: any) => Promise<string>;
 }
 
 interface Emits {
   (e: 'update-document', id: string, title: string, content: string): void;
-  (e: 'navigate-to-document', documentId: string): void;
 }
 
 const props = defineProps<Props>();
@@ -334,9 +288,6 @@ const mergeContent = (fm: string, main: string) => {
 };
 
 // 引用文档对话框相关状态
-const showReferenceDialog = ref(false);
-const referenceDocuments = ref<Array<{ documentId: string; documentTitle: string; referencedAt: string; isConnected: boolean }>>([]);
-const selectedFragmentId = ref<string | null>(null);
 
 // 引用右键菜单状态
 const referenceContextMenu = ref<{
@@ -357,21 +308,39 @@ const referenceContextMenu = ref<{
   currentMode: 'linked'
 });
 
-let debounceTimer: number | null = null;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSavedTitle = '';
 let lastSavedContent = '';
 
 watch(() => props.document, (newDocument) => {
   if (newDocument) {
+    // 检查是否是外部文件（包含 filePath 属性）
+    const filePath = (newDocument as any).filePath;
+
+    // 如果是外部文件，保留 currentFilePath
+    if (filePath) {
+      currentFilePath.value = filePath;
+      console.log('[MarkdownEditor] 外部文件，设置 currentFilePath:', filePath);
+    } else {
+      // 数据库文档，清空外部文件路径
+      currentFilePath.value = '';
+    }
+
     title.value = newDocument.title;
-    content.value = newDocument.content;
+    content.value = newDocument.content || '';
     lastSavedTitle = newDocument.title;
-    lastSavedContent = newDocument.content;
+    lastSavedContent = newDocument.content || '';
     hasChanges.value = false;
-    currentFilePath.value = ''; // 清空外部文件路径
+    console.log('[MarkdownEditor] 文档已加载，初始化 lastSavedTitle 和 lastSavedContent');
+
+    // 分离 frontmatter 和正文（关键：renderContent 使用 mainContent）
+    const { frontmatter: fm, mainContent: main } = splitContent(newDocument.content || '');
+    frontmatter.value = fm;
+    mainContent.value = main;
+
     // 确保内容渲染
     nextTick(async () => {
-    renderContent();
+      renderContent();
       // 更新编辑器内容（始终应用标注）
       const editor = editorElement.value;
       if (editor) {
@@ -390,7 +359,7 @@ watch(() => props.document, (newDocument) => {
   }
 }, { immediate: true });
 
-let renderTimer: number | null = null;
+let renderTimer: ReturnType<typeof setTimeout> | null = null;
 let lastContent = '';
 
 // 处理编辑器输入（从 contenteditable div）
@@ -399,7 +368,62 @@ const handleEditorInput = async (event: Event) => {
   if (!editor) return;
 
   // 获取纯文本内容（移除所有HTML标签）
-  const newMainContent = getTextContent(editor);
+  let newMainContent = getTextContent(editor);
+
+  // 检测并修复被破坏的引用格式
+  // 如果文本中包含 [知识片段：标题] 格式，但mainContent中没有对应的引用标志，尝试恢复
+  const linkedPlaceholderPattern = /\[知识片段：([^\]]+)\]/g;
+  let match;
+  const placeholders: Array<{ match: string; title: string; index: number }> = [];
+
+  linkedPlaceholderPattern.lastIndex = 0;
+  while ((match = linkedPlaceholderPattern.exec(newMainContent)) !== null) {
+    placeholders.push({
+      match: match[0],
+      title: match[1] || '',
+      index: match.index || 0
+    });
+  }
+
+  // 如果找到了占位符，检查mainContent中是否有对应的引用标志
+  if (placeholders.length > 0) {
+    const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
+    const parser = new FragmentReferenceParser();
+    const references = parser.parseReferences(mainContent.value);
+
+    // 从后往前替换，避免索引偏移问题
+    for (let i = placeholders.length - 1; i >= 0; i--) {
+      const placeholder = placeholders[i];
+      if (!placeholder) continue;
+
+      // 检查这个位置是否已经有引用标志
+      const textBeforePlaceholder = newMainContent.substring(0, placeholder.index);
+      const hasRefAtPosition = references.some(ref => {
+        const textBeforeRef = mainContent.value.substring(0, ref.startIndex);
+        return Math.abs(textBeforeRef.length - textBeforePlaceholder.length) < 50;
+      });
+
+      // 如果没有找到对应的引用标志，尝试从mainContent中查找
+      if (!hasRefAtPosition) {
+        // 尝试通过位置匹配来恢复引用
+        let correspondingRef = null;
+        for (const ref of references) {
+          const textBeforeRef = mainContent.value.substring(0, ref.startIndex);
+          if (Math.abs(textBeforeRef.length - textBeforePlaceholder.length) < 100) {
+            correspondingRef = ref;
+            break;
+          }
+        }
+
+        if (correspondingRef && !correspondingRef.fragmentId.startsWith('placeholder:')) {
+          // 找到了对应的引用，替换占位符
+          const refTag = `{{ref:${correspondingRef.fragmentId}:${correspondingRef.mode}}}`;
+          newMainContent = newMainContent.substring(0, placeholder.index) + refTag + newMainContent.substring(placeholder.index + placeholder.match.length);
+        }
+      }
+    }
+  }
+
   mainContent.value = newMainContent;
 
   // 更新完整内容（frontmatter + mainContent）
@@ -434,19 +458,25 @@ const getTextContent = (element: HTMLElement): string => {
 
   // 递归获取所有文本节点的内容，保留换行
   let text = '';
+  const processedElements = new Set<HTMLElement>(); // 用于跟踪已处理的标注元素，避免重复
+
   const walker = document.createTreeWalker(
     element,
     NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
     {
       acceptNode: (node: Node) => {
-        // 跳过标注span
+        // 对于标注元素，跳过其子节点，因为我们会在处理元素本身时获取文本
         if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node as HTMLElement;
           if (el.classList.contains('editor-reference') ||
               el.classList.contains('editor-mermaid') ||
               el.classList.contains('editor-code') ||
               el.classList.contains('editor-formula')) {
-            return NodeFilter.FILTER_ACCEPT; // 接受但只处理其文本子节点
+            // 如果这个元素已经被处理过，跳过其子节点
+            if (processedElements.has(el)) {
+              return NodeFilter.FILTER_REJECT; // 拒绝遍历子节点
+            }
+            return NodeFilter.FILTER_ACCEPT; // 接受元素本身，但会在处理时标记为已处理
           }
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -458,7 +488,21 @@ const getTextContent = (element: HTMLElement): string => {
   let lastNode: Node | null = null;
   while ((node = walker.nextNode()) !== null) {
     if (node.nodeType === Node.TEXT_NODE) {
-      text += node.textContent || '';
+      // 检查这个文本节点是否在已处理的标注元素内
+      let parent = node.parentElement;
+      let isInsideProcessedElement = false;
+      while (parent && parent !== element) {
+        if (processedElements.has(parent)) {
+          isInsideProcessedElement = true;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+
+      // 如果文本节点不在已处理的标注元素内，才添加
+      if (!isInsideProcessedElement) {
+        text += node.textContent || '';
+      }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       // 如果是引用标注span，需要还原为原始引用格式
       const el = node as HTMLElement;
@@ -468,8 +512,21 @@ const getTextContent = (element: HTMLElement): string => {
         if (fragmentId && !fragmentId.startsWith('placeholder:')) {
           // 还原为原始引用格式
           text += `{{ref:${fragmentId}:${mode}}}`;
-          continue; // 跳过文本内容，因为我们已经添加了引用格式
+          // 标记为已处理，避免遍历子节点
+          processedElements.add(el);
+          continue;
         }
+      }
+      // 检查是否是其他标注元素，如果是，只获取其文本内容，不获取HTML
+      if (el.classList.contains('editor-mermaid') ||
+          el.classList.contains('editor-code') ||
+          el.classList.contains('editor-formula')) {
+        // 对于这些标注，只获取文本内容（不包含HTML标签）
+        const textContent = el.textContent || '';
+        text += textContent;
+        // 标记为已处理，避免遍历子节点时重复获取
+        processedElements.add(el);
+        continue;
       }
       // 如果是块级元素，添加换行
       if (lastNode && (el.tagName === 'DIV' || el.tagName === 'P' || el.tagName === 'BR')) {
@@ -498,7 +555,7 @@ const handleEditorFocus = () => {
 const handleEditorMouseDown = () => {
   const editor = editorElement.value;
   if (!editor) return;
-  
+
   // 如果编辑器有焦点，保存当前光标位置
   if (isEditorFocused.value || document.activeElement === editor) {
     const { start, end } = getCursorPosition(editor);
@@ -509,14 +566,16 @@ const handleEditorMouseDown = () => {
 
 // 处理编辑器失去焦点
 const handleEditorBlur = async () => {
-  // 先保存当前内容
+  // 先保存当前内容（使用getTextContent而不是textContent，避免重复）
   const editor = editorElement.value;
   if (editor) {
-    const currentText = editor.textContent || '';
-    if (currentText !== content.value) {
-      content.value = currentText;
+    const currentMainText = getTextContent(editor);
+    const currentFullContent = mergeContent(frontmatter.value, currentMainText);
+    if (currentFullContent !== content.value) {
+      mainContent.value = currentMainText;
+      content.value = currentFullContent;
     }
-    
+
     // 在失去焦点之前保存光标位置
     const { start, end } = getCursorPosition(editor);
     currentSelectionStart.value = start;
@@ -621,18 +680,28 @@ const applyEditorAnnotations = async () => {
         await app.getApplicationService().initialize();
         const fragmentUseCases = app.getKnowledgeFragmentUseCases();
 
-        // 批量获取片段标题
-        for (const ref of references) {
+        // 批量获取片段标题（使用 Promise.all 并行获取，提高性能）
+        const titlePromises = references.map(async (ref) => {
           try {
             const fragment = await fragmentUseCases.getFragment(ref.fragmentId);
             if (fragment && fragment.title) {
-              fragmentTitles.set(ref.fragmentId, fragment.title);
+              return { fragmentId: ref.fragmentId, title: fragment.title };
             }
           } catch (error) {
             // 忽略单个片段获取失败
             console.warn(`无法获取片段 ${ref.fragmentId} 的标题:`, error);
           }
-        }
+          return null;
+        });
+
+        const titleResults = await Promise.all(titlePromises);
+        titleResults.forEach(result => {
+          if (result) {
+            fragmentTitles.set(result.fragmentId, result.title);
+          }
+        });
+
+        console.log('[标注] 获取到的片段标题数量:', fragmentTitles.size, Array.from(fragmentTitles.entries()));
       } catch (error) {
         console.warn('获取知识片段标题失败:', error);
       }
@@ -736,7 +805,8 @@ const applyEditorAnnotations = async () => {
         // 如果有标题，使用友好显示文本
         if (fragmentTitle && mode === 'linked') {
           // 对于linked模式，显示友好文本而不是原始引用标志
-          const spanHtml = `<span class="${className}" title="${title}" data-start="${ann.start}" data-end="${ann.end}" ${dataAttrs} ${inlineStyle}>${escapeHtml(displayText)}</span>`;
+          // 设置contenteditable="false"防止用户直接编辑引用文本
+          const spanHtml = `<span class="${className}" title="${title}" data-start="${ann.start}" data-end="${ann.end}" ${dataAttrs} ${inlineStyle} contenteditable="false">${escapeHtml(displayText)}</span>`;
           annotatedHtml += spanHtml;
           lastIndex = ann.end;
           return; // 跳过后续处理
@@ -909,7 +979,42 @@ const detectAndHandleReferenceModification = async (
 };
 
 const checkChanges = () => {
-  hasChanges.value = title.value !== lastSavedTitle || content.value !== lastSavedContent;
+  // 确保使用最新的内容（从编辑器获取，而不是使用缓存的content.value）
+  const editor = editorElement.value;
+  let currentContent = content.value;
+
+  // 如果编辑器存在，从编辑器获取最新内容
+  if (editor) {
+    const currentMainContent = getTextContent(editor);
+    currentContent = mergeContent(frontmatter.value, currentMainContent);
+    // 更新content.value以保持同步
+    if (currentContent !== content.value) {
+      mainContent.value = currentMainContent;
+      content.value = currentContent;
+    }
+  }
+
+  const titleChanged = title.value !== lastSavedTitle;
+  const contentChanged = currentContent !== lastSavedContent;
+  hasChanges.value = titleChanged || contentChanged;
+
+  // 添加调试日志
+  if (titleChanged || contentChanged) {
+    console.log('[MarkdownEditor] 检测到变化:', {
+      titleChanged,
+      contentChanged,
+      currentTitle: title.value,
+      lastSavedTitle,
+      currentContentLength: currentContent.length,
+      lastSavedContentLength: lastSavedContent.length,
+      contentDiff: currentContent !== lastSavedContent ? '内容不同' : '内容相同'
+    });
+  } else {
+    console.log('[MarkdownEditor] 没有变化:', {
+      currentContentLength: currentContent.length,
+      lastSavedContentLength: lastSavedContent.length
+    });
+  }
 };
 
 const debouncedSave = () => {
@@ -930,16 +1035,28 @@ const updateDocument = () => {
 };
 
 const saveDocument = async () => {
-  if (!hasChanges.value) return;
+  console.log('[MarkdownEditor] saveDocument called, hasChanges:', hasChanges.value, 'currentFilePath:', currentFilePath.value, 'document:', props.document?.id);
+
+  if (!hasChanges.value) {
+    console.log('[MarkdownEditor] 没有变化，跳过保存');
+    return;
+  }
 
   // 如果有外部文件路径，保存到文件系统
   if (currentFilePath.value) {
     try {
+      console.log('[MarkdownEditor] 保存外部文件:', currentFilePath.value);
       const electronAPI = (window as any).electronAPI;
       if (electronAPI && electronAPI.file && electronAPI.file.writeFileContent) {
-        // 获取缓存中的引用信息
-        let contentToSave = content.value;
+        // 确保使用最新的内容（从编辑器获取，而不是使用缓存的content.value）
+        const editor = editorElement.value;
+        const currentMainContent = editor ? getTextContent(editor) : mainContent.value;
+        let contentToSave = mergeContent(frontmatter.value, currentMainContent);
         const cache = await electronAPI.file.getFileCache?.(currentFilePath.value);
+
+        // 更新content.value和mainContent.value以保持同步
+        mainContent.value = currentMainContent;
+        content.value = contentToSave;
 
         if (cache && cache.references && cache.references.length > 0) {
           // 从后往前替换，避免索引偏移
@@ -959,28 +1076,39 @@ const saveDocument = async () => {
           }
         }
 
+        console.log('[MarkdownEditor] 写入文件内容，长度:', contentToSave.length);
         await electronAPI.file.writeFileContent(currentFilePath.value, contentToSave);
+        console.log('[MarkdownEditor] 文件保存成功');
         lastSavedTitle = title.value;
         lastSavedContent = content.value; // 保存编辑器中的内容（带引用标志）
         hasChanges.value = false;
+        console.log('[MarkdownEditor] 已更新 lastSavedTitle 和 lastSavedContent');
         return;
+      } else {
+        console.error('[MarkdownEditor] electronAPI.file.writeFileContent 不可用');
       }
     } catch (error) {
-      console.error('Failed to save file:', error);
+      console.error('[MarkdownEditor] 保存文件失败:', error);
+      // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
       return;
     }
   }
 
   // 如果有document，保存到数据库
   if (props.document) {
-  try {
-    emit('update-document', props.document.id, title.value, content.value);
-    lastSavedTitle = title.value;
-    lastSavedContent = content.value;
-    hasChanges.value = false;
-  } catch (error) {
-    console.error('Failed to save document:', error);
-  }
+    try {
+      console.log('[MarkdownEditor] 保存数据库文档:', props.document.id);
+      emit('update-document', props.document.id, title.value, content.value);
+      lastSavedTitle = title.value;
+      lastSavedContent = content.value;
+      hasChanges.value = false;
+      console.log('[MarkdownEditor] 数据库文档保存成功，已更新 lastSavedTitle 和 lastSavedContent');
+    } catch (error) {
+      console.error('[MarkdownEditor] 保存数据库文档失败:', error);
+      // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
+    }
+  } else {
+    console.warn('[MarkdownEditor] 既没有 currentFilePath 也没有 document，无法保存');
   }
 };
 
@@ -1050,13 +1178,15 @@ const renderContent = async () => {
       let docId: string | undefined;
       let docPath: string | undefined;
       if (props.document) {
-        docId = props.document.id;
-        docPath = props.document.id; // 数据库文档使用ID作为路径
+        // 优先使用 filePath（外部文件），否则使用 id（数据库文档）
+        const actualPath = (props.document as any).filePath || props.document.id;
+        docId = actualPath;
+        docPath = actualPath;
       } else if (currentFilePath.value) {
         // 对于外部文件，直接使用文件路径
         docId = currentFilePath.value;
         docPath = currentFilePath.value;
-  }
+      }
 
       // 获取合并后的变量（document + folder + global）
       let variables: Record<string, any> = {};
@@ -1067,7 +1197,7 @@ const renderContent = async () => {
         // 获取完整内容（包含frontmatter）
         const fullContent = content.value || '';
 
-        const result = await variableUseCases.getVariables({
+        const result = await (variableUseCases as any).getVariables({
           documentPath: docPath,
           documentContent: fullContent
         });
@@ -1083,10 +1213,22 @@ const renderContent = async () => {
       // 在渲染前直接在文本层面替换变量
       let processedContent = mainContent.value;
 
-      // 匹配 {{variableName}} 格式
+      // 匹配 {{variableName}} 格式（但不匹配 {{ref:xxx}} 格式）
+      // 使用负向前瞻确保不匹配 {{ref: 开头的变量
+      // 变量名不能包含冒号，这样可以避免匹配 {{ref:xxx}} 格式
       const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
 
-      processedContent = processedContent.replace(variablePattern, (match, varName) => {
+      processedContent = processedContent.replace(variablePattern, (match, varName, offset) => {
+        // 检查是否是引用标志（{{ref:xxx}} 格式）
+        // 通过检查匹配位置前后的字符来判断
+        const beforeMatch = processedContent.substring(Math.max(0, offset - 10), offset);
+        const afterMatch = processedContent.substring(offset + match.length, offset + match.length + 10);
+
+        // 如果匹配的是 {{ref: 格式，跳过
+        if (beforeMatch.includes('{{ref:') || match.includes('ref:')) {
+          return match;
+        }
+
         if (variables.hasOwnProperty(varName)) {
           const value = variables[varName];
           console.log(`[renderContent] Replacing {{${varName}}} with ${value}`);
@@ -1096,16 +1238,37 @@ const renderContent = async () => {
         return match; // 变量不存在，保持原样
       });
 
-      console.log('[renderContent] Content before markdown:', processedContent.substring(0, 100));
+      console.log('[renderContent] Content before markdown:', processedContent.substring(0, 200));
+      console.log('[renderContent] 内容中是否包含引用标志:', processedContent.includes('{{ref:'));
+      console.log('[renderContent] processedContent 完整长度:', processedContent.length);
+      console.log('[renderContent] processedContent 完整内容:', processedContent);
 
       // 渲染已替换变量的内容（不传递变量给 markdown 处理器）
-      const newRenderedContent = await props.renderMarkdown(processedContent, docId);
-      
+      // renderMarkdown 会调用 resolveReferences 来解析引用标志
+      // 尝试从文件缓存读取，传递给 renderMarkdown 以提高性能
+      let fileCache = null;
+      if (docId && (docId.includes('/') || docId.includes('\\'))) {
+        try {
+          const electronAPI = (window as any).electronAPI;
+          if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
+            fileCache = await electronAPI.file.getFileCache(docId);
+          }
+        } catch (error) {
+          // 缓存读取失败不影响渲染
+        }
+      }
+
+      console.log('[renderContent] 调用 renderMarkdown，docId:', docId, 'hasCache:', !!fileCache);
+      const newRenderedContent = await props.renderMarkdown(processedContent, docId, fileCache);
+      console.log('[renderContent] renderMarkdown 返回的HTML长度:', newRenderedContent.length);
+      console.log('[renderContent] renderMarkdown 返回的HTML前200字符:', newRenderedContent.substring(0, 200));
+      console.log('[renderContent] renderMarkdown 返回的HTML完整内容:', newRenderedContent);
+
       // 获取编辑器的滚动百分比位置（这是我们要同步到预览的基准）
       const editor = editorElement.value;
       let editorScrollPercentage = 0;
       let isEditorAtBottom = false;
-      
+
       if (editor) {
         const editorScrollHeight = editor.scrollHeight - editor.clientHeight;
         if (editorScrollHeight > 0) {
@@ -1124,35 +1287,35 @@ const renderContent = async () => {
           editorScrollPercentage = 0;
         }
       }
-      
+
       // 保存编辑器滚动百分比，用于设置预览滚动位置
       savedScrollPercentage.value = editorScrollPercentage;
       const currentPreviewIndex = activePreviewIndex.value;
-      
+
       // 使用双缓冲技术平滑更新预览
       const nextBufferIndex = currentPreviewIndex === 0 ? 1 : 0;
       const nextPreviewElement = nextBufferIndex === 0 ? previewElement0 : previewElement1;
-      
+
       // 保存滚动恢复信息，用于在 previewBuffers 更新后恢复滚动位置
       pendingScrollRestore.value = {
         percentage: editorScrollPercentage,
         isAtBottom: isEditorAtBottom,
         previewIndex: nextBufferIndex
       };
-      
+
       // 更新非活动缓冲区（这会触发 v-html 更新，watch 会处理滚动恢复）
       previewBuffers.value[nextBufferIndex] = newRenderedContent;
-      
+
       await nextTick();
-      
+
       // 渲染所有资源占位符（Mermaid图表等）到非活动缓冲区
       if (nextPreviewElement.value) {
         await triggerRender(nextPreviewElement);
       }
-      
+
       // 等待DOM完全更新（包括triggerRender中的异步操作）
       await nextTick();
-      
+
       // 确保新内容已经渲染完成后再切换
       // 使用双重 requestAnimationFrame 确保浏览器已经完成渲染和布局
       requestAnimationFrame(() => {
@@ -1165,14 +1328,14 @@ const renderContent = async () => {
               nextPreviewElement.value.scrollTop = targetScrollTop;
             }
           }
-          
+
           // 切换活动缓冲区索引（这会触发CSS类变化，实现平滑过渡）
           activePreviewIndex.value = nextBufferIndex;
           renderedContent.value = newRenderedContent;
-          
+
           // 更新 previewElement 引用以保持兼容性
-          previewElement.value = nextPreviewElement.value || null;
-          
+          previewElement.value = nextPreviewElement.value || undefined;
+
           // 切换后立即再次设置滚动位置（确保在元素变为可见后滚动位置正确）
           nextTick(() => {
             requestAnimationFrame(() => {
@@ -1210,31 +1373,31 @@ const syncScroll = (event: Event) => {
   if (isRestoringScroll.value || isSyncingScroll.value) {
     return;
   }
-  
+
   const editor = event.target as HTMLElement;
   const activePreview = activePreviewIndex.value === 0 ? previewElement0.value : previewElement1.value;
 
   if (!activePreview || !editor) {
     return;
   }
-  
+
   const editorScrollHeight = editor.scrollHeight - editor.clientHeight;
   const previewScrollHeight = activePreview.scrollHeight - activePreview.clientHeight;
-  
+
   // 处理边界情况：如果编辑器或预览没有滚动空间，则不进行同步
   if (editorScrollHeight <= 0 || previewScrollHeight <= 0) {
     return;
   }
-  
+
   // 计算编辑器的滚动百分比
   const scrollPercentage = editor.scrollTop / editorScrollHeight;
-  
+
   // 保存滚动百分比
   savedScrollPercentage.value = scrollPercentage;
-  
+
   // 计算预览应该滚动到的位置
   const previewScrollTop = scrollPercentage * previewScrollHeight;
-  
+
   // 设置预览滚动位置（使用标志位防止循环触发）
   isSyncingScroll.value = true;
   activePreview.scrollTop = previewScrollTop;
@@ -1250,7 +1413,7 @@ const handlePreviewScroll = (previewIndex: number) => {
   if (isRestoringScroll.value || isSyncingScroll.value) {
     return;
   }
-  
+
   // 只处理当前活动预览元素的滚动
   if (previewIndex === activePreviewIndex.value) {
     const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
@@ -1269,9 +1432,9 @@ const handlePreviewScroll = (previewIndex: number) => {
 const restorePreviewScrollPosition = (scrollPercentage: number, previewIndex: number) => {
   const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
   if (!preview || scrollPercentage < 0) return;
-  
+
   isRestoringScroll.value = true;
-  
+
   const setScroll = () => {
     const scrollHeight = preview.scrollHeight - preview.clientHeight;
     if (scrollHeight > 0) {
@@ -1281,7 +1444,7 @@ const restorePreviewScrollPosition = (scrollPercentage: number, previewIndex: nu
     }
     return false;
   };
-  
+
   // 使用 requestAnimationFrame 确保 DOM 已渲染
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -1303,7 +1466,7 @@ const restorePreviewScrollPosition = (scrollPercentage: number, previewIndex: nu
 const restorePreviewScrollPositionHelper = (scrollPercentage: number, previewIndex: number, isAtBottom: boolean = false): boolean => {
   const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
   if (!preview || scrollPercentage < 0) return false;
-  
+
   const scrollHeight = preview.scrollHeight - preview.clientHeight;
   if (scrollHeight > 0) {
     const targetScrollTop = isAtBottom ? scrollHeight : (scrollPercentage * scrollHeight);
@@ -1316,17 +1479,17 @@ const restorePreviewScrollPositionHelper = (scrollPercentage: number, previewInd
 // 尝试恢复预览滚动位置（带重试机制）
 const tryRestorePreviewScroll = (scrollPercentage: number, previewIndex: number, isAtBottom: boolean = false, maxAttempts: number = 10) => {
   if (isRestoringScroll.value) return;
-  
+
   isRestoringScroll.value = true;
   let attempts = 0;
-  
+
   const attempt = () => {
     attempts++;
     if (restorePreviewScrollPositionHelper(scrollPercentage, previewIndex, isAtBottom)) {
       isRestoringScroll.value = false;
       return;
     }
-    
+
     if (attempts < maxAttempts) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -1337,7 +1500,7 @@ const tryRestorePreviewScroll = (scrollPercentage: number, previewIndex: number,
       isRestoringScroll.value = false;
     }
   };
-  
+
   attempt();
 };
 
@@ -1348,7 +1511,7 @@ watch(() => previewBuffers.value[activePreviewIndex.value], async (newContent, o
     const { percentage, isAtBottom, previewIndex } = pendingScrollRestore.value;
     if (previewIndex === activePreviewIndex.value) {
       pendingScrollRestore.value = null;
-      
+
       await nextTick();
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -1417,6 +1580,20 @@ onMounted(() => {
 onUnmounted(() => {
   // 移除点击外部关闭导出菜单的监听
   document.removeEventListener('click', handleClickOutsideExport);
+
+  // 组件卸载前，如果有未保存的更改，强制保存
+  if (hasChanges.value) {
+    console.log('[MarkdownEditor] 组件卸载前检测到未保存的更改，强制保存');
+    // 清除防抖定时器，立即保存
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    // 同步保存（不使用 await，因为 onUnmounted 不支持异步）
+    saveDocument().catch(error => {
+      console.error('[MarkdownEditor] 组件卸载前保存失败:', error);
+    });
+  }
 });
 
 // 计算从元素开始到指定范围的文本长度（使用与getTextContent相同的逻辑）
@@ -1424,13 +1601,13 @@ const calculateTextLength = (element: HTMLElement, endNode: Node, endOffset: num
   const range = document.createRange();
   range.selectNodeContents(element);
   range.setEnd(endNode, endOffset);
-  
+
   // 使用 getTextContent 的逻辑来计算文本长度
   // 创建一个临时容器来提取范围内的内容
   const fragment = range.cloneContents();
   const tempContainer = document.createElement('div');
   tempContainer.appendChild(fragment);
-  
+
   // 使用 getTextContent 来获取文本内容，确保逻辑一致
   return getTextContent(tempContainer).length;
 };
@@ -1445,7 +1622,7 @@ const getCursorPosition = (element: HTMLElement): { start: number; end: number }
   }
 
   const range = selection.getRangeAt(0);
-  
+
   // 使用 calculateTextLength 来计算位置，确保与 getTextContent 的逻辑一致
   const start = calculateTextLength(element, range.startContainer, range.startOffset);
   const end = calculateTextLength(element, range.endContainer, range.endOffset);
@@ -1461,12 +1638,12 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
       console.warn('[setCursorPosition] 无法获取 Selection 对象');
     return;
   }
-  
+
     // 确保位置在有效范围内
     const textContent = element.textContent || '';
     const maxPosition = textContent.length;
     const validPosition = Math.max(0, Math.min(position, maxPosition));
-    
+
     if (validPosition !== position) {
       console.warn(`[setCursorPosition] 位置 ${position} 超出范围 [0, ${maxPosition}]，调整为 ${validPosition}`);
     }
@@ -1485,7 +1662,7 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
     while (walker.nextNode()) {
       const node = walker.currentNode;
       const nodeLength = node.textContent?.length || 0;
-      
+
       if (currentPos + nodeLength >= validPosition) {
         targetNode = node;
         targetOffset = Math.max(0, Math.min(validPosition - currentPos, nodeLength));
@@ -1512,15 +1689,17 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
       while ((node = nodeWalker.nextNode())) {
         textNodes.push(node);
       }
-      
+
       if (textNodes.length > 0) {
         const lastNode = textNodes[textNodes.length - 1];
-        const lastLength = lastNode.textContent?.length || 0;
-        range.setStart(lastNode, lastLength);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        console.log(`[setCursorPosition] 未找到目标节点，设置光标到文档末尾 (${lastLength})`);
+        if (lastNode) {
+          const lastLength = lastNode.textContent?.length || 0;
+          range.setStart(lastNode, lastLength);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          console.log(`[setCursorPosition] 未找到目标节点，设置光标到文档末尾 (${lastLength})`);
+        }
       } else {
         range.selectNodeContents(element);
         range.collapse(false);
@@ -1540,7 +1719,7 @@ const openMermaidEditor = () => {
   if (!editor) {
     return;
   }
-  
+
   // 先同步编辑器内容到 mainContent（如果编辑器有焦点，内容可能不同步）
   const currentEditorText = getTextContent(editor);
   if (currentEditorText !== mainContent.value) {
@@ -1553,7 +1732,7 @@ const openMermaidEditor = () => {
   // 2. 否则使用保存的光标位置（从 handleEditorMouseDown 或 handleEditorBlur 保存）
   let start = currentSelectionStart.value;
   let end = currentSelectionEnd.value;
-  
+
   if (isEditorFocused.value || document.activeElement === editor) {
     try {
       const position = getCursorPosition(editor);
@@ -1569,19 +1748,19 @@ const openMermaidEditor = () => {
       console.warn('[Mermaid编辑器] 获取光标位置失败，使用保存的位置:', e);
     }
   }
-  
+
   // 确保位置在有效范围内
   const validStart = Math.max(0, Math.min(start, mainContent.value.length));
   const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
-  
+
   console.log('[Mermaid编辑器] 打开编辑器');
   console.log('[Mermaid编辑器] mainContent长度:', mainContent.value.length);
   console.log('[Mermaid编辑器] 保存的光标位置 start:', currentSelectionStart.value, 'end:', currentSelectionEnd.value);
   console.log('[Mermaid编辑器] 使用的光标位置 start:', validStart, 'end:', validEnd);
-  
+
   // 尝试提取Mermaid代码块（使用 mainContent，确保索引匹配）
   const mermaidCode = extractMermaidCode(mainContent.value, validStart, validEnd);
-  
+
   currentMermaidCode.value = mermaidCode;
   currentSelectionStart.value = validStart;
   currentSelectionEnd.value = validEnd;
@@ -1597,25 +1776,25 @@ const extractMermaidCode = (content: string, start: number, end: number): string
     }
     return selectedText;
   }
-  
+
   // 如果没有选择文本，查找光标位置附近的Mermaid代码块
   const lines = content.split('\n');
   let currentLine = 0;
   let charCount = 0;
-  
+
   // 更精确地计算当前行号
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
     const lineLength = line.length + 1; // +1 for newline
-    
+
     if (charCount <= start && start < charCount + lineLength) {
       currentLine = i;
       break;
     }
     charCount += lineLength;
   }
-  
+
   // 向前查找Mermaid代码块开始
   let mermaidStart = -1;
   for (let i = currentLine; i >= 0; i--) {
@@ -1625,7 +1804,7 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       break;
     }
   }
-  
+
   // 向后查找Mermaid代码块结束
   if (mermaidStart !== -1) {
     for (let i = mermaidStart + 1; i < lines.length; i++) {
@@ -1635,7 +1814,7 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       }
     }
   }
-  
+
   // 如果没有找到Mermaid代码块，返回默认的流程图模板
   return `graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]`;
 };
@@ -1643,21 +1822,21 @@ const extractMermaidCode = (content: string, start: number, end: number): string
 const handleMermaidSave = async (mermaidCode: string) => {
   const editor = editorElement.value;
   if (!editor) return;
-  
+
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
-  
+
   console.log('[Mermaid保存] 开始保存');
   console.log('[Mermaid保存] 插入位置 start:', start, 'end:', end);
   console.log('[Mermaid保存] mainContent长度:', mainContent.value.length);
-  
+
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
-  
+
   // 构建 Mermaid 代码块
   const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
   let newCursorPosition = start;
-  
+
   // 如果之前有选中的Mermaid代码块，替换它
   if (start !== end && start < newMainContent.length && end <= newMainContent.length) {
     const selectedText = newMainContent.substring(start, end);
@@ -1679,38 +1858,38 @@ const handleMermaidSave = async (mermaidCode: string) => {
     // 光标位置设置为插入块之后（包括换行）
     newCursorPosition = insertPos + mermaidBlock.length + 1;
   }
-  
+
   console.log('[Mermaid保存] 新内容长度:', newMainContent.length);
   console.log('[Mermaid保存] 新光标位置:', newCursorPosition);
-  
+
   // 更新 mainContent 和完整 content
   mainContent.value = newMainContent;
   content.value = mergeContent(frontmatter.value, mainContent.value);
 
   // 关闭编辑器对话框（先关闭，避免干扰）
   closeMermaidEditor();
-  
+
   // 更新编辑器显示和光标位置
   // 注意：在应用标注之前，编辑器失去焦点，所以 isEditorFocused 可能是 false
   // 但我们仍然需要应用标注以显示格式
-  
+
   // 先标记编辑器没有焦点，避免 applyEditorAnnotations 内部尝试恢复光标位置
   const wasFocused = isEditorFocused.value;
   isEditorFocused.value = false;
-  
+
   // 应用标注（会重新渲染编辑器内容）
   await applyEditorAnnotations();
-  
+
   // 等待DOM更新完成
   await nextTick();
-  
+
   // 设置光标位置（基于新的内容）
   setCursorPosition(editor, newCursorPosition);
-  
+
   // 更新保存的光标位置
   currentSelectionStart.value = newCursorPosition;
   currentSelectionEnd.value = newCursorPosition;
-  
+
   // 给编辑器焦点，以便用户继续编辑
   editor.focus();
   // 恢复焦点状态
@@ -1736,11 +1915,11 @@ const openFormulaEditor = () => {
 
   // 先同步编辑器内容到 mainContent（如果编辑器有焦点，内容可能不同步）
   const currentEditorText = getTextContent(editor);
-  
+
   // 获取光标位置：优先使用保存的位置，如果编辑器有焦点则获取当前位置
   let start = currentSelectionStart.value;
   let end = currentSelectionEnd.value;
-  
+
   // 如果编辑器有焦点，尝试获取当前光标位置（可能更准确）
   if (isEditorFocused.value || document.activeElement === editor) {
     try {
@@ -1771,14 +1950,14 @@ const openFormulaEditor = () => {
   console.log('[公式编辑器] mainContent长度:', mainContent.value.length);
   console.log('[公式编辑器] 保存的光标位置 start:', currentSelectionStart.value, 'end:', currentSelectionEnd.value);
   console.log('[公式编辑器] 使用的光标位置 start:', validStart, 'end:', validEnd);
-  
+
   // 尝试提取公式代码（使用 mainContent，确保索引匹配）
   const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd);
   currentFormulaCode.value = formulaCode;
-  
+
   // 确定公式类型 - 更精确的判断逻辑
   currentFormulaType.value = determineFormulaType(mainContent.value, validStart, validEnd);
-  
+
   currentSelectionStart.value = validStart;
   currentSelectionEnd.value = validEnd;
   showFormulaEditor.value = true;
@@ -1793,31 +1972,31 @@ const extractFormulaCode = (content: string, start: number, end: number): string
       return selectedText.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
     }
     // 检查是否为行内公式
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
         !selectedText.trim().startsWith('$$')) {
       return selectedText.replace(/^\$/, '').replace(/\$$/, '').trim();
     }
     return selectedText;
   }
-  
+
   // 如果没有选中文本，尝试查找光标位置附近的公式
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-  
+
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch && inlineBeforeMatch[1] !== undefined && inlineAfterMatch[1] !== undefined) {
     return (inlineBeforeMatch[1] + inlineAfterMatch[1]).trim();
   }
-  
+
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch && blockBeforeMatch[1] !== undefined && blockAfterMatch[1] !== undefined) {
     return (blockBeforeMatch[1] + blockAfterMatch[1]).trim();
   }
-  
+
   return '';
 };
 
@@ -1829,30 +2008,30 @@ const determineFormulaType = (content: string, start: number, end: number): 'inl
       return 'block';
     }
     // 检查是否为行内公式（以$开头和结尾，但不是$$）
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
         !selectedText.trim().startsWith('$$')) {
       return 'inline';
     }
   }
-  
+
   // 如果没有选中文本，检查光标位置附近的公式类型
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-  
+
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch) {
     return 'inline';
   }
-  
+
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch) {
     return 'block';
   }
-  
+
   // 默认返回行内公式
   return 'inline';
 };
@@ -1873,10 +2052,10 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
     latexCode = formulaData.latexCode;
     formulaType = formulaData.formulaType;
   }
-  
+
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
-  
+
   console.log('[公式保存] 保存公式');
   console.log('[公式保存] 保存位置 start:', start, 'end:', end);
   console.log('[公式保存] mainContent长度:', mainContent.value.length);
@@ -1884,9 +2063,9 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
 
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
-  
+
   // 根据公式类型格式化代码
-  const formattedFormula = formulaType === 'block' 
+  const formattedFormula = formulaType === 'block'
     ? `$$${latexCode}$$`
     : `$${latexCode}$`;
 
@@ -1895,7 +2074,7 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   const validEnd = Math.max(validStart, Math.min(end, newMainContent.length));
 
   console.log('[公式保存] 有效位置 start:', validStart, 'end:', validEnd);
-  
+
   // 替换或插入公式
   if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
     newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validEnd);
@@ -1986,17 +2165,17 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
       // 如果是数据库文档，使用 ExportUseCases 准备数据
       let processedContent = documentContent;
       let documentId = props.document?.id || currentFilePath.value;
-      
+
       if (props.document) {
         const exportUseCases = app.getExportUseCases();
         // 先处理内容（包括片段引用等）
         const { InversifyContainer } = await import('../../core/container/inversify.container');
         const container = InversifyContainer.getInstance();
-        
+
         try {
           if (container.isBound(TYPES.FragmentReferenceResolver)) {
-            const resolver = container.get(TYPES.FragmentReferenceResolver);
-            if (resolver) {
+            const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+            if (resolver && typeof resolver.resolveReferences === 'function') {
               processedContent = await resolver.resolveReferences(processedContent, documentId);
             }
           }
@@ -2007,11 +2186,11 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
         // 外部文件：处理片段引用
         const { InversifyContainer } = await import('../../core/container/inversify.container');
         const container = InversifyContainer.getInstance();
-        
+
         try {
           if (container.isBound(TYPES.FragmentReferenceResolver)) {
-            const resolver = container.get(TYPES.FragmentReferenceResolver);
-            if (resolver) {
+            const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+            if (resolver && typeof resolver.resolveReferences === 'function') {
               processedContent = await resolver.resolveReferences(processedContent, currentFilePath.value);
             }
           }
@@ -2023,9 +2202,9 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
       // 准备 HTML 内容（渲染进程中处理 Markdown 和资源）
       const { InversifyContainer } = await import('../../core/container/inversify.container');
       const container = InversifyContainer.getInstance();
-      const exportFactory = container.get(TYPES.ExportFactory);
-      const htmlExporter = exportFactory.getExporter(ExportFormat.HTML);
-      
+        const exportFactory = container.get<any>(TYPES.ExportFactory);
+        const htmlExporter = exportFactory.getExporter(ExportFormat.HTML);
+
       // 先导出为 HTML（包含所有样式和资源）
       const htmlResult = await htmlExporter.export({
         format: ExportFormat.HTML,
@@ -2035,10 +2214,10 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
         variables: {},
         includeStyles: true
       });
-      
+
       // 将 HTML buffer 转换为字符串
       const htmlString = new TextDecoder('utf-8').decode(htmlResult.buffer);
-      
+
       // 通过 IPC 调用主进程的 PDF 导出（传递完整的 HTML）
       const pdfResult = await electronAPI.export.pdf({
         title: documentTitle,
@@ -2061,7 +2240,7 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
       // 其他格式（Word、HTML、Markdown）在渲染进程中处理
       // 如果是数据库文档，使用 ExportUseCases
       if (props.document) {
-        const exportUseCases = app.getExportUseCases();
+        const exportUseCases = app.getExportUseCases() as any;
         result = await exportUseCases.exportDocument({
           documentId: props.document.id,
           format: exportFormat,
@@ -2077,15 +2256,15 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
           throw new Error('导出服务未初始化，请确保应用已正确启动');
         }
 
-        const exportFactory = container.get(TYPES.ExportFactory);
+        const exportFactory = container.get<any>(TYPES.ExportFactory);
         const exporter = exportFactory.getExporter(exportFormat);
 
         // 处理片段引用（如果有）
         let processedContent = documentContent;
         try {
           if (container.isBound(TYPES.FragmentReferenceResolver)) {
-            const resolver = container.get(TYPES.FragmentReferenceResolver);
-            if (resolver) {
+            const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+            if (resolver && typeof resolver.resolveReferences === 'function') {
               processedContent = await resolver.resolveReferences(processedContent, currentFilePath.value);
             }
           }
@@ -2120,7 +2299,7 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
 const saveExportFile = async (result: any, format: string) => {
   // 检查是否在Electron环境中
   const electronAPI = (window as any).electronAPI;
-  
+
   if (electronAPI && electronAPI.dialog && electronAPI.dialog.saveFile) {
     // Electron环境：使用保存对话框
     const filters = [];
@@ -2165,7 +2344,7 @@ const saveExportFile = async (result: any, format: string) => {
       } else {
         throw new Error('不支持的 buffer 格式');
       }
-      
+
       // 使用writeBinary保存文件
       await electronAPI.file.writeBinary(filePath, arrayBuffer);
     }
@@ -2191,18 +2370,16 @@ const getTextPositionFromPoint = (element: HTMLElement, x: number, y: number): n
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const selRange = selection.getRangeAt(0);
-      const preRange = document.createRange();
-      preRange.selectNodeContents(element);
-      preRange.setEnd(selRange.startContainer, selRange.startOffset);
-      return preRange.toString().length;
+      // 使用 getTextContent 的逻辑来计算位置，确保与编辑器内容一致
+      return calculateTextLength(element, selRange.startContainer, selRange.startOffset);
     }
-    return 0;
+    // 如果没有选择，返回编辑器文本的末尾位置
+    const editorText = getTextContent(element);
+    return editorText.length;
   }
 
-  const preRange = document.createRange();
-  preRange.selectNodeContents(element);
-  preRange.setEnd(range.startContainer, range.startOffset);
-  return preRange.toString().length;
+  // 使用 calculateTextLength 来计算位置，确保与 getTextContent 的逻辑一致
+  return calculateTextLength(element, range.startContainer, range.startOffset);
 };
 
 // 图片拖放处理
@@ -2262,19 +2439,26 @@ const handleDragOver = (event: DragEvent) => {
 
 // 编辑器拖拽放下
 const handleEditorDrop = async (event: DragEvent) => {
+  console.log('[MarkdownEditor] handleEditorDrop called');
   event.preventDefault();
   event.stopPropagation();
   isDragging.value = false;
 
   // 支持外部文件和数据库文档
   if (!props.document && !currentFilePath.value) {
+    console.log('[MarkdownEditor] No document or file path, showing alert');
     alert('请先打开一个文档或文件');
     return;
   }
 
+  console.log('[MarkdownEditor] Document:', props.document, 'CurrentFilePath:', currentFilePath.value);
+
   // 获取鼠标位置的文本位置
   const editor = editorElement.value;
-  if (!editor) return;
+  if (!editor) {
+    console.log('[MarkdownEditor] Editor element not found');
+    return;
+  }
 
   // 根据鼠标位置计算文本位置
   const textPosition = getTextPositionFromPoint(editor, event.clientX, event.clientY);
@@ -2292,50 +2476,61 @@ const handleEditorDrop = async (event: DragEvent) => {
   // 检查是否是知识片段拖拽
   const fragmentId = event.dataTransfer?.getData('application/x-knowledge-fragment');
   if (fragmentId) {
+    console.log('[MarkdownEditor] Fragment drag detected:', fragmentId);
     // 处理知识片段拖拽，使用计算出的位置
     await handleInsertFragmentAtPosition(fragmentId, textPosition);
     return;
   }
 
   // 处理文件拖拽
+  console.log('[MarkdownEditor] Processing file drop');
   await handleDrop(event);
 };
 
 // 包装的handleDrop用于文件拖拽
 const handleDrop = async (event: DragEvent) => {
+  console.log('[MarkdownEditor] handleDrop called');
 
   const files = event.dataTransfer?.files;
+  console.log('[MarkdownEditor] Dropped files:', files ? Array.from(files).map(f => ({ name: f.name, type: f.type, size: f.size })) : 'null');
+
   if (!files || files.length === 0) {
+    console.log('[MarkdownEditor] No files in drop event');
     return;
   }
 
   // 获取光标位置
   const editor = editorElement.value;
   if (!editor) {
+    console.log('[MarkdownEditor] Editor element not found in handleDrop');
     return;
   }
 
   const { start: cursorPosition } = getCursorPosition(editor);
+  console.log('[MarkdownEditor] Cursor position:', cursorPosition);
 
   try {
     let imagePaths: string[] = [];
 
-    // 如果有document，使用document ID
-    if (props.document) {
-      imagePaths = await handleDroppedImages(props.document.id, files);
-    }
-    // 如果是外部文件，需要获取文件所在目录来保存图片
-    else if (currentFilePath.value) {
-      // 对于外部文件，我们需要使用文件路径的目录部分
-      const fileDir = currentFilePath.value.split(/[/\\]/).slice(0, -1).join('/');
+    // 获取实际的文件路径（外部文件用 filePath，数据库文档用 id）
+    const actualFilePath = (props.document as any)?.filePath || currentFilePath.value;
+    const isExternalFile = actualFilePath && (actualFilePath.includes('/') || actualFilePath.includes('\\'));
+    console.log('[MarkdownEditor] Actual file path:', actualFilePath, 'Is external:', isExternalFile);
+
+    if (isExternalFile) {
+      // 外部文件：使用文件路径的目录部分
+      const fileDir = actualFilePath.split(/[/\\]/).slice(0, -1).join('/');
       const assetsDir = `${fileDir}/assets`;
+      console.log('[MarkdownEditor] External file - fileDir:', fileDir, 'assetsDir:', assetsDir);
 
       // 确保assets目录存在
       const electronAPI = (window as any).electronAPI;
       if (electronAPI && electronAPI.file && electronAPI.file.mkdir) {
         try {
           await electronAPI.file.mkdir(assetsDir);
+          console.log('[MarkdownEditor] Assets directory created/verified');
         } catch (error) {
+          console.log('[MarkdownEditor] Assets directory creation error (may already exist):', error);
           // 目录可能已存在，忽略错误
         }
       }
@@ -2346,18 +2541,35 @@ const handleDrop = async (event: DragEvent) => {
 
       // 使用文件目录作为documentId（需要特殊处理）
       const tempDocId = `file:${fileDir}`;
+      console.log('[MarkdownEditor] Using tempDocId:', tempDocId);
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (file && file.type.startsWith('image/')) {
+        if (!file) continue;
+        console.log('[MarkdownEditor] Processing file:', file.name, 'type:', file.type);
+        if (file.type.startsWith('image/')) {
+          console.log('[MarkdownEditor] Saving image:', file.name);
           // 保存图片到文件系统的assets目录
           const imagePath = await imageStorage.saveImageToDocument(tempDocId, file);
+          console.log('[MarkdownEditor] Image saved, path:', imagePath);
           imagePaths.push(imagePath);
+        } else {
+          console.log('[MarkdownEditor] Skipping non-image file:', file.name, 'type:', file.type);
         }
       }
+    } else if (props.document) {
+      console.log('[MarkdownEditor] Database document, using document ID:', props.document.id);
+      // 数据库文档：使用document ID
+      imagePaths = await handleDroppedImages(props.document.id, files);
+      console.log('[MarkdownEditor] Images saved for database document, paths:', imagePaths);
+    } else {
+      console.log('[MarkdownEditor] Neither external file nor database document, cannot save images');
     }
 
+    console.log('[MarkdownEditor] Total image paths:', imagePaths.length);
+
     if (imagePaths.length > 0) {
+      console.log('[MarkdownEditor] Inserting image references into content');
       // 插入所有图片引用
       let newContent = content.value;
       let newPosition = cursorPosition;
@@ -2366,21 +2578,40 @@ const handleDrop = async (event: DragEvent) => {
         const result = insertImageReference(newContent, imagePath, newPosition);
         newContent = result.content;
         newPosition = result.newPosition;
+        console.log('[MarkdownEditor] Inserted image reference:', imagePath);
       }
 
       content.value = newContent;
+      console.log('[MarkdownEditor] Content updated, new length:', newContent.length);
+
+      // 更新 mainContent（从完整内容中分离）
+      const { mainContent: newMainContent } = splitContent(newContent);
+      mainContent.value = newMainContent;
+      console.log('[MarkdownEditor] MainContent updated, length:', newMainContent.length);
+
+      // 更新编辑器显示
+      if (editor) {
+        if (!isEditorFocused.value) {
+          // 编辑器没有焦点时，应用标注
+          await applyEditorAnnotations();
+        } else {
+          // 编辑器有焦点时，直接更新文本内容
+          editor.textContent = newMainContent;
+          console.log('[MarkdownEditor] Editor textContent updated');
+        }
+      }
 
       // 触发内容更新和重新渲染
       checkChanges();
       renderContent();
       await nextTick();
-      if (!isEditorFocused.value) {
-        applyEditorAnnotations();
-      }
       debouncedSave();
+      console.log('[MarkdownEditor] Image drop handling completed successfully');
+    } else {
+      console.log('[MarkdownEditor] No image paths to insert');
     }
   } catch (error) {
-    console.error('Error handling dropped images:', error);
+    console.error('[MarkdownEditor] Error handling dropped images:', error);
     alert('图片上传失败：' + (error instanceof Error ? error.message : '未知错误'));
   }
 };
@@ -2412,120 +2643,185 @@ const handleInsertFragmentAtPosition = async (fragmentId: string, position: numb
     const cursorPosition = position;
 
     // 获取片段内容（Markdown格式）
+    // 注意：这里不立即处理图片，图片处理将在后台异步执行
+    // 缓存中保存的是原始内容，渲染时会使用缓存中已处理的内容
     let fragmentContent = fragment.markdown;
-
-    // 如果是外部文件，需要处理图片路径
-    if (currentFilePath.value) {
-      try {
-        const { FragmentReferenceResolver } = await import('../../domain/services/fragment-reference-resolver.service');
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
-
-        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
-          const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
-          // 使用文件路径作为documentId
-          fragmentContent = await resolver.resolveReference(fragmentId, `file:${currentFilePath.value}`);
-        }
-      } catch (error) {
-        console.warn('Error resolving fragment content for file:', error);
-      }
-    }
 
     // 插入内容和引用标志
     // 使用形态A（强引用模式）的语法
     const referenceTag = `{{ref:${fragmentId}:linked}}`;
-    const before = content.value.substring(0, cursorPosition);
-    const after = content.value.substring(cursorPosition);
+
+    // 注意：cursorPosition 是基于 mainContent 的位置，需要转换为 content 的位置
+    // 先获取 frontmatter 的长度
+    const frontmatterLength = frontmatter.value.length;
+    // 在 content 中的实际位置 = frontmatter长度 + cursorPosition
+    const contentPosition = frontmatterLength + cursorPosition;
+
+    const before = content.value.substring(0, contentPosition);
+    const after = content.value.substring(contentPosition);
 
     // 在编辑器中显示引用标志
     content.value = before + '\n\n' + referenceTag + '\n\n' + after;
 
-    // 保存到缓存：存储引用标志位置和对应的片段内容
+    // 关键：更新 mainContent（从完整内容中分离）
+    const { mainContent: newMainContent } = splitContent(content.value);
+    mainContent.value = newMainContent;
+
+    console.log('[MarkdownEditor] 插入片段后，mainContent长度:', newMainContent.length, '引用标志位置:', newMainContent.indexOf(referenceTag));
+    console.log('[MarkdownEditor] 插入片段后，更新 mainContent，长度:', newMainContent.length);
+
+    // 计算引用位置（用于后续操作）
+    const refPosition = newMainContent.indexOf(referenceTag);
+    const newPosition = refPosition !== -1 ? refPosition : (cursorPosition + 2); // +2 for \n\n
+
+    // 并行执行所有异步操作以提高性能
+    const asyncOperations: Promise<void>[] = [];
+
+    // 后台处理图片并保存到缓存：存储引用标志位置和对应的片段内容（已处理图片路径）
     if (currentFilePath.value) {
-      try {
-        const electronAPI = (window as any).electronAPI;
-        if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
-          const cache = await electronAPI.file.getFileCache(currentFilePath.value) || { references: [] };
-          const refPosition = cursorPosition + 2; // +2 for \n\n
-          cache.references = cache.references || [];
-          cache.references.push({
-            fragmentId,
-            position: refPosition,
-            length: referenceTag.length,
-            content: fragmentContent,
-            isConnected: true
-          });
-          // 按位置排序
-          cache.references.sort((a: any, b: any) => a.position - b.position);
+      asyncOperations.push(
+        (async () => {
+          try {
+            const electronAPI = (window as any).electronAPI;
+            if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
+              // 先处理图片路径（如果有图片）
+              let processedContent = fragmentContent;
+              const hasImages = /!\[([^\]]*)\]\(([^)]+)\)/.test(fragmentContent);
+              if (hasImages) {
+                try {
+                  const { FragmentReferenceResolver } = await import('../../domain/services/fragment-reference-resolver.service');
+                  const { InversifyContainer } = await import('../../core/container/inversify.container');
+                  const container = InversifyContainer.getInstance();
 
-          if (electronAPI.file.saveFileCache) {
-            await electronAPI.file.saveFileCache(currentFilePath.value, cache);
+                  if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
+                    const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+                    // 使用文件路径作为documentId，处理图片路径
+                    processedContent = await resolver.resolveReference(fragmentId, `file:${currentFilePath.value}`);
+                  }
+                } catch (error) {
+                  console.warn('Error resolving fragment content for cache:', error);
+                  // 如果处理失败，使用原始内容
+                }
+              }
+
+              // 获取缓存并保存已处理的内容
+              const cache = await electronAPI.file.getFileCache(currentFilePath.value) || { references: [] };
+              cache.references = cache.references || [];
+
+              // 获取片段更新时间，用于缓存验证
+              const fragmentUpdatedAt = new Date(fragment.updatedAt || fragment.createdAt || Date.now()).getTime();
+
+              // 检查是否已存在该引用，如果存在则更新，否则添加
+              const existingIndex = cache.references.findIndex((r: any) => r.fragmentId === fragmentId);
+              const cacheEntry = {
+                fragmentId,
+                position: newPosition,
+                length: referenceTag.length,
+                content: processedContent, // 已处理的完整内容（包括图片路径已转换）
+                isConnected: true,
+                fragmentUpdatedAt // 记录片段更新时间，用于判断缓存是否有效
+              };
+
+              if (existingIndex >= 0) {
+                cache.references[existingIndex] = cacheEntry;
+              } else {
+                cache.references.push(cacheEntry);
+              }
+
+              // 按位置排序
+              cache.references.sort((a: any, b: any) => a.position - b.position);
+
+              if (electronAPI.file.saveFileCache) {
+                await electronAPI.file.saveFileCache(currentFilePath.value, cache);
+              }
+            }
+          } catch (error) {
+            console.error('Error saving file cache:', error);
           }
-        }
+        })()
+      );
 
-        // 为外部文件也注册引用关系到知识片段
-        try {
-          const { InversifyContainer } = await import('../../core/container/inversify.container');
-          const container = InversifyContainer.getInstance();
+      // 为外部文件也注册引用关系到知识片段
+      asyncOperations.push(
+        (async () => {
+          try {
+            const { InversifyContainer } = await import('../../core/container/inversify.container');
+            const container = InversifyContainer.getInstance();
 
-          if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
-            const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
-            // 使用 file: 前缀标识外部文件
-            const fileDocumentId = `file:${currentFilePath.value}`;
-            const newPosition = cursorPosition + 2; // +2 for \n\n
-            // 从文件路径提取文件名作为标题
-            const fileName = currentFilePath.value.split(/[/\\]/).pop() || 'Untitled';
-            await registrationService.registerExternalFileReference(
-              fileDocumentId,
-              fileName,
-              fragmentId,
-              newPosition,
-              referenceTag.length
-            );
+            if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
+              const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
+              // 使用 file: 前缀标识外部文件
+              const fileDocumentId = `file:${currentFilePath.value}`;
+              // 从文件路径提取文件名作为标题
+              const fileName = currentFilePath.value.split(/[/\\]/).pop() || 'Untitled';
+              await registrationService.registerExternalFileReference(
+                fileDocumentId,
+                fileName,
+                fragmentId,
+                newPosition,
+                referenceTag.length
+              );
+            }
+          } catch (error) {
+            console.error('Error registering external file reference:', error);
           }
-        } catch (error) {
-          console.error('Error registering external file reference:', error);
-        }
-      } catch (error) {
-        console.error('Error saving file cache:', error);
-      }
+        })()
+      );
     }
 
     // 如果是数据库文档，注册引用关系
-    if (props.document) {
-      try {
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
+    // 注意：外部文件的临时ID（external-xxx）已经在上面处理过了，这里只处理真正的数据库文档
+    if (props.document && props.document.id && !props.document.id.startsWith('external-')) {
+      const documentId = props.document.id; // 保存到局部变量，避免类型检查问题
+      asyncOperations.push(
+        (async () => {
+          try {
+            const { InversifyContainer } = await import('../../core/container/inversify.container');
+            const container = InversifyContainer.getInstance();
 
-        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
-          const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
-          const newPosition = cursorPosition + 2; // +2 for \n\n
-          await registrationService.registerReference(
-            props.document.id,
-            fragmentId,
-            newPosition,
-            referenceTag.length
-          );
-        }
-      } catch (error) {
-        console.error('Error registering fragment reference:', error);
-      }
+            if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
+              const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
+              await registrationService.registerReference(
+                documentId,
+                fragmentId,
+                newPosition,
+                referenceTag.length
+              );
+            }
+          } catch (error) {
+            console.error('Error registering fragment reference:', error);
+          }
+        })()
+      );
     }
 
     // 更新编辑器内容（在聚焦之前应用标注，避免焦点丢失）
     await nextTick();
-    // 不要在这里调用 focus()，让用户自然地保持焦点
-    // 只在编辑器没有焦点时才应用标注
-    if (!isEditorFocused.value) {
-      await applyEditorAnnotations();
-    } else {
-      // 如果编辑器有焦点，只设置纯文本内容
-      editor.textContent = content.value;
+
+    // 并行执行所有异步操作，不等待完成（后台执行）
+    // 这样可以立即显示内容，而不需要等待文件保存和引用注册
+    Promise.all(asyncOperations).catch(err => {
+      console.error('Error in async operations:', err);
+    });
+
+    // 减少延迟时间：从200ms减少到50ms，足够让DOM更新完成
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // 无论编辑器是否有焦点，都应用标注以显示友好文本
+    // 这样可以确保拖入知识片段后立即显示 [知识片段：标题] 而不是 {{ref:...}}
+    console.log('[MarkdownEditor] 应用标注以显示友好文本，isEditorFocused:', isEditorFocused.value);
+    await applyEditorAnnotations();
+
+    // 如果编辑器有焦点，在应用标注后恢复焦点
+    if (isEditorFocused.value) {
+      await nextTick();
+      editor.focus();
     }
 
-    // 触发内容更新和重新渲染
+    // 触发内容更新和重新渲染（确保引用被解析）
     checkChanges();
-    renderContent();
+    console.log('[MarkdownEditor] 插入片段后，调用 renderContent 进行渲染');
+    await renderContent();
     await nextTick();
     debouncedSave();
   } catch (error) {
@@ -2542,6 +2838,31 @@ const handleInsertFragment = async (fragmentId: string) => {
   }
   const { start: cursorPosition } = getCursorPosition(editor);
   await handleInsertFragmentAtPosition(fragmentId, cursorPosition);
+
+  // 确保编辑器获得焦点
+  await nextTick();
+  if (editor) {
+    editor.focus();
+    isEditorFocused.value = true;
+    // 恢复光标位置
+    const selection = window.getSelection();
+    if (selection && editor.textContent) {
+      try {
+        const range = document.createRange();
+        const textNode = editor.firstChild;
+        if (textNode) {
+          const textLength = textNode.textContent?.length || 0;
+          const newPosition = Math.min(cursorPosition, textLength);
+          range.setStart(textNode, newPosition);
+          range.setEnd(textNode, newPosition);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      } catch (error) {
+        console.warn('[MarkdownEditor] 恢复光标位置失败:', error);
+      }
+    }
+  }
 };
 
 // 暴露方法供外部调用
@@ -2581,9 +2902,9 @@ const refreshContent = () => {
 };
 
 const getContent = () => {
-  // 获取编辑器当前内容
+  // 获取编辑器当前内容（使用getTextContent而不是textContent，避免重复）
   const editor = editorElement.value;
-  const currentMainContent = editor ? editor.textContent || '' : mainContent.value;
+  const currentMainContent = editor ? getTextContent(editor) : mainContent.value;
 
   // 合并 frontmatter 和正文
   return mergeContent(frontmatter.value, currentMainContent);
@@ -2649,15 +2970,15 @@ const handleClickOutside = (event: MouseEvent) => {
   }
 };
 
-// 切换引用形态
-const switchReferenceMode = async (newMode: 'linked' | 'detached' | 'clean') => {
+// 脱钩知识片段：将引用转换为完整的文档内容
+const switchReferenceMode = async (newMode: 'detached') => {
   const menu = referenceContextMenu.value;
   if (!menu.fragmentId) return;
 
   // 检查是否是placeholder格式（不应该出现，但需要处理）
   if (menu.fragmentId.startsWith('placeholder:')) {
     console.error('Invalid fragmentId format:', menu.fragmentId);
-    alert('无法切换引用模式：引用格式错误');
+    alert('无法脱钩：引用格式错误');
     return;
   }
 
@@ -2696,114 +3017,125 @@ const switchReferenceMode = async (newMode: 'linked' | 'detached' | 'clean') => 
       return;
     }
 
-    let newContent = content.value;
-    const before = content.value.substring(0, ref.startIndex);
-    const after = content.value.substring(ref.endIndex);
+    // 脱钩模式：获取片段内容，直接替换引用标记为完整内容
+    const { Application } = await import('../../core/application');
+    const app = Application.getInstance();
+    await app.getApplicationService().initialize();
+    const fragmentUseCases = app.getKnowledgeFragmentUseCases();
+    const fragment = await fragmentUseCases.getFragment(ref.fragmentId);
 
-    if (newMode === 'linked') {
-      // 形态A：强引用模式
-      const newTag = `{{ref:${ref.fragmentId}:linked}}`;
-      newContent = before + newTag + after;
-    } else if (newMode === 'detached') {
-      // 形态B：脱钩模式 - 获取片段内容并插入
-      const { Application } = await import('../../core/application');
-      const app = Application.getInstance();
-      await app.getApplicationService().initialize();
-      const fragmentUseCases = app.getKnowledgeFragmentUseCases();
-      const fragment = await fragmentUseCases.getFragment(ref.fragmentId);
+    if (!fragment) {
+      alert('无法获取片段内容');
+      return;
+    }
 
-      if (fragment) {
-        // 插入标记和内容
-        const tag = `{{ref:${ref.fragmentId}:detached}}`;
-        const fragmentContent = fragment.markdown;
-        newContent = before + tag + '\n\n' + fragmentContent + '\n\n' + after;
-      } else {
-        alert('无法获取片段内容');
-        return;
+    // 获取片段内容（Markdown格式）
+    let fragmentContent = fragment.markdown;
+
+    // 如果是外部文件，需要处理图片路径
+    if (currentFilePath.value) {
+      try {
+        const { FragmentReferenceResolver } = await import('../../domain/services/fragment-reference-resolver.service');
+        const { InversifyContainer } = await import('../../core/container/inversify.container');
+        const container = InversifyContainer.getInstance();
+
+        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
+          const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+          // 使用文件路径作为documentId
+          fragmentContent = await resolver.resolveReference(ref.fragmentId, `file:${currentFilePath.value}`);
+        }
+      } catch (error) {
+        console.warn('Error resolving fragment content for file:', error);
       }
-    } else if (newMode === 'clean') {
-      // 形态C：完全断开 - 获取片段内容，移除标记
-      const { Application } = await import('../../core/application');
-      const app = Application.getInstance();
-      await app.getApplicationService().initialize();
-      const fragmentUseCases = app.getKnowledgeFragmentUseCases();
-      const fragment = await fragmentUseCases.getFragment(ref.fragmentId);
+    } else if (props.document) {
+      try {
+        const { FragmentReferenceResolver } = await import('../../domain/services/fragment-reference-resolver.service');
+        const { InversifyContainer } = await import('../../core/container/inversify.container');
+        const container = InversifyContainer.getInstance();
 
-      if (fragment) {
-        // 只插入内容，不插入标记
-        const fragmentContent = fragment.markdown;
-        newContent = before + fragmentContent + after;
-      } else {
-        // 如果片段不存在，直接移除标记
-        newContent = before + after;
+        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
+          const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+          fragmentContent = await resolver.resolveReference(ref.fragmentId, props.document.id);
+        }
+      } catch (error) {
+        console.warn('Error resolving fragment content for document:', error);
       }
     }
 
+    // 直接替换引用标记为完整内容（不保留任何标记）
+    const before = content.value.substring(0, ref.startIndex);
+    const after = content.value.substring(ref.endIndex);
+    // 在内容前后添加换行，保持格式
+    const newContent = before + '\n\n' + fragmentContent + '\n\n' + after;
     content.value = newContent;
+
+    // 更新 mainContent（从完整内容中分离）
+    const { mainContent: newMainContent } = splitContent(content.value);
+    mainContent.value = newMainContent;
+
+    // 取消注册引用关系（因为已经完全脱钩）
+    if (currentFilePath.value) {
+      try {
+        const electronAPI = (window as any).electronAPI;
+        if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
+          const cache = await electronAPI.file.getFileCache(currentFilePath.value) || { references: [] };
+          // 移除对应的引用
+          cache.references = (cache.references || []).filter((r: any) => r.fragmentId !== ref.fragmentId);
+          if (electronAPI.file.saveFileCache) {
+            await electronAPI.file.saveFileCache(currentFilePath.value, cache);
+          }
+        }
+      } catch (error) {
+        console.warn('Error removing file cache reference:', error);
+      }
+    }
+
+    if (props.document) {
+      try {
+        const { InversifyContainer } = await import('../../core/container/inversify.container');
+        const container = InversifyContainer.getInstance();
+
+        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
+          const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
+          // 取消注册引用关系
+          await registrationService.unregisterReference(props.document.id, ref.fragmentId);
+        }
+      } catch (error) {
+        console.warn('Error unregistering fragment reference:', error);
+      }
+    }
+
     referenceContextMenu.value.visible = false;
 
-    // 更新编辑器显示（只在编辑器没有焦点时应用标注）
+    // 更新编辑器显示
     await nextTick();
     const editor = editorElement.value;
     if (editor) {
-      if (!isEditorFocused.value) {
-        await applyEditorAnnotations();
-      } else {
-        editor.textContent = content.value;
-      }
+      // 更新编辑器内容为纯文本（脱钩后的内容是普通文本，不需要标注）
+      editor.textContent = mainContent.value;
+      console.log('[MarkdownEditor] 脱钩完成，编辑器内容已更新为普通文本');
     }
 
+    // 更新 mainContent 和 content
     checkChanges();
     renderContent();
+
+    console.log('[MarkdownEditor] 知识片段已脱钩，内容已转换为文档内容');
   } catch (error) {
-    console.error('Error switching reference mode:', error);
-    alert('切换形态失败：' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('Error detaching fragment:', error);
+    alert('脱钩失败：' + (error instanceof Error ? error.message : '未知错误'));
   }
 };
 
-// 查看引用信息
-const viewReferenceInfo = () => {
-  const menu = referenceContextMenu.value;
-  if (menu.fragmentId) {
-    handleReferenceClick(menu.fragmentId);
-  }
-  referenceContextMenu.value.visible = false;
-};
-
-// 处理引用标志点击（通过双击引用标志触发）
-const handleReferenceClick = async (fragmentId: string) => {
-  try {
-    const { Application } = await import('../../core/application');
-    const app = Application.getInstance();
-    const appService = app.getApplicationService();
-    await appService.initialize();
-    const fragmentUseCases = app.getKnowledgeFragmentUseCases();
-
-    const fragment = await fragmentUseCases.getFragment(fragmentId);
-    if (fragment && fragment.referencedDocuments) {
-      // 显示引用文档列表对话框
-      showReferenceDialog.value = true;
-      referenceDocuments.value = fragment.referencedDocuments;
-      selectedFragmentId.value = fragmentId;
-    }
-  } catch (error) {
-    console.error('Error handling reference click:', error);
-  }
-};
-
-// 跳转到文档
-const navigateToDocument = (documentId: string) => {
-  // 触发事件，让父组件处理导航
-  emit('navigate-to-document', documentId);
-  showReferenceDialog.value = false;
-};
 
 // handleEditorClick已移除，现在使用右键菜单处理引用交互
 
 // 获取当前文档上下文
 const getDocumentContext = () => {
   if (props.document) {
-    return { documentId: props.document.id, filePath: undefined };
+    // 检查文档对象是否包含 filePath（外部文件）
+    const filePath = (props.document as any).filePath || currentFilePath.value;
+    return { documentId: props.document.id, filePath };
   } else if (currentFilePath.value) {
     return { documentId: undefined, filePath: currentFilePath.value };
   }

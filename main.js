@@ -33,7 +33,34 @@ function saveConfig(config) {
   }
 }
 
-// 获取数据存储目录（支持自定义路径）
+// 获取全局数据目录（用于知识片段库等全局共享数据）
+// 支持自定义路径，但默认是固定的，不随项目切换而变化
+function getGlobalDataPath() {
+  const config = loadConfig();
+  // 如果设置了自定义全局路径，优先使用
+  if (config.customGlobalDataPath && fs.existsSync(config.customGlobalDataPath)) {
+    return config.customGlobalDataPath;
+  }
+
+  // 如果是生产环境（已打包），使用app同级目录
+  if (!isDev) {
+    const appPath = app.getAppPath();
+    let basePath;
+    if (appPath.endsWith('.asar')) {
+      basePath = path.dirname(appPath);
+    } else if (appPath.includes('.asar')) {
+      const asarIndex = appPath.indexOf('.asar');
+      basePath = path.dirname(appPath.substring(0, asarIndex + 5));
+    } else {
+      basePath = path.dirname(appPath);
+    }
+    return path.join(basePath, 'MDNoteGlobal');
+  }
+  // 开发环境：使用用户数据目录下的 global 子目录
+  return path.join(userDataPath, 'global');
+}
+
+// 获取项目数据存储目录（支持自定义路径，随项目切换）
 function getDataPath() {
   const config = loadConfig();
   if (config.customDataPath && fs.existsSync(config.customDataPath)) {
@@ -64,10 +91,11 @@ function getDataPath() {
   return path.join(userDataPath, 'data');
 }
 
-// 获取应该自动打开的文件夹（优先使用知识片段库文件夹，否则使用上次打开的文件夹）
+// 获取应该自动打开的文件夹（优先使用项目数据路径，否则使用上次打开的文件夹）
+// 注意：知识片段库使用独立的全局路径（customGlobalDataPath），不在这里处理
 function getAutoOpenFolder() {
   const config = loadConfig();
-  // 优先使用知识片段库文件夹（customDataPath）
+  // 优先使用项目数据路径（customDataPath）
   if (config.customDataPath && fs.existsSync(config.customDataPath)) {
     return config.customDataPath;
   }
@@ -84,6 +112,12 @@ let dataPath = getDataPath();
 // 确保数据目录存在
 if (!fs.existsSync(dataPath)) {
   fs.mkdirSync(dataPath, { recursive: true });
+}
+
+// 初始化全局数据路径（知识片段库）
+let globalDataPath = getGlobalDataPath();
+if (!fs.existsSync(globalDataPath)) {
+  fs.mkdirSync(globalDataPath, { recursive: true });
 }
 
 // 创建原生菜单
@@ -393,7 +427,185 @@ ipcMain.handle('file:list', async (_event, _pattern = '*.json') => {
   }
 });
 
-// 图片和文件操作 IPC 处理
+// ==================== 知识片段库专用 IPC（使用全局路径） ====================
+// 知识片段库存储在全局路径，不随项目切换而变化
+
+ipcMain.handle('fragment:read', async (event, filename) => {
+  try {
+    const filePath = path.join(getGlobalDataPath(), filename);
+    console.log('[Main Process] fragment:read path:', filePath);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error reading fragment file:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('fragment:write', async (event, filename, data) => {
+  try {
+    const filePath = path.join(getGlobalDataPath(), filename);
+    console.log('[Main Process] fragment:write path:', filePath);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('Error writing fragment file:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('fragment:mkdir', async (event, dirPath) => {
+  try {
+    // 知识片段的目录总是相对于全局路径
+    const fullPath = path.join(getGlobalDataPath(), dirPath);
+    console.log('[Main Process] fragment:mkdir path:', fullPath);
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true });
+    }
+    return true;
+  } catch (error) {
+    console.error('Error creating fragment directory:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('fragment:get-global-path', async () => {
+  const globalPath = getGlobalDataPath();
+  console.log('[Main Process] fragment:get-global-path called, returning:', globalPath);
+  return globalPath;
+});
+
+// 获取自定义全局数据路径（如果已设置）
+ipcMain.handle('fragment:get-custom-global-path', async () => {
+  const config = loadConfig();
+  const customPath = config.customGlobalDataPath || null;
+  console.log('[Main Process] fragment:get-custom-global-path called, returning:', customPath);
+  return customPath;
+});
+
+// 设置自定义全局数据路径（知识片段库存储位置）
+ipcMain.handle('fragment:set-global-path', async (_event, customPath) => {
+  try {
+    console.log('[Main Process] fragment:set-global-path called with:', customPath);
+
+    if (!customPath || !fs.existsSync(customPath)) {
+      throw new Error('Invalid path or path does not exist');
+    }
+
+    const config = loadConfig();
+    config.customGlobalDataPath = customPath;
+    saveConfig(config);
+
+    // 更新 globalDataPath 变量
+    globalDataPath = customPath;
+    console.log('[Main Process] globalDataPath updated to:', globalDataPath);
+
+    // 确保数据目录存在
+    if (!fs.existsSync(globalDataPath)) {
+      fs.mkdirSync(globalDataPath, { recursive: true });
+    }
+
+    console.log('[Main Process] Custom global data path set successfully:', customPath);
+    return { success: true, path: customPath };
+  } catch (error) {
+    console.error('[Main Process] Error setting custom global data path:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 重置为默认全局数据路径
+ipcMain.handle('fragment:reset-global-path', async () => {
+  try {
+    const config = loadConfig();
+    delete config.customGlobalDataPath;
+    saveConfig(config);
+
+    // 更新 globalDataPath 变量为默认路径
+    if (!isDev) {
+      const appPath = app.getAppPath();
+      let basePath;
+      if (appPath.endsWith('.asar')) {
+        basePath = path.dirname(appPath);
+      } else if (appPath.includes('.asar')) {
+        const asarIndex = appPath.indexOf('.asar');
+        basePath = path.dirname(appPath.substring(0, asarIndex + 5));
+      } else {
+        basePath = path.dirname(appPath);
+      }
+      globalDataPath = path.join(basePath, 'MDNoteGlobal');
+    } else {
+      globalDataPath = path.join(userDataPath, 'global');
+    }
+
+    // 确保数据目录存在
+    if (!fs.existsSync(globalDataPath)) {
+      fs.mkdirSync(globalDataPath, { recursive: true });
+    }
+
+    return { success: true, path: globalDataPath };
+  } catch (error) {
+    console.error('Error resetting global data path:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('fragment:copy', async (event, sourcePath, destPath) => {
+  try {
+    // destPath 是相对于全局路径的
+    const fullDestPath = path.join(getGlobalDataPath(), destPath);
+    console.log('[Main Process] fragment:copy', sourcePath, '->', fullDestPath);
+
+    // 确保目标目录存在
+    const destDir = path.dirname(fullDestPath);
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+
+    // sourcePath 可能是绝对路径或相对于项目路径
+    let fullSourcePath = sourcePath;
+    if (!path.isAbsolute(sourcePath)) {
+      fullSourcePath = path.join(getDataPath(), sourcePath);
+    }
+
+    fs.copyFileSync(fullSourcePath, fullDestPath);
+    return true;
+  } catch (error) {
+    console.error('Error copying fragment file:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('fragment:delete-dir', async (event, dirPath) => {
+  try {
+    const fullPath = path.join(getGlobalDataPath(), dirPath);
+    console.log('[Main Process] fragment:delete-dir path:', fullPath);
+    if (fs.existsSync(fullPath)) {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    }
+    return true;
+  } catch (error) {
+    console.error('Error deleting fragment directory:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('fragment:get-full-path', async (event, relativePath) => {
+  try {
+    // 知识片段的路径总是相对于全局数据目录
+    const fullPath = path.join(getGlobalDataPath(), relativePath);
+    const normalizedPath = fullPath.replace(/\\/g, '/');
+    console.log('[Main Process] fragment:get-full-path:', relativePath, '->', normalizedPath);
+    return `app://${normalizedPath}`;
+  } catch (error) {
+    console.error('Error getting fragment full path:', error);
+    throw error;
+  }
+});
+
+// ==================== 图片和文件操作 IPC 处理 ====================
 ipcMain.handle('file:copy', async (event, sourcePath, destPath) => {
   try {
     // 确保目标目录存在
@@ -411,34 +623,63 @@ ipcMain.handle('file:copy', async (event, sourcePath, destPath) => {
 
 ipcMain.handle('file:mkdir', async (event, dirPath) => {
   try {
+    console.log('[Main Process] file:mkdir called, dirPath:', dirPath);
+    // 规范化路径（处理 Windows 路径分隔符）
+    const normalizedDirPath = path.normalize(dirPath);
+    console.log('[Main Process] Normalized dirPath:', normalizedDirPath);
     // 如果是相对路径（不包含 : 或 / 开头），需要拼接 dataPath
-    let fullPath = dirPath;
-    if (!path.isAbsolute(dirPath) && !dirPath.includes(':')) {
+    let fullPath = normalizedDirPath;
+    const isAbsolute = path.isAbsolute(normalizedDirPath) || normalizedDirPath.includes(':');
+    console.log('[Main Process] Is absolute path:', isAbsolute);
+    if (!isAbsolute) {
       // 相对路径：拼接到 dataPath
-      fullPath = path.join(getDataPath(), dirPath);
+      fullPath = path.join(getDataPath(), normalizedDirPath);
+      console.log('[Main Process] Converted to full path:', fullPath);
     }
 
     if (!fs.existsSync(fullPath)) {
+      console.log('[Main Process] Directory does not exist, creating:', fullPath);
       fs.mkdirSync(fullPath, { recursive: true });
+      console.log('[Main Process] Directory created successfully');
+    } else {
+      console.log('[Main Process] Directory already exists');
     }
     return true;
   } catch (error) {
-    console.error('Error creating directory:', error);
+    console.error('[Main Process] Error creating directory:', error);
     throw error;
   }
 });
 
 ipcMain.handle('file:write-binary', async (event, filePath, buffer) => {
   try {
+    console.log('[Main Process] file:write-binary called, filePath:', filePath, 'buffer length:', buffer.length);
+    // 规范化路径（处理 Windows 路径分隔符）
+    const normalizedPath = path.normalize(filePath);
+    console.log('[Main Process] Normalized path:', normalizedPath);
     // 确保目录存在
-    const dir = path.dirname(filePath);
+    const dir = path.dirname(normalizedPath);
+    console.log('[Main Process] Directory path:', dir);
     if (!fs.existsSync(dir)) {
+      console.log('[Main Process] Directory does not exist, creating...');
       fs.mkdirSync(dir, { recursive: true });
+      console.log('[Main Process] Directory created');
+    } else {
+      console.log('[Main Process] Directory already exists');
     }
-    fs.writeFileSync(filePath, Buffer.from(buffer));
+    console.log('[Main Process] Writing file...');
+    fs.writeFileSync(normalizedPath, Buffer.from(buffer));
+    console.log('[Main Process] File written successfully:', normalizedPath);
+    // 验证文件是否存在
+    if (fs.existsSync(normalizedPath)) {
+      const stats = fs.statSync(normalizedPath);
+      console.log('[Main Process] File verified, size:', stats.size, 'bytes');
+    } else {
+      console.error('[Main Process] File was not created!');
+    }
     return true;
   } catch (error) {
-    console.error('Error writing binary file:', error);
+    console.error('[Main Process] Error writing binary file:', error);
     throw error;
   }
 });
@@ -579,15 +820,18 @@ ipcMain.handle('file:reset-data-path', async () => {
 });
 
 // 打开文件夹对话框
-ipcMain.handle('dialog:open-folder', async (_event) => {
+ipcMain.handle('dialog:open-folder', async (_event, options = {}) => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']
   });
   if (!result.canceled && result.filePaths.length > 0) {
-    // 保存上次打开的文件夹
-    const config = loadConfig();
-    config.lastOpenedFolder = result.filePaths[0];
-    saveConfig(config);
+    // 只有在不是知识片段库设置时才保存上次打开的文件夹
+    // options.skipSaveLastFolder 为 true 时，不保存 lastOpenedFolder
+    if (!options.skipSaveLastFolder) {
+      const config = loadConfig();
+      config.lastOpenedFolder = result.filePaths[0];
+      saveConfig(config);
+    }
     return result.filePaths[0];
   }
   return null;
@@ -793,11 +1037,11 @@ ipcMain.handle('file:delete-file-cache', async (event, filePath) => {
 ipcMain.handle('export:pdf', async (event, options) => {
   try {
     console.log('[Main Process] PDF export requested:', options.title);
-    
+
     // 直接使用 Puppeteer 生成 PDF，不依赖 TypeScript 编译后的文件
     // 渲染进程已经准备好了 HTML 内容，我们只需要使用 Puppeteer 生成 PDF
     const puppeteer = require('puppeteer');
-    
+
     let browser;
     try {
       // 启动浏览器

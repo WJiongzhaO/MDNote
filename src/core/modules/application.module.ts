@@ -41,6 +41,13 @@ import { PDFExporter } from '../../infrastructure/services/exporters/pdf-exporte
 import { HTMLExporter } from '../../infrastructure/services/exporters/html-exporter.service';
 import { MarkdownExporter } from '../../infrastructure/services/exporters/markdown-exporter.service';
 
+// 文件打开策略
+import { MarkdownFileOpenerStrategy } from '../../domain/services/markdown-file-opener.strategy';
+import { TextFileOpenerStrategy } from '../../domain/services/text-file-opener.strategy';
+import { JsonFileOpenerStrategy } from '../../domain/services/json-file-opener.strategy';
+import { ImageFileOpenerStrategy } from '../../domain/services/image-file-opener.strategy';
+import { FileOpenerManager } from '../../domain/services/file-opener-manager.service';
+
 /**
  * 应用模块配置 - 负责配置应用层的依赖关系
  */
@@ -49,7 +56,7 @@ export class ApplicationModule {
     // 配置仓储实现
     container.bind<DocumentRepository>(TYPES.DocumentRepository)
       .toConstantValue(StorageAdapter.createDocumentRepository());
-    
+
     container.bind<FolderRepository>(TYPES.FolderRepository)
       .toConstantValue(StorageAdapter.createFolderRepository());
 
@@ -86,14 +93,14 @@ export class ApplicationModule {
     // 配置资源渲染服务（延迟初始化依赖）
     // 先创建实例，然后在配置完成后设置依赖
     const assetRenderer = new AssetRendererService();
-    container.bind(AssetRendererService)
+    container.bind<AssetRendererService>(AssetRendererService as any)
       .toConstantValue(assetRenderer);
-    
+
     // 在配置完成后设置依赖（使用Promise确保顺序）
     Promise.resolve().then(() => {
       try {
         const mermaidRenderer = container.get<MermaidRendererService>(TYPES.MermaidRenderer);
-        const assetManager = container.get(TYPES.AssetManager);
+        const assetManager = container.get<any>(TYPES.AssetManager);
         assetRenderer.setMermaidRenderer(mermaidRenderer);
         assetRenderer.setAssetManager(assetManager);
       } catch (error) {
@@ -154,17 +161,17 @@ export class ApplicationModule {
     container.bind<VariableUseCases>(TYPES.VariableUseCases)
       .toSingleton(VariableUseCases);
 
-    // 配置导出服务
-    container.bind<WordExporter>(WordExporter)
+    // 配置导出服务（使用类作为标识符，因为它们是具体的类）
+    container.bind<WordExporter>(WordExporter as any)
       .to(WordExporter);
 
-    container.bind<PDFExporter>(PDFExporter)
+    container.bind<PDFExporter>(PDFExporter as any)
       .to(PDFExporter);
 
-    container.bind<HTMLExporter>(HTMLExporter)
+    container.bind<HTMLExporter>(HTMLExporter as any)
       .to(HTMLExporter);
 
-    container.bind<MarkdownExporter>(MarkdownExporter)
+    container.bind<MarkdownExporter>(MarkdownExporter as any)
       .to(MarkdownExporter);
 
     container.bind<ExportFactory>(TYPES.ExportFactory)
@@ -172,6 +179,18 @@ export class ApplicationModule {
 
     container.bind<ExportUseCases>(TYPES.ExportUseCases)
       .to(ExportUseCases);
+
+    // 配置文件打开策略
+    container.bind(TYPES.MarkdownFileOpenerStrategy)
+      .to(MarkdownFileOpenerStrategy);
+    container.bind(TYPES.TextFileOpenerStrategy)
+      .to(TextFileOpenerStrategy);
+    container.bind(TYPES.JsonFileOpenerStrategy)
+      .to(JsonFileOpenerStrategy);
+    container.bind(TYPES.ImageFileOpenerStrategy)
+      .to(ImageFileOpenerStrategy);
+    container.bind(TYPES.FileOpenerManager)
+      .toSingleton(FileOpenerManager);
 
     // 配置处理器之间的依赖关系
     this.configureProcessorDependencies(container);

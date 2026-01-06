@@ -160,18 +160,21 @@ export class KnowledgeFragmentUseCases {
     // 删除知识片段数据
     await this.repository.delete({ value: id });
 
-    // 删除对应的存储目录
+    // 删除对应的存储目录（使用全局路径）
     try {
       const fragmentStoragePath = this.imageStorage.getFragmentStoragePath(id);
       const electronAPI = (window as any).electronAPI;
-      if (electronAPI && electronAPI.file && electronAPI.file.deleteNode) {
-        // 获取完整路径（使用字符串拼接，因为浏览器环境没有path模块）
+      // 优先使用 fragment API（全局路径）
+      if (electronAPI && electronAPI.fragment && electronAPI.fragment.deleteDir) {
+        await electronAPI.fragment.deleteDir(fragmentStoragePath);
+        console.log('已删除知识片段存储目录（全局）:', fragmentStoragePath);
+      }
+      // 降级：使用 file API
+      else if (electronAPI && electronAPI.file && electronAPI.file.deleteNode) {
         const dataPath = await electronAPI.file.getDataPath();
-        // 规范化路径分隔符
         const normalizedDataPath = dataPath.replace(/\\/g, '/');
         const normalizedFragmentPath = fragmentStoragePath.replace(/\\/g, '/');
         const fullPath = `${normalizedDataPath}/${normalizedFragmentPath}`.replace(/\/+/g, '/');
-        // 删除目录
         await electronAPI.file.deleteNode(fullPath);
         console.log('已删除知识片段存储目录:', fullPath);
       }
@@ -227,16 +230,30 @@ export class KnowledgeFragmentUseCases {
             // 确定源图片的完整路径
             let sourceImagePath: string;
 
-            if (sourceDocumentId) {
-              // 从文档的assets目录复制
+            // 优先使用 sourceFilePath（外部文件），因为 sourceDocumentId 可能是临时ID（external-xxx）
+            // 如果 sourceDocumentId 是外部文件的临时ID（以 external- 开头），也应该使用 sourceFilePath
+            const isExternalFileId = sourceDocumentId && sourceDocumentId.startsWith('external-');
+
+            if (sourceFilePath || isExternalFileId) {
+              // 从外部文件的assets目录复制
+              if (sourceFilePath) {
+                // 规范化路径分隔符，统一使用正斜杠
+                const normalizedSourcePath = sourceFilePath.replace(/\\/g, '/');
+                const fileDir = normalizedSourcePath.split('/').slice(0, -1).join('/');
+                sourceImagePath = `${fileDir}/assets/${fileName}`;
+                console.log('[Fragment] 使用外部文件路径，sourceImagePath:', sourceImagePath);
+              } else {
+                // 无法确定源路径
+                console.warn('无法确定图片源路径，sourceFilePath未提供:', fileName);
+                // 保持原节点，不复制图片
+                updatedNodes.push(node);
+                continue;
+              }
+            } else if (sourceDocumentId) {
+              // 从文档的assets目录复制（数据库文档）
               const documentAssetsPath = this.imageStorage.getDocumentAssetsPath(sourceDocumentId);
               sourceImagePath = `${documentAssetsPath}/${fileName}`;
-            } else if (sourceFilePath) {
-              // 从外部文件的assets目录复制
-              // 规范化路径分隔符，统一使用正斜杠
-              const normalizedSourcePath = sourceFilePath.replace(/\\/g, '/');
-              const fileDir = normalizedSourcePath.split('/').slice(0, -1).join('/');
-              sourceImagePath = `${fileDir}/assets/${fileName}`;
+              console.log('[Fragment] 使用文档路径，sourceImagePath:', sourceImagePath);
             } else {
               // 无法确定源路径
               console.warn('无法确定图片源路径，sourceDocumentId和sourceFilePath都未提供:', fileName);
@@ -245,9 +262,18 @@ export class KnowledgeFragmentUseCases {
               continue;
             }
 
-            // 确保目标目录存在（通过electronAPI）
+            // 确保目标目录存在（使用全局 fragment API）
             const electronAPI = (window as any).electronAPI;
-            if (electronAPI && electronAPI.file && electronAPI.file.mkdir) {
+            // 优先使用 fragment API（全局路径）
+            if (electronAPI && electronAPI.fragment && electronAPI.fragment.mkdir) {
+              try {
+                await electronAPI.fragment.mkdir(fragmentStoragePath);
+              } catch {
+                // 目录可能已存在，忽略错误
+              }
+            }
+            // 降级：使用 file API
+            else if (electronAPI && electronAPI.file && electronAPI.file.mkdir) {
               try {
                 await electronAPI.file.mkdir(fragmentStoragePath);
               } catch {
@@ -255,9 +281,9 @@ export class KnowledgeFragmentUseCases {
               }
             }
 
-            // 复制图片到知识片段存储目录
+            // 复制图片到知识片段存储目录（使用全局路径）
             const destImagePath = `${fragmentStoragePath}/${fileName}`;
-            const success = await this.imageStorage.copyImage(sourceImagePath, destImagePath);
+            const success = await this.copyImageToFragmentStorage(sourceImagePath, destImagePath);
 
             if (success) {
               // 更新节点路径
@@ -299,6 +325,30 @@ export class KnowledgeFragmentUseCases {
     }
 
     return updatedNodes;
+  }
+
+  /**
+   * 复制图片到知识片段存储目录（使用全局路径）
+   * @param sourcePath 源图片路径（可能是绝对路径或相对于项目的路径）
+   * @param destPath 目标路径（相对于全局知识片段目录）
+   */
+  private async copyImageToFragmentStorage(sourcePath: string, destPath: string): Promise<boolean> {
+    try {
+      const electronAPI = (window as any).electronAPI;
+
+      // 优先使用 fragment API（全局路径）
+      if (electronAPI && electronAPI.fragment && electronAPI.fragment.copy) {
+        await electronAPI.fragment.copy(sourcePath, destPath);
+        console.log('[Fragment] 图片复制成功（全局路径）:', sourcePath, '->', destPath);
+        return true;
+      }
+
+      // 降级：使用 imageStorage.copyImage（旧逻辑）
+      return await this.imageStorage.copyImage(sourcePath, destPath);
+    } catch (error) {
+      console.error('[Fragment] 复制图片失败:', error);
+      return false;
+    }
   }
 
   /**
