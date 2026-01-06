@@ -33,6 +33,14 @@ import { FolderVariableResolver } from '../../domain/services/folder-variable-re
 import { VariableMerger } from '../../domain/services/variable-merger.service';
 import { VariableUseCases } from '../../application/usecases/variable.usecases';
 
+// 导出服务
+import { ExportUseCases } from '../../application/usecases/export.usecases';
+import { ExportFactory } from '../../infrastructure/services/export-factory.service';
+import { WordExporter } from '../../infrastructure/services/exporters/word-exporter.service';
+import { PDFExporter } from '../../infrastructure/services/exporters/pdf-exporter.service';
+import { HTMLExporter } from '../../infrastructure/services/exporters/html-exporter.service';
+import { MarkdownExporter } from '../../infrastructure/services/exporters/markdown-exporter.service';
+
 /**
  * 应用模块配置 - 负责配置应用层的依赖关系
  */
@@ -145,6 +153,25 @@ export class ApplicationModule {
 
     container.bind<VariableUseCases>(TYPES.VariableUseCases)
       .toSingleton(VariableUseCases);
+
+    // 配置导出服务
+    container.bind<WordExporter>(WordExporter)
+      .to(WordExporter);
+
+    container.bind<PDFExporter>(PDFExporter)
+      .to(PDFExporter);
+
+    container.bind<HTMLExporter>(HTMLExporter)
+      .to(HTMLExporter);
+
+    container.bind<MarkdownExporter>(MarkdownExporter)
+      .to(MarkdownExporter);
+
+    container.bind<ExportFactory>(TYPES.ExportFactory)
+      .to(ExportFactory);
+
+    container.bind<ExportUseCases>(TYPES.ExportUseCases)
+      .to(ExportUseCases);
 
     // 配置处理器之间的依赖关系
     this.configureProcessorDependencies(container);

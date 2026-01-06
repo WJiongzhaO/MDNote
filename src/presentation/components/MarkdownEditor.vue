@@ -9,23 +9,47 @@
         @blur="updateDocument"
       />
       <div v-else class="title-placeholder">请选择或创建文档</div>
-
+      
       <div v-if="document || currentFilePath" class="editor-toolbar">
-        <button
-          class="toolbar-btn"
+        <button 
+          class="toolbar-btn" 
           @click="openMermaidEditor"
           title="编辑Mermaid图表"
         >
           📊 Mermaid编辑器
         </button>
         <!-- 添加公式编辑器按钮 -->
-        <button
-          class="toolbar-btn"
+        <button 
+          class="toolbar-btn" 
           @click="openFormulaEditor"
           title="编辑数学公式"
         >
           📐 公式编辑器
         </button>
+        <!-- 导出按钮 -->
+        <div class="export-menu">
+          <button
+            class="toolbar-btn"
+            @click="showExportMenu = !showExportMenu"
+            title="导出文档"
+          >
+            📤 导出
+          </button>
+          <div v-if="showExportMenu" class="export-dropdown" @click.stop>
+            <div class="export-item" @click="handleExport('word')">
+              📄 Word (.docx)
+            </div>
+            <div class="export-item" @click="handleExport('pdf')">
+              📕 PDF (.pdf)
+            </div>
+            <div class="export-item" @click="handleExport('html')">
+              🌐 HTML (.html)
+            </div>
+            <div class="export-item" @click="handleExport('markdown')">
+              📝 Markdown (.md)
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -41,10 +65,11 @@
             class="markdown-editor-content"
             :data-placeholder="'开始编写您的 Markdown 文档...'"
             @input="handleEditorInput"
-            @scroll="syncScroll"
+          @scroll="syncScroll"
             @paste="handlePaste"
             @focus="handleEditorFocus"
             @blur="handleEditorBlur"
+            @mousedown="handleEditorMouseDown"
             @dragover.prevent="handleDragOver"
             @drop="handleEditorDrop"
             @dragenter.prevent="handleEditorDragEnter"
@@ -60,11 +85,22 @@
 
       <div class="preview-pane">
         <div class="editor-label">实时预览</div>
+        <div class="markdown-preview-container">
         <div
           class="markdown-preview"
-          v-html="renderedContent"
-          ref="previewElement"
+            :class="{ 'preview-active': activePreviewIndex === 0, 'preview-hidden': activePreviewIndex !== 0 }"
+            v-html="previewBuffers[0]"
+            ref="previewElement0"
+            @scroll="handlePreviewScroll(0)"
+          ></div>
+          <div
+            class="markdown-preview"
+            :class="{ 'preview-active': activePreviewIndex === 1, 'preview-hidden': activePreviewIndex !== 1 }"
+            v-html="previewBuffers[1]"
+            ref="previewElement1"
+            @scroll="handlePreviewScroll(1)"
         ></div>
+        </div>
       </div>
     </div>
 
@@ -231,8 +267,18 @@ const renderedContent = ref(''); // 预览渲染内容
 const hasChanges = ref(false);
 const isEditorFocused = ref(false); // 编辑器是否获得焦点
 const previewElement = ref<HTMLDivElement>();
+const previewElement0 = ref<HTMLDivElement>();
+const previewElement1 = ref<HTMLDivElement>();
 const editorElement = ref<HTMLDivElement>(); // 编辑器元素（contenteditable div）
 const currentFilePath = ref<string>(''); // 当前打开的外部文件路径
+
+// 双缓冲预览
+const previewBuffers = ref<string[]>(['', '']); // 两个预览缓冲区
+const activePreviewIndex = ref(0); // 当前活动的预览索引
+const savedScrollPercentage = ref<number>(0); // 保存的滚动百分比
+const isRestoringScroll = ref(false); // 标记是否正在恢复滚动位置
+const isSyncingScroll = ref(false); // 标记是否正在同步滚动（防止循环触发）
+const pendingScrollRestore = ref<{ percentage: number; isAtBottom: boolean; previewIndex: number } | null>(null); // 待恢复的滚动信息
 
 // 资源渲染器
 const { useAutoRender, triggerRender } = useAssetRenderer();
@@ -251,6 +297,10 @@ const currentSelectionEnd = ref(0);
 const showFormulaEditor = ref(false);
 const currentFormulaCode = ref('');
 const currentFormulaType = ref<'inline' | 'block'>('inline');
+
+// 导出相关状态
+const showExportMenu = ref(false);
+const isExporting = ref(false);
 
 /**
  * 分离 frontmatter 和正文内容
@@ -321,7 +371,7 @@ watch(() => props.document, (newDocument) => {
     currentFilePath.value = ''; // 清空外部文件路径
     // 确保内容渲染
     nextTick(async () => {
-      renderContent();
+    renderContent();
       // 更新编辑器内容（始终应用标注）
       const editor = editorElement.value;
       if (editor) {
@@ -367,7 +417,7 @@ const handleEditorInput = async (event: Event) => {
     clearTimeout(renderTimer);
   }
   renderTimer = setTimeout(() => {
-    renderContent();
+  renderContent();
     // 不要在用户输入时重新应用标注，因为这会重新渲染innerHTML导致失去焦点
     // 标注只在编辑器失去焦点时应用
   }, 150);
@@ -444,6 +494,19 @@ const handleEditorFocus = () => {
   isEditorFocused.value = true;
 };
 
+// 处理编辑器鼠标按下事件（在失去焦点之前保存光标位置）
+const handleEditorMouseDown = () => {
+  const editor = editorElement.value;
+  if (!editor) return;
+  
+  // 如果编辑器有焦点，保存当前光标位置
+  if (isEditorFocused.value || document.activeElement === editor) {
+    const { start, end } = getCursorPosition(editor);
+    currentSelectionStart.value = start;
+    currentSelectionEnd.value = end;
+  }
+};
+
 // 处理编辑器失去焦点
 const handleEditorBlur = async () => {
   // 先保存当前内容
@@ -453,6 +516,11 @@ const handleEditorBlur = async () => {
     if (currentText !== content.value) {
       content.value = currentText;
     }
+    
+    // 在失去焦点之前保存光标位置
+    const { start, end } = getCursorPosition(editor);
+    currentSelectionStart.value = start;
+    currentSelectionEnd.value = end;
   }
 
   isEditorFocused.value = false;
@@ -905,14 +973,14 @@ const saveDocument = async () => {
 
   // 如果有document，保存到数据库
   if (props.document) {
-    try {
-      emit('update-document', props.document.id, title.value, content.value);
-      lastSavedTitle = title.value;
-      lastSavedContent = content.value;
-      hasChanges.value = false;
-    } catch (error) {
-      console.error('Failed to save document:', error);
-    }
+  try {
+    emit('update-document', props.document.id, title.value, content.value);
+    lastSavedTitle = title.value;
+    lastSavedContent = content.value;
+    hasChanges.value = false;
+  } catch (error) {
+    console.error('Failed to save document:', error);
+  }
   }
 };
 
@@ -988,7 +1056,7 @@ const renderContent = async () => {
         // 对于外部文件，直接使用文件路径
         docId = currentFilePath.value;
         docPath = currentFilePath.value;
-      }
+  }
 
       // 获取合并后的变量（document + folder + global）
       let variables: Record<string, any> = {};
@@ -1031,48 +1099,306 @@ const renderContent = async () => {
       console.log('[renderContent] Content before markdown:', processedContent.substring(0, 100));
 
       // 渲染已替换变量的内容（不传递变量给 markdown 处理器）
-      renderedContent.value = await props.renderMarkdown(processedContent, docId);
-      await nextTick();
-      adjustPreviewHeight();
-
-      // 渲染所有资源占位符（Mermaid图表等）
-      if (previewElement.value) {
-        await triggerRender(previewElement);
+      const newRenderedContent = await props.renderMarkdown(processedContent, docId);
+      
+      // 获取编辑器的滚动百分比位置（这是我们要同步到预览的基准）
+      const editor = editorElement.value;
+      let editorScrollPercentage = 0;
+      let isEditorAtBottom = false;
+      
+      if (editor) {
+        const editorScrollHeight = editor.scrollHeight - editor.clientHeight;
+        if (editorScrollHeight > 0) {
+          const distanceFromBottom = editorScrollHeight - editor.scrollTop;
+          // 如果编辑器接近底部（距离底部小于10px），认为在底部
+          if (distanceFromBottom <= 10) {
+            isEditorAtBottom = true;
+            editorScrollPercentage = 1;
+          } else {
+            editorScrollPercentage = editor.scrollTop / editorScrollHeight;
+            // 限制在 0-1 之间
+            editorScrollPercentage = Math.max(0, Math.min(1, editorScrollPercentage));
+          }
+        } else {
+          // 如果编辑器没有滚动空间，默认在顶部
+          editorScrollPercentage = 0;
+        }
       }
+      
+      // 保存编辑器滚动百分比，用于设置预览滚动位置
+      savedScrollPercentage.value = editorScrollPercentage;
+      const currentPreviewIndex = activePreviewIndex.value;
+      
+      // 使用双缓冲技术平滑更新预览
+      const nextBufferIndex = currentPreviewIndex === 0 ? 1 : 0;
+      const nextPreviewElement = nextBufferIndex === 0 ? previewElement0 : previewElement1;
+      
+      // 保存滚动恢复信息，用于在 previewBuffers 更新后恢复滚动位置
+      pendingScrollRestore.value = {
+        percentage: editorScrollPercentage,
+        isAtBottom: isEditorAtBottom,
+        previewIndex: nextBufferIndex
+      };
+      
+      // 更新非活动缓冲区（这会触发 v-html 更新，watch 会处理滚动恢复）
+      previewBuffers.value[nextBufferIndex] = newRenderedContent;
+      
+      await nextTick();
+      
+      // 渲染所有资源占位符（Mermaid图表等）到非活动缓冲区
+      if (nextPreviewElement.value) {
+        await triggerRender(nextPreviewElement);
+      }
+      
+      // 等待DOM完全更新（包括triggerRender中的异步操作）
+      await nextTick();
+      
+      // 确保新内容已经渲染完成后再切换
+      // 使用双重 requestAnimationFrame 确保浏览器已经完成渲染和布局
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // 在切换前，先在新预览元素上设置滚动位置（此时元素还不可见，但内容已加载）
+          if (nextPreviewElement.value) {
+            const previewScrollHeight = nextPreviewElement.value.scrollHeight - nextPreviewElement.value.clientHeight;
+            if (previewScrollHeight > 0) {
+              const targetScrollTop = isEditorAtBottom ? previewScrollHeight : (editorScrollPercentage * previewScrollHeight);
+              nextPreviewElement.value.scrollTop = targetScrollTop;
+            }
+          }
+          
+          // 切换活动缓冲区索引（这会触发CSS类变化，实现平滑过渡）
+          activePreviewIndex.value = nextBufferIndex;
+          renderedContent.value = newRenderedContent;
+          
+          // 更新 previewElement 引用以保持兼容性
+          previewElement.value = nextPreviewElement.value || null;
+          
+          // 切换后立即再次设置滚动位置（确保在元素变为可见后滚动位置正确）
+          nextTick(() => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                if (nextPreviewElement.value) {
+                  const previewScrollHeight = nextPreviewElement.value.scrollHeight - nextPreviewElement.value.clientHeight;
+                  if (previewScrollHeight > 0) {
+                    const targetScrollTop = isEditorAtBottom ? previewScrollHeight : (editorScrollPercentage * previewScrollHeight);
+                    nextPreviewElement.value.scrollTop = targetScrollTop;
+                  }
+                }
+              });
+            });
+          });
+        });
+      });
     } catch (error) {
       console.error('Failed to render markdown:', error);
-      renderedContent.value = '<p>渲染错误</p>';
+      const errorContent = '<p>渲染错误</p>';
+      renderedContent.value = errorContent;
+      // 更新当前活动的缓冲区
+      previewBuffers.value[activePreviewIndex.value] = errorContent;
     }
   } else {
     renderedContent.value = '';
+    // 清空当前活动的缓冲区
+    previewBuffers.value[activePreviewIndex.value] = '';
   }
 };
 
 
+// 同步编辑器滚动到预览（基于滚动百分比）
 const syncScroll = (event: Event) => {
+  // 如果正在恢复滚动位置，不进行同步（避免干扰）
+  if (isRestoringScroll.value || isSyncingScroll.value) {
+    return;
+  }
+  
   const editor = event.target as HTMLElement;
-  const preview = previewElement.value;
+  const activePreview = activePreviewIndex.value === 0 ? previewElement0.value : previewElement1.value;
 
-  if (preview && editor) {
-    const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
-    const previewScrollTop = scrollPercentage * (preview.scrollHeight - preview.clientHeight);
-    preview.scrollTop = previewScrollTop;
+  if (!activePreview || !editor) {
+    return;
+  }
+  
+  const editorScrollHeight = editor.scrollHeight - editor.clientHeight;
+  const previewScrollHeight = activePreview.scrollHeight - activePreview.clientHeight;
+  
+  // 处理边界情况：如果编辑器或预览没有滚动空间，则不进行同步
+  if (editorScrollHeight <= 0 || previewScrollHeight <= 0) {
+    return;
+  }
+  
+  // 计算编辑器的滚动百分比
+  const scrollPercentage = editor.scrollTop / editorScrollHeight;
+  
+  // 保存滚动百分比
+  savedScrollPercentage.value = scrollPercentage;
+  
+  // 计算预览应该滚动到的位置
+  const previewScrollTop = scrollPercentage * previewScrollHeight;
+  
+  // 设置预览滚动位置（使用标志位防止循环触发）
+  isSyncingScroll.value = true;
+  activePreview.scrollTop = previewScrollTop;
+  // 使用 requestAnimationFrame 确保标志位在下一帧重置
+  requestAnimationFrame(() => {
+    isSyncingScroll.value = false;
+  });
+};
+
+// 处理预览滚动事件（用户手动滚动预览时，可选：同步到编辑器）
+const handlePreviewScroll = (previewIndex: number) => {
+  // 如果正在恢复滚动位置或正在同步，不处理（避免干扰）
+  if (isRestoringScroll.value || isSyncingScroll.value) {
+    return;
+  }
+  
+  // 只处理当前活动预览元素的滚动
+  if (previewIndex === activePreviewIndex.value) {
+    const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
+  if (preview) {
+      const scrollHeight = preview.scrollHeight - preview.clientHeight;
+      if (scrollHeight > 0) {
+        // 保存预览的滚动百分比（但不反向同步到编辑器，因为编辑器是主导）
+        savedScrollPercentage.value = preview.scrollTop / scrollHeight;
+      }
+    }
   }
 };
 
-const adjustPreviewHeight = () => {
-  if (previewElement.value) {
-    const preview = previewElement.value;
-    preview.style.height = 'auto';
-    preview.style.height = preview.scrollHeight + 'px';
-  }
+
+// 恢复预览滚动位置（参考 VSCode 的简单实现）
+const restorePreviewScrollPosition = (scrollPercentage: number, previewIndex: number) => {
+  const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
+  if (!preview || scrollPercentage < 0) return;
+  
+  isRestoringScroll.value = true;
+  
+  const setScroll = () => {
+    const scrollHeight = preview.scrollHeight - preview.clientHeight;
+    if (scrollHeight > 0) {
+      const targetScrollTop = scrollPercentage * scrollHeight;
+      preview.scrollTop = targetScrollTop;
+      return true;
+    }
+    return false;
+  };
+  
+  // 使用 requestAnimationFrame 确保 DOM 已渲染
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!setScroll()) {
+        // 如果失败，再试一次（可能是内容还在加载）
+        setTimeout(() => {
+          setScroll();
+          isRestoringScroll.value = false;
+        }, 50);
+      } else {
+        isRestoringScroll.value = false;
+      }
+    });
+  });
 };
+
+
+// 恢复预览滚动位置的辅助函数（带底部检测）
+const restorePreviewScrollPositionHelper = (scrollPercentage: number, previewIndex: number, isAtBottom: boolean = false): boolean => {
+  const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
+  if (!preview || scrollPercentage < 0) return false;
+  
+  const scrollHeight = preview.scrollHeight - preview.clientHeight;
+  if (scrollHeight > 0) {
+    const targetScrollTop = isAtBottom ? scrollHeight : (scrollPercentage * scrollHeight);
+    preview.scrollTop = targetScrollTop;
+    return true;
+  }
+  return false;
+};
+
+// 尝试恢复预览滚动位置（带重试机制）
+const tryRestorePreviewScroll = (scrollPercentage: number, previewIndex: number, isAtBottom: boolean = false, maxAttempts: number = 10) => {
+  if (isRestoringScroll.value) return;
+  
+  isRestoringScroll.value = true;
+  let attempts = 0;
+  
+  const attempt = () => {
+    attempts++;
+    if (restorePreviewScrollPositionHelper(scrollPercentage, previewIndex, isAtBottom)) {
+      isRestoringScroll.value = false;
+      return;
+    }
+    
+    if (attempts < maxAttempts) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          attempt();
+        });
+      });
+    } else {
+      isRestoringScroll.value = false;
+    }
+  };
+  
+  attempt();
+};
+
+// 监听 previewBuffers 变化，在 v-html 更新后立即恢复滚动位置
+watch(() => previewBuffers.value[activePreviewIndex.value], async (newContent, oldContent) => {
+  // 只在内容真正变化时恢复滚动位置
+  if (newContent !== oldContent && newContent && pendingScrollRestore.value) {
+    const { percentage, isAtBottom, previewIndex } = pendingScrollRestore.value;
+    if (previewIndex === activePreviewIndex.value) {
+      pendingScrollRestore.value = null;
+      
+      await nextTick();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
+          if (preview) {
+            const previewScrollHeight = preview.scrollHeight - preview.clientHeight;
+            if (previewScrollHeight > 0) {
+              const targetScrollTop = isAtBottom ? previewScrollHeight : (percentage * previewScrollHeight);
+              preview.scrollTop = targetScrollTop;
+            }
+          }
+        });
+      });
+    }
+  }
+}, { flush: 'post' });
+
+// 监听 activePreviewIndex 变化，在切换预览元素时恢复滚动位置
+watch(activePreviewIndex, (newIndex, oldIndex) => {
+  if (newIndex !== oldIndex && savedScrollPercentage.value >= 0 && !isRestoringScroll.value) {
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const preview = newIndex === 0 ? previewElement0.value : previewElement1.value;
+          if (preview) {
+            const previewScrollHeight = preview.scrollHeight - preview.clientHeight;
+            if (previewScrollHeight > 0) {
+              // 检查是否在底部（百分比接近1）
+              const isAtBottom = savedScrollPercentage.value >= 0.99;
+              const targetScrollTop = isAtBottom ? previewScrollHeight : (savedScrollPercentage.value * previewScrollHeight);
+              preview.scrollTop = targetScrollTop;
+            }
+          }
+        });
+      });
+    });
+  }
+});
 
 onMounted(() => {
-  // 设置自动渲染
-  if (previewElement.value) {
-    useAutoRender(previewElement);
+  // 初始化时，两个预览元素都启用自动渲染
+  if (previewElement0.value) {
+    useAutoRender(previewElement0);
   }
+  if (previewElement1.value) {
+    useAutoRender(previewElement1);
+  }
+
+  // 添加点击外部关闭导出菜单的监听
+  document.addEventListener('click', handleClickOutsideExport);
 
   if (content.value) {
     renderContent();
@@ -1083,30 +1409,129 @@ onMounted(() => {
         // 初始加载时，无论是否焦点，都先应用标注以便用户看到效果
         // 如果用户点击编辑器，handleEditorFocus 会切换为纯文本模式
         await applyEditorAnnotations();
-      }
-    });
+  }
+});
   }
 });
 
-// 获取contenteditable元素的光标位置
+onUnmounted(() => {
+  // 移除点击外部关闭导出菜单的监听
+  document.removeEventListener('click', handleClickOutsideExport);
+});
+
+// 计算从元素开始到指定范围的文本长度（使用与getTextContent相同的逻辑）
+const calculateTextLength = (element: HTMLElement, endNode: Node, endOffset: number): number => {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.setEnd(endNode, endOffset);
+  
+  // 使用 getTextContent 的逻辑来计算文本长度
+  // 创建一个临时容器来提取范围内的内容
+  const fragment = range.cloneContents();
+  const tempContainer = document.createElement('div');
+  tempContainer.appendChild(fragment);
+  
+  // 使用 getTextContent 来获取文本内容，确保逻辑一致
+  return getTextContent(tempContainer).length;
+};
+
+// 获取contenteditable元素的光标位置（基于纯文本，考虑HTML标注）
 const getCursorPosition = (element: HTMLElement): { start: number; end: number } => {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) {
-    return { start: 0, end: 0 };
+    // 如果没有选择，尝试获取编辑器的文本内容长度作为默认位置
+    const editorText = getTextContent(element);
+    return { start: editorText.length, end: editorText.length };
   }
 
   const range = selection.getRangeAt(0);
-  const preRange = document.createRange();
-  preRange.selectNodeContents(element);
-  preRange.setEnd(range.startContainer, range.startOffset);
-  const start = preRange.toString().length;
-
-  const endRange = document.createRange();
-  endRange.selectNodeContents(element);
-  endRange.setEnd(range.endContainer, range.endOffset);
-  const end = endRange.toString().length;
+  
+  // 使用 calculateTextLength 来计算位置，确保与 getTextContent 的逻辑一致
+  const start = calculateTextLength(element, range.startContainer, range.startOffset);
+  const end = calculateTextLength(element, range.endContainer, range.endOffset);
 
   return { start, end };
+};
+
+// 设置contenteditable元素的光标位置（基于纯文本位置）
+const setCursorPosition = (element: HTMLElement, position: number): void => {
+  try {
+    const selection = window.getSelection();
+    if (!selection) {
+      console.warn('[setCursorPosition] 无法获取 Selection 对象');
+    return;
+  }
+  
+    // 确保位置在有效范围内
+    const textContent = element.textContent || '';
+    const maxPosition = textContent.length;
+    const validPosition = Math.max(0, Math.min(position, maxPosition));
+    
+    if (validPosition !== position) {
+      console.warn(`[setCursorPosition] 位置 ${position} 超出范围 [0, ${maxPosition}]，调整为 ${validPosition}`);
+    }
+
+    const range = document.createRange();
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let currentPos = 0;
+    let targetNode: Node | null = null;
+    let targetOffset = 0;
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const nodeLength = node.textContent?.length || 0;
+      
+      if (currentPos + nodeLength >= validPosition) {
+        targetNode = node;
+        targetOffset = Math.max(0, Math.min(validPosition - currentPos, nodeLength));
+        break;
+      }
+      currentPos += nodeLength;
+    }
+
+    if (targetNode) {
+      range.setStart(targetNode, targetOffset);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      console.log(`[setCursorPosition] 成功设置光标位置到 ${validPosition}`);
+    } else {
+      // 如果找不到目标节点，将光标设置到末尾
+      const textNodes: Node[] = [];
+      const nodeWalker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+      let node: Node | null;
+      while ((node = nodeWalker.nextNode())) {
+        textNodes.push(node);
+      }
+      
+      if (textNodes.length > 0) {
+        const lastNode = textNodes[textNodes.length - 1];
+        const lastLength = lastNode.textContent?.length || 0;
+        range.setStart(lastNode, lastLength);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        console.log(`[setCursorPosition] 未找到目标节点，设置光标到文档末尾 (${lastLength})`);
+      } else {
+        range.selectNodeContents(element);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        console.log(`[setCursorPosition] 没有文本节点，设置光标到元素末尾`);
+      }
+    }
+  } catch (error) {
+    console.error('[setCursorPosition] 设置光标位置时出错:', error);
+  }
 };
 
 // Mermaid编辑器相关方法
@@ -1115,16 +1540,51 @@ const openMermaidEditor = () => {
   if (!editor) {
     return;
   }
+  
+  // 先同步编辑器内容到 mainContent（如果编辑器有焦点，内容可能不同步）
+  const currentEditorText = getTextContent(editor);
+  if (currentEditorText !== mainContent.value) {
+    mainContent.value = currentEditorText;
+    content.value = mergeContent(frontmatter.value, mainContent.value);
+  }
 
-  // 获取当前选择范围
-  const { start, end } = getCursorPosition(editor);
-
-  // 尝试提取Mermaid代码块
-  const mermaidCode = extractMermaidCode(content.value, start, end);
-
-  currentMermaidCode.value = mermaidCode;
+  // 获取当前选择范围：
+  // 1. 如果编辑器有焦点，实时获取光标位置（更准确）
+  // 2. 否则使用保存的光标位置（从 handleEditorMouseDown 或 handleEditorBlur 保存）
+  let start = currentSelectionStart.value;
+  let end = currentSelectionEnd.value;
+  
+  if (isEditorFocused.value || document.activeElement === editor) {
+    try {
+      const position = getCursorPosition(editor);
+      // 只有在位置有效时才使用实时位置
+      if (position.start >= 0 && position.end >= 0) {
+        start = position.start;
+        end = position.end;
+        // 更新保存的位置
   currentSelectionStart.value = start;
   currentSelectionEnd.value = end;
+      }
+    } catch (e) {
+      console.warn('[Mermaid编辑器] 获取光标位置失败，使用保存的位置:', e);
+    }
+  }
+  
+  // 确保位置在有效范围内
+  const validStart = Math.max(0, Math.min(start, mainContent.value.length));
+  const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+  
+  console.log('[Mermaid编辑器] 打开编辑器');
+  console.log('[Mermaid编辑器] mainContent长度:', mainContent.value.length);
+  console.log('[Mermaid编辑器] 保存的光标位置 start:', currentSelectionStart.value, 'end:', currentSelectionEnd.value);
+  console.log('[Mermaid编辑器] 使用的光标位置 start:', validStart, 'end:', validEnd);
+  
+  // 尝试提取Mermaid代码块（使用 mainContent，确保索引匹配）
+  const mermaidCode = extractMermaidCode(mainContent.value, validStart, validEnd);
+  
+  currentMermaidCode.value = mermaidCode;
+  currentSelectionStart.value = validStart;
+  currentSelectionEnd.value = validEnd;
   showMermaidEditor.value = true;
 };
 
@@ -1137,25 +1597,25 @@ const extractMermaidCode = (content: string, start: number, end: number): string
     }
     return selectedText;
   }
-
+  
   // 如果没有选择文本，查找光标位置附近的Mermaid代码块
   const lines = content.split('\n');
   let currentLine = 0;
   let charCount = 0;
-
+  
   // 更精确地计算当前行号
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
     const lineLength = line.length + 1; // +1 for newline
-
+    
     if (charCount <= start && start < charCount + lineLength) {
       currentLine = i;
       break;
     }
     charCount += lineLength;
   }
-
+  
   // 向前查找Mermaid代码块开始
   let mermaidStart = -1;
   for (let i = currentLine; i >= 0; i--) {
@@ -1165,7 +1625,7 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       break;
     }
   }
-
+  
   // 向后查找Mermaid代码块结束
   if (mermaidStart !== -1) {
     for (let i = mermaidStart + 1; i < lines.length; i++) {
@@ -1175,51 +1635,91 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       }
     }
   }
-
+  
   // 如果没有找到Mermaid代码块，返回默认的流程图模板
   return `graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]`;
 };
 
-const handleMermaidSave = (mermaidCode: string) => {
-  if (!content.value) return;
-
+const handleMermaidSave = async (mermaidCode: string) => {
   const editor = editorElement.value;
   if (!editor) return;
-
+  
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
-
-  let newContent = content.value;
-
+  
+  console.log('[Mermaid保存] 开始保存');
+  console.log('[Mermaid保存] 插入位置 start:', start, 'end:', end);
+  console.log('[Mermaid保存] mainContent长度:', mainContent.value.length);
+  
+  // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
+  let newMainContent = mainContent.value;
+  
+  // 构建 Mermaid 代码块
+  const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
+  let newCursorPosition = start;
+  
   // 如果之前有选中的Mermaid代码块，替换它
-  if (start !== end) {
-    const selectedText = content.value.substring(start, end);
+  if (start !== end && start < newMainContent.length && end <= newMainContent.length) {
+    const selectedText = newMainContent.substring(start, end);
     if (selectedText.trim().startsWith('```mermaid')) {
       // 替换整个Mermaid代码块
-      const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
-      newContent = content.value.substring(0, start) + mermaidBlock + content.value.substring(end);
+      newMainContent = newMainContent.substring(0, start) + mermaidBlock + newMainContent.substring(end);
+      // 光标位置设置为插入块之后
+      newCursorPosition = start + mermaidBlock.length;
     } else {
       // 替换选中的文本
-      newContent = content.value.substring(0, start) + mermaidCode + content.value.substring(end);
+      newMainContent = newMainContent.substring(0, start) + mermaidBlock + newMainContent.substring(end);
+      // 光标位置设置为插入块之后
+      newCursorPosition = start + mermaidBlock.length;
     }
   } else {
     // 如果没有选中文本，在当前位置插入Mermaid代码块
-    const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
-    newContent = content.value.substring(0, start) + mermaidBlock + content.value.substring(start);
+    const insertPos = Math.min(start, newMainContent.length);
+    newMainContent = newMainContent.substring(0, insertPos) + mermaidBlock + '\n' + newMainContent.substring(insertPos);
+    // 光标位置设置为插入块之后（包括换行）
+    newCursorPosition = insertPos + mermaidBlock.length + 1;
   }
+  
+  console.log('[Mermaid保存] 新内容长度:', newMainContent.length);
+  console.log('[Mermaid保存] 新光标位置:', newCursorPosition);
+  
+  // 更新 mainContent 和完整 content
+  mainContent.value = newMainContent;
+  content.value = mergeContent(frontmatter.value, mainContent.value);
 
-  content.value = newContent;
-
-  // 更新编辑器显示（只在编辑器没有焦点时应用标注）
-  if (!isEditorFocused.value) {
-    applyEditorAnnotations();
-  } else {
-    editor.textContent = content.value;
+  // 关闭编辑器对话框（先关闭，避免干扰）
+  closeMermaidEditor();
+  
+  // 更新编辑器显示和光标位置
+  // 注意：在应用标注之前，编辑器失去焦点，所以 isEditorFocused 可能是 false
+  // 但我们仍然需要应用标注以显示格式
+  
+  // 先标记编辑器没有焦点，避免 applyEditorAnnotations 内部尝试恢复光标位置
+  const wasFocused = isEditorFocused.value;
+  isEditorFocused.value = false;
+  
+  // 应用标注（会重新渲染编辑器内容）
+  await applyEditorAnnotations();
+  
+  // 等待DOM更新完成
+  await nextTick();
+  
+  // 设置光标位置（基于新的内容）
+  setCursorPosition(editor, newCursorPosition);
+  
+  // 更新保存的光标位置
+  currentSelectionStart.value = newCursorPosition;
+  currentSelectionEnd.value = newCursorPosition;
+  
+  // 给编辑器焦点，以便用户继续编辑
+  editor.focus();
+  // 恢复焦点状态
+  if (wasFocused) {
+    isEditorFocused.value = true;
   }
 
   checkChanges();
   renderContent();
-  closeMermaidEditor();
 };
 
 const closeMermaidEditor = () => {
@@ -1234,18 +1734,53 @@ const openFormulaEditor = () => {
   const editor = editorElement.value;
   if (!editor) return;
 
-  // 获取当前选择范围
-  const { start, end } = getCursorPosition(editor);
+  // 先同步编辑器内容到 mainContent（如果编辑器有焦点，内容可能不同步）
+  const currentEditorText = getTextContent(editor);
+  
+  // 获取光标位置：优先使用保存的位置，如果编辑器有焦点则获取当前位置
+  let start = currentSelectionStart.value;
+  let end = currentSelectionEnd.value;
+  
+  // 如果编辑器有焦点，尝试获取当前光标位置（可能更准确）
+  if (isEditorFocused.value || document.activeElement === editor) {
+    try {
+      const position = getCursorPosition(editor);
+      // 只有在位置有效时才使用
+      if (position.start >= 0 && position.end >= 0) {
+        start = position.start;
+        end = position.end;
+      }
+    } catch (e) {
+      // 如果获取位置失败，使用保存的位置
+      console.warn('[公式编辑器] 获取光标位置失败，使用保存的位置:', e);
+    }
+  }
 
-  // 尝试提取公式代码
-  const formulaCode = extractFormulaCode(content.value, start, end);
+  // 同步内容
+  if (currentEditorText !== mainContent.value) {
+    mainContent.value = currentEditorText;
+    content.value = mergeContent(frontmatter.value, mainContent.value);
+  }
+
+  // 确保位置在有效范围内
+  const validStart = Math.max(0, Math.min(start, mainContent.value.length));
+  const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+
+  console.log('[公式编辑器] 打开公式编辑器');
+  console.log('[公式编辑器] 编辑器文本长度:', currentEditorText.length);
+  console.log('[公式编辑器] mainContent长度:', mainContent.value.length);
+  console.log('[公式编辑器] 保存的光标位置 start:', currentSelectionStart.value, 'end:', currentSelectionEnd.value);
+  console.log('[公式编辑器] 使用的光标位置 start:', validStart, 'end:', validEnd);
+  
+  // 尝试提取公式代码（使用 mainContent，确保索引匹配）
+  const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd);
   currentFormulaCode.value = formulaCode;
-
+  
   // 确定公式类型 - 更精确的判断逻辑
-  currentFormulaType.value = determineFormulaType(content.value, start, end);
-
-  currentSelectionStart.value = start;
-  currentSelectionEnd.value = end;
+  currentFormulaType.value = determineFormulaType(mainContent.value, validStart, validEnd);
+  
+  currentSelectionStart.value = validStart;
+  currentSelectionEnd.value = validEnd;
   showFormulaEditor.value = true;
 };
 
@@ -1258,31 +1793,31 @@ const extractFormulaCode = (content: string, start: number, end: number): string
       return selectedText.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
     }
     // 检查是否为行内公式
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
         !selectedText.trim().startsWith('$$')) {
       return selectedText.replace(/^\$/, '').replace(/\$$/, '').trim();
     }
     return selectedText;
   }
-
+  
   // 如果没有选中文本，尝试查找光标位置附近的公式
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-
+  
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch && inlineBeforeMatch[1] !== undefined && inlineAfterMatch[1] !== undefined) {
     return (inlineBeforeMatch[1] + inlineAfterMatch[1]).trim();
   }
-
+  
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch && blockBeforeMatch[1] !== undefined && blockAfterMatch[1] !== undefined) {
     return (blockBeforeMatch[1] + blockAfterMatch[1]).trim();
   }
-
+  
   return '';
 };
 
@@ -1294,37 +1829,35 @@ const determineFormulaType = (content: string, start: number, end: number): 'inl
       return 'block';
     }
     // 检查是否为行内公式（以$开头和结尾，但不是$$）
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
         !selectedText.trim().startsWith('$$')) {
       return 'inline';
     }
   }
-
+  
   // 如果没有选中文本，检查光标位置附近的公式类型
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-
+  
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch) {
     return 'inline';
   }
-
+  
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch) {
     return 'block';
   }
-
+  
   // 默认返回行内公式
   return 'inline';
 };
 
 const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inline' | 'block' } | string) => {
-  if (!content.value) return;
-
   const editor = editorElement.value;
   if (!editor) return;
 
@@ -1340,31 +1873,50 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
     latexCode = formulaData.latexCode;
     formulaType = formulaData.formulaType;
   }
-
+  
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
+  
+  console.log('[公式保存] 保存公式');
+  console.log('[公式保存] 保存位置 start:', start, 'end:', end);
+  console.log('[公式保存] mainContent长度:', mainContent.value.length);
+  console.log('[公式保存] mainContent前100字符:', mainContent.value.substring(0, 100));
 
-  let newContent = content.value;
-
+  // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
+  let newMainContent = mainContent.value;
+  
   // 根据公式类型格式化代码
-  const formattedFormula = formulaType === 'block'
+  const formattedFormula = formulaType === 'block' 
     ? `$$${latexCode}$$`
     : `$${latexCode}$`;
 
+  // 确保位置有效
+  const validStart = Math.max(0, Math.min(start, newMainContent.length));
+  const validEnd = Math.max(validStart, Math.min(end, newMainContent.length));
+
+  console.log('[公式保存] 有效位置 start:', validStart, 'end:', validEnd);
+  
   // 替换或插入公式
-  if (start !== end) {
-    newContent = content.value.substring(0, start) + formattedFormula + content.value.substring(end);
+  if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
+    newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validEnd);
   } else {
-    newContent = content.value.substring(0, start) + formattedFormula + content.value.substring(start);
+    newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validStart);
   }
 
-  content.value = newContent;
+  console.log('[公式保存] 插入后mainContent前100字符:', newMainContent.substring(0, 100));
+  console.log('[公式保存] 公式插入位置:', newMainContent.indexOf(formattedFormula));
 
-  // 更新编辑器显示（只在编辑器没有焦点时应用标注）
+  // 更新 mainContent 和完整 content
+  mainContent.value = newMainContent;
+  content.value = mergeContent(frontmatter.value, mainContent.value);
+
+  // 更新编辑器显示
   if (!isEditorFocused.value) {
+    // 编辑器没有焦点时，应用标注
     applyEditorAnnotations();
   } else {
-    editor.textContent = content.value;
+    // 编辑器有焦点时，直接更新文本内容
+    editor.textContent = mainContent.value;
   }
 
   checkChanges();
@@ -1375,8 +1927,260 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
 const closeFormulaEditor = () => {
   showFormulaEditor.value = false;
   currentFormulaCode.value = '';
-  currentSelectionStart.value = 0;
-  currentSelectionEnd.value = 0;
+};
+
+// 点击外部关闭导出菜单
+const handleClickOutsideExport = (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.export-menu')) {
+    showExportMenu.value = false;
+  }
+};
+
+// 导出相关方法
+const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
+  // 检查是否有文档或外部文件
+  if ((!props.document && !currentFilePath.value) || isExporting.value) {
+    return;
+  }
+
+  showExportMenu.value = false;
+  isExporting.value = true;
+
+  try {
+    const app = Application.getInstance();
+    const { ExportFormat } = await import('../../domain/services/document-export.interface');
+    const { ExportFactory } = await import('../../infrastructure/services/export-factory.service');
+
+    let exportFormat;
+    switch (format) {
+      case 'word':
+        exportFormat = ExportFormat.WORD;
+        break;
+      case 'pdf':
+        exportFormat = ExportFormat.PDF;
+        break;
+      case 'html':
+        exportFormat = ExportFormat.HTML;
+        break;
+      case 'markdown':
+        exportFormat = ExportFormat.MARKDOWN;
+        break;
+      default:
+        throw new Error(`Unsupported format: ${format}`);
+    }
+
+    // 获取当前文档内容（使用合并后的内容）
+    const documentContent = mergeContent(frontmatter.value, mainContent.value);
+    const documentTitle = title.value || '未命名文档';
+
+    let result;
+
+    // PDF 导出需要通过主进程（Node.js 环境）
+    if (format === 'pdf') {
+      const electronAPI = (window as any).electronAPI;
+      if (!electronAPI || !electronAPI.export || !electronAPI.export.pdf) {
+        throw new Error('PDF导出需要在Electron环境中运行');
+      }
+
+      // 如果是数据库文档，使用 ExportUseCases 准备数据
+      let processedContent = documentContent;
+      let documentId = props.document?.id || currentFilePath.value;
+      
+      if (props.document) {
+        const exportUseCases = app.getExportUseCases();
+        // 先处理内容（包括片段引用等）
+        const { InversifyContainer } = await import('../../core/container/inversify.container');
+        const container = InversifyContainer.getInstance();
+        
+        try {
+          if (container.isBound(TYPES.FragmentReferenceResolver)) {
+            const resolver = container.get(TYPES.FragmentReferenceResolver);
+            if (resolver) {
+              processedContent = await resolver.resolveReferences(processedContent, documentId);
+            }
+          }
+        } catch (error) {
+          console.warn('解析片段引用失败，使用原始内容:', error);
+        }
+      } else {
+        // 外部文件：处理片段引用
+        const { InversifyContainer } = await import('../../core/container/inversify.container');
+        const container = InversifyContainer.getInstance();
+        
+        try {
+          if (container.isBound(TYPES.FragmentReferenceResolver)) {
+            const resolver = container.get(TYPES.FragmentReferenceResolver);
+            if (resolver) {
+              processedContent = await resolver.resolveReferences(processedContent, currentFilePath.value);
+            }
+          }
+        } catch (error) {
+          console.warn('解析片段引用失败，使用原始内容:', error);
+        }
+      }
+
+      // 准备 HTML 内容（渲染进程中处理 Markdown 和资源）
+      const { InversifyContainer } = await import('../../core/container/inversify.container');
+      const container = InversifyContainer.getInstance();
+      const exportFactory = container.get(TYPES.ExportFactory);
+      const htmlExporter = exportFactory.getExporter(ExportFormat.HTML);
+      
+      // 先导出为 HTML（包含所有样式和资源）
+      const htmlResult = await htmlExporter.export({
+        format: ExportFormat.HTML,
+        title: documentTitle,
+        content: processedContent,
+        documentId: documentId,
+        variables: {},
+        includeStyles: true
+      });
+      
+      // 将 HTML buffer 转换为字符串
+      const htmlString = new TextDecoder('utf-8').decode(htmlResult.buffer);
+      
+      // 通过 IPC 调用主进程的 PDF 导出（传递完整的 HTML）
+      const pdfResult = await electronAPI.export.pdf({
+        title: documentTitle,
+        html: htmlString
+      });
+
+      if (!pdfResult.success) {
+        throw new Error(pdfResult.error || 'PDF导出失败');
+      }
+
+      // 将 Array 转换回 Buffer/ArrayBuffer
+      const buffer = new Uint8Array(pdfResult.buffer).buffer;
+      result = {
+        buffer: buffer,
+        extension: pdfResult.extension,
+        mimeType: pdfResult.mimeType,
+        filename: pdfResult.filename
+      };
+    } else {
+      // 其他格式（Word、HTML、Markdown）在渲染进程中处理
+      // 如果是数据库文档，使用 ExportUseCases
+      if (props.document) {
+        const exportUseCases = app.getExportUseCases();
+        result = await exportUseCases.exportDocument({
+          documentId: props.document.id,
+          format: exportFormat,
+          variables: {} // 可以添加变量支持
+        });
+      } else {
+        // 如果是外部文件，直接使用 ExportFactory 和导出器
+        // 使用 InversifyContainer 直接获取容器
+        const { InversifyContainer } = await import('../../core/container/inversify.container');
+        const container = InversifyContainer.getInstance();
+
+        if (!container || !container.isBound(TYPES.ExportFactory)) {
+          throw new Error('导出服务未初始化，请确保应用已正确启动');
+        }
+
+        const exportFactory = container.get(TYPES.ExportFactory);
+        const exporter = exportFactory.getExporter(exportFormat);
+
+        // 处理片段引用（如果有）
+        let processedContent = documentContent;
+        try {
+          if (container.isBound(TYPES.FragmentReferenceResolver)) {
+            const resolver = container.get(TYPES.FragmentReferenceResolver);
+            if (resolver) {
+              processedContent = await resolver.resolveReferences(processedContent, currentFilePath.value);
+            }
+          }
+        } catch (error) {
+          console.warn('解析片段引用失败，使用原始内容:', error);
+        }
+
+        // 执行导出
+        result = await exporter.export({
+          format: exportFormat,
+          title: documentTitle,
+          content: processedContent,
+          documentId: currentFilePath.value,
+          variables: {},
+          includeStyles: true
+        });
+      }
+    }
+
+    // 保存文件
+    await saveExportFile(result, format);
+
+    alert(`文档已成功导出为 ${format.toUpperCase()} 格式！`);
+  } catch (error) {
+    console.error('导出失败:', error);
+    alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
+  } finally {
+    isExporting.value = false;
+  }
+};
+
+const saveExportFile = async (result: any, format: string) => {
+  // 检查是否在Electron环境中
+  const electronAPI = (window as any).electronAPI;
+  
+  if (electronAPI && electronAPI.dialog && electronAPI.dialog.saveFile) {
+    // Electron环境：使用保存对话框
+    const filters = [];
+    switch (format) {
+      case 'word':
+        filters.push({ name: 'Word文档', extensions: ['docx'] });
+        break;
+      case 'pdf':
+        filters.push({ name: 'PDF文档', extensions: ['pdf'] });
+        break;
+      case 'html':
+        filters.push({ name: 'HTML文件', extensions: ['html'] });
+        break;
+      case 'markdown':
+        filters.push({ name: 'Markdown文件', extensions: ['md'] });
+        break;
+    }
+    filters.push({ name: 'All Files', extensions: ['*'] });
+
+    const filePath = await electronAPI.dialog.saveFile({
+      title: '保存导出文件',
+      defaultPath: result.filename,
+      filters: filters
+    });
+
+    if (filePath) {
+      // 处理 buffer（可能是 Buffer 或 ArrayBuffer）
+      let arrayBuffer: ArrayBuffer;
+      if (result.buffer instanceof ArrayBuffer) {
+        arrayBuffer = result.buffer;
+      } else if (result.buffer instanceof Uint8Array) {
+        arrayBuffer = result.buffer.buffer.slice(
+          result.buffer.byteOffset,
+          result.buffer.byteOffset + result.buffer.byteLength
+        );
+      } else if (result.buffer.buffer) {
+        // Node.js Buffer
+        arrayBuffer = result.buffer.buffer.slice(
+          result.buffer.byteOffset,
+          result.buffer.byteOffset + result.buffer.byteLength
+        );
+      } else {
+        throw new Error('不支持的 buffer 格式');
+      }
+      
+      // 使用writeBinary保存文件
+      await electronAPI.file.writeBinary(filePath, arrayBuffer);
+    }
+  } else {
+    // 浏览器环境：使用下载API
+    const blob = new Blob([result.buffer], { type: result.mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = result.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 };
 
 // 根据鼠标位置获取文本位置
@@ -2114,13 +2918,40 @@ defineExpose({
   color: #555;
 }
 
-.markdown-preview {
+.markdown-preview-container {
   flex: 1;
+  position: relative;
+  min-height: 0; /* 重要：允许flex子元素缩小 */
+  overflow: hidden;
+  background: white;
+}
+
+.markdown-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
   background: white;
-  min-height: 0; /* 重要：允许flex子元素缩小 */
+  will-change: opacity;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  pointer-events: none;
+}
+
+.markdown-preview.preview-active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.markdown-preview.preview-hidden {
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .markdown-preview :deep(img) {
@@ -2194,6 +3025,41 @@ defineExpose({
 
 .toolbar-btn:hover {
   background: #5a6fd8;
+}
+
+/* 导出菜单样式 */
+.export-menu {
+  position: relative;
+}
+
+.export-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.export-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #333;
+  transition: background-color 0.2s;
+}
+
+.export-item:hover {
+  background-color: #f8f9fa;
+}
+
+.export-item:not(:last-child) {
+  border-bottom: 1px solid #e9ecef;
 }
 
 .modal-overlay {
@@ -2415,3 +3281,4 @@ defineExpose({
   margin: 4px 0;
 }
 </style>
+

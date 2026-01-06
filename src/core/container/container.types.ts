@@ -27,7 +27,7 @@ export const TYPES = {
   FrontmatterParser: Symbol.for('FrontmatterParser'),
   FolderVariableResolver: Symbol.for('FolderVariableResolver'),
   VariableMerger: Symbol.for('VariableMerger'),
-
+  
   // 应用服务
   ApplicationService: Symbol.for('ApplicationService'),
   DocumentUseCases: Symbol.for('DocumentUseCases'),
@@ -35,6 +35,10 @@ export const TYPES = {
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
   GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
+  ExportUseCases: Symbol.for('ExportUseCases'),
+  
+  // 导出服务
+  ExportFactory: Symbol.for('ExportFactory'),
   
   // 基础设施
   StorageAdapter: Symbol.for('StorageAdapter'),

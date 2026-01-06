@@ -34,6 +34,7 @@ export default defineConfig({
     include: ['src/**/*.ts', 'src/**/*.tsx']
   },
   optimizeDeps: {
+    exclude: ['puppeteer', 'jsdom'], // 排除 Node.js 专用库
     esbuildOptions: {
       tsconfigRaw: {
         compilerOptions: {
@@ -41,6 +42,11 @@ export default defineConfig({
           emitDecoratorMetadata: true
         }
       }
+    }
+  },
+  build: {
+    rollupOptions: {
+      external: ['puppeteer', 'jsdom'] // 构建时排除这些依赖
     }
   }
 })

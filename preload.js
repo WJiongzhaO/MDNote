@@ -81,7 +81,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   dialog: {
     openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
-    openFile: () => ipcRenderer.invoke('dialog:open-file')
+    openFile: () => ipcRenderer.invoke('dialog:open-file'),
+    saveFile: (options) => ipcRenderer.invoke('dialog:save-file', options)
+  },
+  export: {
+    pdf: (options) => ipcRenderer.invoke('export:pdf', options)
   },
   menu: {
     onNewFile: (callback) => ipcRenderer.on('menu:new-file', callback),

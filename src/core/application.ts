@@ -73,6 +73,13 @@ export class Application {
   }
 
   /**
+   * 获取导出用例实例
+   */
+  getExportUseCases() {
+    return this.container.get(Symbol.for('ExportUseCases'));
+  }
+
+  /**
    * 获取变量系统用例实例
    */
   getVariableUseCases() {

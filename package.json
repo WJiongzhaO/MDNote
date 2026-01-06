@@ -19,6 +19,7 @@
     "dompurify": "^3.3.1",
     "electron-is-dev": "^2.0.0",
     "gray-matter": "^4.0.3",
+    "html2canvas": "^1.4.1",
     "inversify": "^7.10.8",
     "jszip": "^3.10.1",
     "katex": "^0.16.11",
