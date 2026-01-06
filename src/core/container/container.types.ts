@@ -36,6 +36,12 @@ export const TYPES = {
   GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
+
+  // 编辑器工具栏相关 ⭐ NEW
+  FormatEditorService: Symbol.for('FormatEditorService'),
+  InsertContentService: Symbol.for('InsertContentService'),
+  EditorToolbarUseCase: Symbol.for('EditorToolbarUseCase'),
+  ShortcutManager: Symbol.for('ShortcutManager'),
   
   // 导出服务
   ExportFactory: Symbol.for('ExportFactory'),

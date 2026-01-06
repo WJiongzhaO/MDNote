@@ -41,6 +41,11 @@ import { PDFExporter } from '../../infrastructure/services/exporters/pdf-exporte
 import { HTMLExporter } from '../../infrastructure/services/exporters/html-exporter.service';
 import { MarkdownExporter } from '../../infrastructure/services/exporters/markdown-exporter.service';
 
+// 编辑器工具栏相关 ⭐ NEW
+import { FormatEditorService } from '../../domain/services/editor/format-editor.service';
+import { InsertContentService } from '../../domain/services/editor/insert-content.service';
+import { EditorToolbarUseCase } from '../../application/usecases/editor/editor-toolbar.usecase';
+
 /**
  * 应用模块配置 - 负责配置应用层的依赖关系
  */
@@ -172,6 +177,16 @@ export class ApplicationModule {
 
     container.bind<ExportUseCases>(TYPES.ExportUseCases)
       .to(ExportUseCases);
+
+    // 配置编辑器工具栏服务 ⭐ NEW
+    container.bind<FormatEditorService>(TYPES.FormatEditorService)
+      .toSingleton(FormatEditorService);
+
+    container.bind<InsertContentService>(TYPES.InsertContentService)
+      .toSingleton(InsertContentService);
+
+    container.bind<EditorToolbarUseCase>(TYPES.EditorToolbarUseCase)
+      .toSingleton(EditorToolbarUseCase);
 
     // 配置处理器之间的依赖关系
     this.configureProcessorDependencies(container);

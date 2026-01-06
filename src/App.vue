@@ -12,25 +12,23 @@ import type { MermaidRenderer } from './domain/services/markdown-processor.inter
 // 创建响应式变量来存储服务实例
 const mermaidRenderer = ref<MermaidRenderer | null>(null);
 
+// 在setup阶段立即初始化应用并配置 DI 容器（必须在子组件挂载之前）
+const app = Application.getInstance();
+const container = InversifyContainer.getInstance();
+provide('diContainer', container);
+
 // 在setup阶段提供响应式引用
 provide(TYPES.MermaidRenderer, mermaidRenderer);
 
 onMounted(async () => {
   try {
-    // 初始化应用服务（包括Mermaid渲染器）
-    // 使用单例模式，避免重复创建实例
-    const app = Application.getInstance();
     await app.start();
 
-    // 获取依赖注入服务并更新响应式变量
-    const container = InversifyContainer.getInstance();
-    if (container) {
-      try {
-        const renderer = container.get<MermaidRenderer>(TYPES.MermaidRenderer);
-        mermaidRenderer.value = renderer;
-      } catch (error) {
-        console.error('提供MermaidRenderer服务失败:', error);
-      }
+    try {
+      const renderer = container.get<MermaidRenderer>(TYPES.MermaidRenderer);
+      mermaidRenderer.value = renderer;
+    } catch (error) {
+      console.error('提供MermaidRenderer服务失败:', error);
     }
   } catch (error) {
     console.error('应用初始化失败:', error);

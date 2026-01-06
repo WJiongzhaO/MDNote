@@ -11,16 +11,16 @@
       <div v-else class="title-placeholder">请选择或创建文档</div>
       
       <div v-if="document || currentFilePath" class="editor-toolbar">
-        <button 
-          class="toolbar-btn" 
+        <button
+          class="toolbar-btn"
           @click="openMermaidEditor"
           title="编辑Mermaid图表"
         >
           📊 Mermaid编辑器
         </button>
         <!-- 添加公式编辑器按钮 -->
-        <button 
-          class="toolbar-btn" 
+        <button
+          class="toolbar-btn"
           @click="openFormulaEditor"
           title="编辑数学公式"
         >
@@ -51,6 +51,17 @@
           </div>
         </div>
       </div>
+
+      <!-- 新增：格式化工具栏 -->
+      <EditorToolbar
+        v-if="document || currentFilePath"
+        :editor="editorElement"
+        :content="mainContent"
+        @update:content="handleToolbarUpdate"
+        @open-mermaid="openMermaidEditor"
+        @open-formula="openFormulaEditor"
+        @insert-fragment="handleInsertFragment"
+      />
     </div>
 
     <div class="editor-content" v-if="document || currentFilePath">
@@ -240,6 +251,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import MermaidEditor from './MermaidEditor.vue';
 import FormulaEditor from './FormulaEditor.vue';
+import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
 import type { DocumentResponse } from '../../application';
 import { useAssetRenderer } from '../composables/useAssetRenderer';
 import { useImageUpload } from '../composables/useImageUpload';
@@ -910,6 +922,35 @@ const detectAndHandleReferenceModification = async (
 
 const checkChanges = () => {
   hasChanges.value = title.value !== lastSavedTitle || content.value !== lastSavedContent;
+};
+
+// 处理工具栏内容更新
+const handleToolbarUpdate = (newContent: string) => {
+  console.log('[工具栏] 内容更新:', {
+    oldLength: mainContent.value.length,
+    newLength: newContent.length
+  });
+
+  // 更新主内容
+  mainContent.value = newContent;
+
+  // 合并 frontmatter 和主内容
+  content.value = mergeContent(frontmatter.value, mainContent.value);
+
+  // 更新编辑器显示
+  nextTick(() => {
+    const editor = editorElement.value;
+    if (editor) {
+      editor.textContent = mainContent.value;
+    }
+  });
+
+  // 渲染预览
+  renderContent();
+
+  // 检查更改并保存
+  checkChanges();
+  debouncedSave();
 };
 
 const debouncedSave = () => {
