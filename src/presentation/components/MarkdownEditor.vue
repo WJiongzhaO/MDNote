@@ -1,26 +1,17 @@
 <template>
   <div class="editor-container">
     <div class="editor-header">
-      <input
-        v-if="document || currentFilePath"
-        v-model="title"
-        class="title-input"
-        placeholder="请输入标题..."
-        @blur="updateDocument"
-      />
-      <div v-else class="title-placeholder">请选择或创建文档</div>
-      
       <div v-if="document || currentFilePath" class="editor-toolbar">
-        <button 
-          class="toolbar-btn" 
+        <button
+          class="toolbar-btn"
           @click="openMermaidEditor"
           title="编辑Mermaid图表"
         >
           📊 Mermaid编辑器
         </button>
         <!-- 添加公式编辑器按钮 -->
-        <button 
-          class="toolbar-btn" 
+        <button
+          class="toolbar-btn"
           @click="openFormulaEditor"
           title="编辑数学公式"
         >
@@ -121,6 +112,14 @@
     <div class="save-indicator" :class="{ visible: hasChanges }">
       {{ hasChanges ? '未保存' : '已保存' }}
     </div>
+
+    <!-- 隐藏的焦点接收器：用于在删除文档时接收焦点，避免光标状态问题 -->
+    <div
+      ref="focusSinkElement"
+      tabindex="-1"
+      class="focus-sink"
+      aria-hidden="true"
+    ></div>
 
     <!-- 引用脱钩菜单 -->
     <div
@@ -257,6 +256,7 @@ const previewElement = ref<HTMLDivElement>();
 const previewElement0 = ref<HTMLDivElement>();
 const previewElement1 = ref<HTMLDivElement>();
 const editorElement = ref<HTMLDivElement>(); // 编辑器元素（contenteditable div）
+const focusSinkElement = ref<HTMLDivElement>(); // 隐藏的焦点接收器
 const currentFilePath = ref<string>(''); // 当前打开的外部文件路径
 
 // 双缓冲预览
@@ -382,7 +382,28 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSavedTitle = '';
 let lastSavedContent = '';
 
-watch(() => props.document, (newDocument) => {
+watch(() => props.document, (newDocument, oldDocument) => {
+  // 清理光标状态：当文档切换或删除时，清除旧的 Selection
+  // window.getSelection() 是全局单例，如果还持有对已删除 DOM 节点的引用，会导致光标不显示
+  const selection = window.getSelection();
+  if (selection) {
+    selection.removeAllRanges();
+  }
+
+  // 重置光标位置状态
+  currentSelectionStart.value = 0;
+  currentSelectionEnd.value = 0;
+  
+  // 如果文档被删除（从有文档变为无文档），将焦点移到隐藏的焦点接收器
+  // 这样可以避免 Selection 持有对已删除 DOM 节点的引用
+  if (oldDocument && !newDocument) {
+    nextTick(() => {
+      if (focusSinkElement.value) {
+        focusSinkElement.value.focus();
+      }
+    });
+  }
+
   if (newDocument) {
     // 检查是否是外部文件（包含 filePath 属性）
     const filePath = (newDocument as any).filePath;
@@ -413,6 +434,21 @@ watch(() => props.document, (newDocument) => {
       const editor = editorElement.value;
       if (editor) {
         await applyEditorAnnotations();
+        // 在新文档加载后，将光标设置到文档开头，确保光标可见
+        // 使用 setTimeout 确保 DOM 已完全更新
+        setTimeout(() => {
+          if (editor && editor.textContent) {
+            // 先设置光标位置
+            setCursorPosition(editor, 0);
+            // 关键：让编辑器获得焦点，这样光标才会显示
+            // 最小化/恢复窗口时能恢复光标，就是因为窗口恢复时会触发焦点事件
+            editor.focus();
+            // 再次设置光标位置，确保在获得焦点后光标位置正确
+            setCursorPosition(editor, 0);
+            // 更新焦点状态
+            isEditorFocused.value = true;
+          }
+        }, 100);
       }
     });
   }
@@ -424,6 +460,23 @@ watch(() => props.document, (newDocument) => {
     content.value = '';
     renderedContent.value = '';
     hasChanges.value = false;
+    
+    // 当文档被删除时，将焦点移到隐藏的焦点接收器
+    // 这样可以避免 Selection 持有对已删除 DOM 节点的引用
+    nextTick(() => {
+      if (focusSinkElement.value) {
+        focusSinkElement.value.focus();
+      }
+      // 清理编辑器状态
+      const editor = editorElement.value;
+      if (editor) {
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+        }
+        isEditorFocused.value = false;
+      }
+    });
   }
 }, { immediate: true });
 
@@ -1704,7 +1757,7 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
     if (!selection) {
     return;
   }
-  
+
     // 确保位置在有效范围内
     const textContent = element.textContent || '';
     const maxPosition = textContent.length;
@@ -1830,25 +1883,25 @@ const extractMermaidCode = (content: string, start: number, end: number): string
     }
     return selectedText;
   }
-  
+
   // 如果没有选择文本，查找光标位置附近的Mermaid代码块
   const lines = content.split('\n');
   let currentLine = 0;
   let charCount = 0;
-  
+
   // 更精确地计算当前行号
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
     const lineLength = line.length + 1; // +1 for newline
-    
+
     if (charCount <= start && start < charCount + lineLength) {
       currentLine = i;
       break;
     }
     charCount += lineLength;
   }
-  
+
   // 向前查找Mermaid代码块开始
   let mermaidStart = -1;
   for (let i = currentLine; i >= 0; i--) {
@@ -1858,7 +1911,7 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       break;
     }
   }
-  
+
   // 向后查找Mermaid代码块结束
   if (mermaidStart !== -1) {
     for (let i = mermaidStart + 1; i < lines.length; i++) {
@@ -1868,7 +1921,7 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       }
     }
   }
-  
+
   // 如果没有找到Mermaid代码块，返回默认的流程图模板
   return `graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]`;
 };
@@ -1876,17 +1929,17 @@ const extractMermaidCode = (content: string, start: number, end: number): string
 const handleMermaidSave = async (mermaidCode: string) => {
   const editor = editorElement.value;
   if (!editor) return;
-  
+
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
-  
+
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
 
   // 构建 Mermaid 代码块
   const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
   let newCursorPosition = start;
-  
+
   // 如果之前有选中的Mermaid代码块，替换它
   if (start !== end && start < newMainContent.length && end <= newMainContent.length) {
     const selectedText = newMainContent.substring(start, end);
@@ -1995,10 +2048,10 @@ const openFormulaEditor = () => {
   // 尝试提取公式代码（使用 mainContent，确保索引匹配）
   const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd);
   currentFormulaCode.value = formulaCode;
-  
+
   // 确定公式类型 - 更精确的判断逻辑
   currentFormulaType.value = determineFormulaType(mainContent.value, validStart, validEnd);
-  
+
   currentSelectionStart.value = validStart;
   currentSelectionEnd.value = validEnd;
   showFormulaEditor.value = true;
@@ -2013,31 +2066,31 @@ const extractFormulaCode = (content: string, start: number, end: number): string
       return selectedText.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
     }
     // 检查是否为行内公式
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
         !selectedText.trim().startsWith('$$')) {
       return selectedText.replace(/^\$/, '').replace(/\$$/, '').trim();
     }
     return selectedText;
   }
-  
+
   // 如果没有选中文本，尝试查找光标位置附近的公式
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-  
+
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch && inlineBeforeMatch[1] !== undefined && inlineAfterMatch[1] !== undefined) {
     return (inlineBeforeMatch[1] + inlineAfterMatch[1]).trim();
   }
-  
+
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch && blockBeforeMatch[1] !== undefined && blockAfterMatch[1] !== undefined) {
     return (blockBeforeMatch[1] + blockAfterMatch[1]).trim();
   }
-  
+
   return '';
 };
 
@@ -2049,30 +2102,30 @@ const determineFormulaType = (content: string, start: number, end: number): 'inl
       return 'block';
     }
     // 检查是否为行内公式（以$开头和结尾，但不是$$）
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
         !selectedText.trim().startsWith('$$')) {
       return 'inline';
     }
   }
-  
+
   // 如果没有选中文本，检查光标位置附近的公式类型
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-  
+
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch) {
     return 'inline';
   }
-  
+
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch) {
     return 'block';
   }
-  
+
   // 默认返回行内公式
   return 'inline';
 };
@@ -2093,22 +2146,22 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
     latexCode = formulaData.latexCode;
     formulaType = formulaData.formulaType;
   }
-  
+
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
-  
+
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
-  
+
   // 根据公式类型格式化代码
-  const formattedFormula = formulaType === 'block' 
+  const formattedFormula = formulaType === 'block'
     ? `$$${latexCode}$$`
     : `$${latexCode}$`;
 
   // 确保位置有效
   const validStart = Math.max(0, Math.min(start, newMainContent.length));
   const validEnd = Math.max(validStart, Math.min(end, newMainContent.length));
-  
+
   // 替换或插入公式
   if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
     newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validEnd);
@@ -2155,13 +2208,13 @@ const handleExport = async (format: 'pdf' | 'html' | 'markdown') => {
   }
 
   showExportMenu.value = false;
-  
+
   // Markdown 导出不需要配置，直接导出
   if (format === 'markdown') {
     await performExport(format, null);
     return;
   }
-  
+
   // PDF 和 HTML 导出需要配置
   pendingExportFormat.value = format;
   showExportConfigModal.value = true;
@@ -2176,12 +2229,12 @@ const getDefaultFileName = (): string => {
     // 移除扩展名
     return fileName.replace(/\.(md|markdown|txt)$/i, '');
   }
-  
+
   // 其次使用文档标题
   if (title.value) {
     return title.value;
   }
-  
+
   // 最后使用默认名称
   return '未命名文档';
 };
@@ -2193,13 +2246,13 @@ const handleExportConfigConfirm = async (config: ExportConfig, fileName: string,
   exportingFileName.value = fileName;
   exportingSavePath.value = savePath;
   exportingFormat.value = pendingExportFormat.value;
-  
+
   // 显示进度条
   showExportProgress.value = true;
   exportProgress.value = 0;
   exportStatus.value = 'processing';
   exportStatusMessage.value = '正在准备导出...';
-  
+
   try {
     await performExport(pendingExportFormat.value, config, fileName, savePath);
   } catch (error) {
@@ -2216,7 +2269,7 @@ const handleExportConfigCancel = () => {
 // 执行实际的导出操作
 const performExport = async (format: 'pdf' | 'html' | 'markdown', config: ExportConfig | null, fileName?: string, savePath?: string) => {
   isExporting.value = true;
-  
+
   // 更新进度：10%
   exportProgress.value = 10;
   exportStatusMessage.value = '正在处理文档内容...';
@@ -2258,12 +2311,12 @@ const performExport = async (format: 'pdf' | 'html' | 'markdown', config: Export
       // 对于外部文档（ID 以 external- 开头），使用文件路径而不是 ID
       const isExternalDoc = props.document?.id?.startsWith?.('external-');
       let documentId = isExternalDoc ? currentFilePath.value : (props.document?.id || currentFilePath.value);
-      
-      console.log('[Export] PDF 导出 - 文档信息:', { 
-        hasDocument: !!props.document, 
+
+      console.log('[Export] PDF 导出 - 文档信息:', {
+        hasDocument: !!props.document,
         documentId: documentId,
         isExternalDoc: isExternalDoc,
-        currentFilePath: currentFilePath.value 
+        currentFilePath: currentFilePath.value
       });
 
       // 准备数据
@@ -2333,14 +2386,14 @@ const performExport = async (format: 'pdf' | 'html' | 'markdown', config: Export
       // 其他格式（HTML、Markdown）在渲染进程中处理
       // 判断是否是外部文档
       const isExternalDoc = props.document?.id?.startsWith?.('external-');
-      
-      console.log('[Export] HTML/Markdown 导出 - 文档信息:', { 
-        hasDocument: !!props.document, 
+
+      console.log('[Export] HTML/Markdown 导出 - 文档信息:', {
+        hasDocument: !!props.document,
         documentId: props.document?.id,
         isExternalDoc: isExternalDoc,
-        currentFilePath: currentFilePath.value 
+        currentFilePath: currentFilePath.value
       });
-      
+
       // 如果是数据库文档（非外部文档），使用 ExportUseCases
       if (props.document && !isExternalDoc) {
         const exportUseCases = app.getExportUseCases() as any;
@@ -2425,7 +2478,7 @@ const performExport = async (format: 'pdf' | 'html' | 'markdown', config: Export
 // 保存文件到指定路径
 const saveExportFileToPath = async (result: any, filePath: string) => {
   const electronAPI = (window as any).electronAPI;
-  
+
   if (!electronAPI || !electronAPI.file || !electronAPI.file.writeBinary) {
     throw new Error('文件写入功能需要在 Electron 环境中运行');
   }
@@ -3226,7 +3279,7 @@ const setCurrentSearchMatch = (start: number, end: number) => {
   allHighlights.forEach(span => {
     const matchStart = parseInt(span.getAttribute('data-match-start') || '-1');
     const matchEnd = parseInt(span.getAttribute('data-match-end') || '-1');
-    
+
     // 检查这个高亮是否覆盖了目标区间
     if (matchStart !== -1 && matchEnd !== -1 && matchStart <= start && matchEnd >= end) {
       currentSpan = span as HTMLElement;
@@ -3235,25 +3288,25 @@ const setCurrentSearchMatch = (start: number, end: number) => {
 
   if (currentSpan) {
     currentSpan.classList.add('quick-search-highlight-current');
-    
+
     // 滚动到视图：editorRoot 就是滚动容器（markdown-editor-content）
     // 使用 nextTick 确保 DOM 更新完成后再滚动
     nextTick(() => {
       if (!editorRoot) return;
-      
+
       const spanRect = currentSpan.getBoundingClientRect();
       const editorRect = editorRoot.getBoundingClientRect();
-      
+
       // 计算 span 相对于编辑器容器的位置
       const spanTopRelativeToEditor = spanRect.top - editorRect.top + editorRoot.scrollTop;
-      
+
       // 计算目标滚动位置：让匹配项显示在容器中间
       const targetScrollTop = spanTopRelativeToEditor - (editorRect.height / 2) + (spanRect.height / 2);
-      
+
       // 确保滚动位置在有效范围内
       const maxScrollTop = editorRoot.scrollHeight - editorRoot.clientHeight;
       const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
-      
+
       editorRoot.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
     });
   }
@@ -3554,7 +3607,7 @@ const replaceTextWithUndo = (start: number, end: number, replacement: string) =>
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
-    
+
     // 触发 input 事件
     const inputEvent = new Event('input', { bubbles: true });
     editor.dispatchEvent(inputEvent);
@@ -3775,6 +3828,18 @@ defineExpose({
 
 .save-indicator.visible {
   opacity: 1;
+}
+
+/* 隐藏的焦点接收器：用于在删除文档时接收焦点，避免光标状态问题 */
+.focus-sink {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  outline: none;
 }
 
 /* Mermaid编辑器相关样式 */
