@@ -208,6 +208,14 @@ export class ShortcutCommandsFactory {
         undefined,
         ['save', '保存']
       ),
+      new Command(
+        'editor.quickSearch',
+        '快速搜索',
+        this.createQuickSearchHandler(),
+        'search',
+        undefined,
+        ['search', '查找', '快速搜索']
+      ),
     ];
   }
 
@@ -321,6 +329,30 @@ export class ShortcutCommandsFactory {
   }
 
   /**
+   * 创建快速搜索处理器
+   *
+   * 这里只负责发出一个全局事件，具体如何展示“快速搜索”UI 交给前端组件实现，
+   * 避免在用例层直接依赖具体的视图实现。
+   */
+  private createQuickSearchHandler(): (context: CommandContext) => Promise<void> {
+    return async (context: CommandContext) => {
+      if (typeof window === 'undefined') {
+        return;
+      }
+
+      const event = new CustomEvent('mdnote:open-quick-search', {
+        detail: {
+          // 当前快捷键上下文，可以按需使用
+          keyBinding: context.keyBinding,
+          shortcutContext: context.context,
+        }
+      });
+
+      window.dispatchEvent(event);
+    };
+  }
+
+  /**
    * 获取编辑器内容
    */
   private getEditorContent(context: CommandContext): string | null {
@@ -419,6 +451,12 @@ export class ShortcutCommandsFactory {
 
       // 设置光标位置
       this.setCursorPosition(context.editor, newCursorPosition);
+
+      // 手动触发 input 事件，让 handleEditorInput 处理内容同步和渲染
+      // 这样可以确保预览立即更新，就像用户手动输入一样
+      const inputEvent = new Event('input', { bubbles: true });
+      context.editor.dispatchEvent(inputEvent);
+      console.log('[ShortcutCommandsFactory.updateEditorContent] 已触发 input 事件');
     }
   }
 

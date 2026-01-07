@@ -258,13 +258,17 @@ const isDragging = ref(false);
 useEditorShortcuts({
   editor: editorElement,
   content: mainContent,
-  onContentUpdate: (newContent, cursorPosition) => {
+  onContentUpdate: async (newContent, cursorPosition) => {
     // 当快捷键命令更新内容时，同步到编辑器
     mainContent.value = newContent;
+    // 更新完整内容（包含 frontmatter），这样 renderContent 才能使用最新内容
+    content.value = mergeContent(frontmatter.value, mainContent.value);
     hasChanges.value = true;
 
-    // 重新渲染预览
-    renderContent();
+    // 等待响应式更新完成后再渲染预览
+    await nextTick();
+    // 重新渲染预览（确保使用最新内容）
+    await renderContent();
 
     // 如果提供了光标位置，设置光标
     if (cursorPosition !== undefined && editorElement.value) {
@@ -596,59 +600,9 @@ const handleEditorMouseDown = () => {
   }
 };
 
-// 处理编辑器失去焦点
-const handleEditorBlur = async () => {
-  console.log('[handleEditorBlur] ========== 开始处理 blur 事件 ==========');
-  console.log('[handleEditorBlur] isToolbarOperation:', isToolbarOperation);
-  console.log('[handleEditorBlur] isEditorFocused:', isEditorFocused.value);
-  
-  // 如果工具栏操作正在进行，不处理 blur 事件
-  // 避免覆盖工具栏格式化后的内容
-  if (isToolbarOperation) {
-    console.log('[handleEditorBlur] 工具栏操作中，跳过 blur 处理');
-    return;
-  }
-
-  console.log('[handleEditorBlur] 开始保存编辑器内容');
-  // 先保存当前内容（使用getTextContent而不是textContent，避免重复）
-  const editor = editorElement.value;
-  if (editor) {
-    const currentMainText = getTextContent(editor);
-    const currentFullContent = mergeContent(frontmatter.value, currentMainText);
-    
-    console.log('[handleEditorBlur] 编辑器内容:', {
-      currentMainText,
-      currentFullContent,
-      existingContent: content.value,
-      existingMainContent: mainContent.value,
-      isDifferent: currentFullContent !== content.value
-    });
-    
-    if (currentFullContent !== content.value) {
-      console.log('[handleEditorBlur] 内容发生变化，更新 mainContent 和 content');
-      mainContent.value = currentMainText;
-      content.value = currentFullContent;
-    } else {
-      console.log('[handleEditorBlur] 内容未发生变化');
-    }
-
-    // 在失去焦点之前保存光标位置
-    const { start, end } = getCursorPosition(editor);
-    currentSelectionStart.value = start;
-    currentSelectionEnd.value = end;
-    console.log('[handleEditorBlur] 保存光标位置:', { start, end });
-  } else {
-    console.warn('[handleEditorBlur] editorElement.value 为 null');
-  }
-
+// 处理编辑器失去焦点（精简版：只做状态标记，不再重建 DOM）
+const handleEditorBlur = () => {
   isEditorFocused.value = false;
-  console.log('[handleEditorBlur] 设置 isEditorFocused = false');
-  
-  // 应用标注
-  console.log('[handleEditorBlur] 准备应用标注');
-  await applyEditorAnnotations();
-  console.log('[handleEditorBlur] 标注应用完成');
-  console.log('[handleEditorBlur] ========== blur 事件处理完成 ==========');
 };
 
 // 处理粘贴事件
@@ -2964,6 +2918,192 @@ const getSelectedText = () => {
   return '';
 };
 
+// 根据偏移量选中一段文本（用于快速搜索跳转）
+const setSelectionRange = (start: number, end: number) => {
+  const editor = editorElement.value;
+  if (!editor) return;
+
+  const range = document.createRange();
+  const selection = window.getSelection();
+
+  let currentPosition = 0;
+  let foundStart = false;
+  let foundEnd = false;
+
+  const traverseNodes = (node: Node) => {
+    if (foundEnd) return;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      const textLength = node.textContent?.length || 0;
+
+      if (!foundStart && currentPosition + textLength >= start) {
+        range.setStart(node, start - currentPosition);
+        foundStart = true;
+      }
+
+      if (foundStart && currentPosition + textLength >= end) {
+        range.setEnd(node, end - currentPosition);
+        foundEnd = true;
+      }
+
+      currentPosition += textLength;
+    } else {
+      for (const child of Array.from(node.childNodes)) {
+        traverseNodes(child);
+        if (foundEnd) break;
+      }
+    }
+  };
+
+  traverseNodes(editor);
+
+  if (foundStart && selection) {
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+};
+
+// 在编辑器中高亮搜索匹配项
+const setSearchHighlights = (query: string, caseSensitive: boolean, useRegex: boolean) => {
+  const editorRoot = editorElement.value;
+  if (!editorRoot) return;
+
+  // 先清除已有高亮（展开 span.quick-search-highlight）
+  const existing = editorRoot.querySelectorAll('.quick-search-highlight');
+  existing.forEach(span => {
+    const parent = span.parentNode;
+    if (!parent) return;
+    while (span.firstChild) {
+      parent.insertBefore(span.firstChild, span);
+    }
+    parent.removeChild(span);
+  });
+
+  if (!query) return;
+
+  let regex: RegExp;
+  try {
+    const source = useRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flags = caseSensitive ? 'g' : 'gi';
+    regex = new RegExp(source, flags);
+  } catch (error) {
+    console.error('构建搜索高亮正则失败:', error);
+    return;
+  }
+
+  const walker = document.createTreeWalker(editorRoot, NodeFilter.SHOW_TEXT, null);
+
+  // 先计算所有文本节点的全局位置
+  const textNodes: Array<{ node: Text; globalStart: number }> = [];
+  let globalPos = 0;
+  let node: Node | null;
+  while ((node = walker.nextNode()) !== null) {
+    // 跳过在脚本/样式中的文本（理论上预览里不会有）
+    if (node.parentElement && ['SCRIPT', 'STYLE'].includes(node.parentElement.tagName)) {
+      continue;
+    }
+    const textNode = node as Text;
+    textNodes.push({ node: textNode, globalStart: globalPos });
+    globalPos += textNode.textContent?.length || 0;
+  }
+
+  // 处理每个文本节点，创建高亮
+  textNodes.forEach(({ node: textNode, globalStart }) => {
+    const text = textNode.textContent || '';
+    let match: RegExpExecArray | null;
+    let lastIndex = 0;
+    const fragments: (Text | HTMLElement)[] = [];
+
+    while ((match = regex.exec(text)) !== null) {
+      const start = match.index;
+      const end = match.index + match[0].length;
+
+      if (start > lastIndex) {
+        fragments.push(document.createTextNode(text.slice(lastIndex, start)));
+      }
+
+      const span = document.createElement('span');
+      span.className = 'quick-search-highlight';
+      span.textContent = text.slice(start, end);
+      // 保存全局位置到 data 属性，方便后续查找
+      const globalMatchStart = globalStart + start;
+      const globalMatchEnd = globalStart + end;
+      span.setAttribute('data-match-start', globalMatchStart.toString());
+      span.setAttribute('data-match-end', globalMatchEnd.toString());
+      fragments.push(span);
+
+      lastIndex = end;
+
+      if (match[0].length === 0) {
+        regex.lastIndex++;
+      }
+    }
+
+    if (fragments.length > 0) {
+      if (lastIndex < text.length) {
+        fragments.push(document.createTextNode(text.slice(lastIndex)));
+      }
+
+      const parent = textNode.parentNode;
+      if (!parent) return;
+      const df = document.createDocumentFragment();
+      fragments.forEach(f => df.appendChild(f));
+      parent.replaceChild(df, textNode);
+    }
+  });
+};
+
+// 标记当前匹配项（不改变 selection，只改变样式）
+const setCurrentSearchMatch = (start: number, end: number) => {
+  const editorRoot = editorElement.value;
+  if (!editorRoot) return;
+
+  // 先清除之前的"当前匹配"标记
+  const allHighlights = editorRoot.querySelectorAll('.quick-search-highlight');
+  allHighlights.forEach(span => {
+    span.classList.remove('quick-search-highlight-current');
+  });
+
+  if (start === end) return;
+
+  // 通过 data 属性直接查找匹配的 span
+  let currentSpan: HTMLElement | null = null;
+  allHighlights.forEach(span => {
+    const matchStart = parseInt(span.getAttribute('data-match-start') || '-1');
+    const matchEnd = parseInt(span.getAttribute('data-match-end') || '-1');
+    
+    // 检查这个高亮是否覆盖了目标区间
+    if (matchStart !== -1 && matchEnd !== -1 && matchStart <= start && matchEnd >= end) {
+      currentSpan = span as HTMLElement;
+    }
+  });
+
+  if (currentSpan) {
+    currentSpan.classList.add('quick-search-highlight-current');
+    
+    // 滚动到视图：editorRoot 就是滚动容器（markdown-editor-content）
+    // 使用 nextTick 确保 DOM 更新完成后再滚动
+    nextTick(() => {
+      if (!editorRoot) return;
+      
+      const spanRect = currentSpan.getBoundingClientRect();
+      const editorRect = editorRoot.getBoundingClientRect();
+      
+      // 计算 span 相对于编辑器容器的位置
+      const spanTopRelativeToEditor = spanRect.top - editorRect.top + editorRoot.scrollTop;
+      
+      // 计算目标滚动位置：让匹配项显示在容器中间
+      const targetScrollTop = spanTopRelativeToEditor - (editorRect.height / 2) + (spanRect.height / 2);
+      
+      // 确保滚动位置在有效范围内
+      const maxScrollTop = editorRoot.scrollHeight - editorRoot.clientHeight;
+      const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
+      
+      editorRoot.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
+    });
+  }
+};
+
 // 处理编辑器点击（左键点击引用标志）
 const handleEditorClick = async (event: MouseEvent) => {
   const editor = editorElement.value;
@@ -3187,12 +3327,99 @@ const getDocumentContext = () => {
   return { documentId: undefined, filePath: undefined };
 };
 
+// 使用 Selection API 执行替换操作，支持撤销
+const replaceTextWithUndo = (start: number, end: number, replacement: string) => {
+  const editor = editorElement.value;
+  if (!editor) return false;
+
+  // 确保编辑器获得焦点（撤销历史需要焦点）
+  editor.focus();
+
+  // 设置选择范围
+  const range = document.createRange();
+  const selection = window.getSelection();
+  if (!selection) return false;
+
+  let currentPosition = 0;
+  let foundStart = false;
+  let foundEnd = false;
+
+  const traverseNodes = (node: Node) => {
+    if (foundEnd) return;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      const textLength = node.textContent?.length || 0;
+
+      if (!foundStart && currentPosition + textLength >= start) {
+        range.setStart(node, start - currentPosition);
+        foundStart = true;
+      }
+
+      if (foundStart && currentPosition + textLength >= end) {
+        range.setEnd(node, end - currentPosition);
+        foundEnd = true;
+      }
+
+      currentPosition += textLength;
+    } else {
+      for (const child of Array.from(node.childNodes)) {
+        traverseNodes(child);
+        if (foundEnd) break;
+      }
+    }
+  };
+
+  traverseNodes(editor);
+
+  if (!foundStart || !foundEnd) return false;
+
+  // 设置选择
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  // 使用 document.execCommand('insertText') 来插入文本，这会自动加入到撤销历史
+  // 但需要先删除选中的内容
+  if (document.execCommand && document.execCommand('delete', false)) {
+    // 删除成功后，使用 insertText 插入新文本（支持撤销）
+    if (document.execCommand('insertText', false, replacement)) {
+      // 触发 input 事件，确保内容同步
+      const inputEvent = new Event('input', { bubbles: true });
+      editor.dispatchEvent(inputEvent);
+      return true;
+    }
+  }
+
+  // 如果 execCommand 不可用，使用 Range API 手动操作（但可能不支持撤销）
+  // 作为后备方案
+  try {
+    range.deleteContents();
+    const textNode = document.createTextNode(replacement);
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    // 触发 input 事件
+    const inputEvent = new Event('input', { bubbles: true });
+    editor.dispatchEvent(inputEvent);
+    return true;
+  } catch (e) {
+    console.error('替换操作失败:', e);
+    return false;
+  }
+};
+
 defineExpose({
   handleInsertFragment,
   setContent,
   getContent,
   refreshContent,
   getSelectedText,
+  setSelectionRange,
+  setSearchHighlights,
+  setCurrentSearchMatch,
+  replaceTextWithUndo,
   getDocumentContext
 });
 </script>
@@ -3338,6 +3565,17 @@ defineExpose({
   margin: 16px 0;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.markdown-editor-content :deep(.quick-search-highlight) {
+  background-color: rgba(255, 255, 0, 0.4);
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+.markdown-editor-content :deep(.quick-search-highlight-current) {
+  background-color: rgba(255, 200, 0, 0.9);
+  border-radius: 2px;
 }
 
 .no-document {

@@ -55,24 +55,21 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
             data-asset-id="${diagramId}"
             data-diagram="${encodedDiagram}"
             style="
-              border: 1px solid #e0e0e0;
+              border: 1px dashed #ccc;
               border-radius: 4px;
-              padding: 1rem;
-              margin: 1rem 0;
+              padding: 0.5rem 1rem;
+              margin: 0.5rem 0;
               background-color: #f8f9fa;
-              position: relative;
-              min-height: 200px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
+              display: inline-block;
+              font-size: 0.85rem;
+              color: #666;
             "
           >
             <div class="mermaid-loading" style="
               text-align: center;
               color: #666;
             ">
-              <div style="margin-bottom: 0.5rem;">🔄 正在渲染Mermaid图表...</div>
-              <div style="font-size: 0.8rem; opacity: 0.7;">请稍候</div>
+              <div>此处放置 mermaid 图表或图片</div>
             </div>
           </div>
         `;

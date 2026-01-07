@@ -8,7 +8,11 @@
     </div>
 
     <!-- 文件树 -->
-    <div class="file-tree" v-if="fileTree.length > 0">
+    <div
+      class="file-tree"
+      v-if="fileTree.length > 0"
+      @contextmenu="handleBlankContextMenu"
+    >
       <FileTreeNode
         v-for="node in fileTree"
         :key="node.path"
@@ -20,7 +24,11 @@
       />
     </div>
 
-    <div v-else class="empty-state">
+    <div
+      v-else
+      class="empty-state"
+      @contextmenu="handleEmptyContextMenu"
+    >
       <p>请从 File 菜单打开文件夹</p>
     </div>
 
@@ -38,6 +46,10 @@
       <div class="context-menu-item" @click="handleNewFolder">
         <span class="menu-icon">📁</span>
         <span>新建文件夹</span>
+      </div>
+      <div class="context-menu-item" @click="handleNewFromTemplate">
+        <span class="menu-icon">📑</span>
+        <span>通过模板创建...</span>
       </div>
       <div v-if="contextMenu.node" class="context-menu-divider"></div>
       <div v-if="contextMenu.node" class="context-menu-item" @click="handleDelete">
@@ -103,6 +115,7 @@ interface FileNode {
 const emit = defineEmits<{
   (e: 'select-file', path: string): void;
   (e: 'open-folder', path: string): void;
+  (e: 'create-from-template', parentPath: string): void;
 }>();
 
 const currentPath = ref<string>('');
@@ -142,6 +155,35 @@ const handleContextMenu = (event: MouseEvent, node: FileNode) => {
   contextMenuParentPath.value = node.type === 'folder' ? node.path : getParentPath(node.path);
 };
 
+const handleBlankContextMenu = (event: MouseEvent) => {
+  // 仅在点击文件树空白区域时触发
+  const target = event.target as HTMLElement;
+  if (target.closest('.node-item')) {
+    return;
+  }
+
+  event.preventDefault();
+  contextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    node: null
+  };
+  contextMenuParentPath.value = currentPath.value;
+};
+
+const handleEmptyContextMenu = (event: MouseEvent) => {
+  // 没有文件树内容时的右键菜单（仍然允许在当前路径创建）
+  event.preventDefault();
+  contextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    node: null
+  };
+  contextMenuParentPath.value = currentPath.value;
+};
+
 const handleNewFile = () => {
   contextMenu.value.visible = false;
   showNewFileDialog.value = true;
@@ -158,6 +200,13 @@ const handleNewFolder = () => {
   nextTick(() => {
     newFolderInput.value?.focus();
   });
+};
+
+const handleNewFromTemplate = () => {
+  contextMenu.value.visible = false;
+  const parentPath = contextMenuParentPath.value || currentPath.value;
+  // 暂时只发出事件，由上层或后续逻辑决定如何根据模板创建
+  emit('create-from-template', parentPath);
 };
 
 const handleDelete = () => {
