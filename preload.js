@@ -95,7 +95,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dialog: {
     openFolder: (options) => ipcRenderer.invoke('dialog:open-folder', options),
     openFile: () => ipcRenderer.invoke('dialog:open-file'),
-    saveFile: (options) => ipcRenderer.invoke('dialog:save-file', options)
+    saveFile: (options) => ipcRenderer.invoke('dialog:save-file', options),
+    showSaveDialog: (options) => ipcRenderer.invoke('dialog:showSaveDialog', options)
   },
   export: {
     pdf: (options) => ipcRenderer.invoke('export:pdf', options)

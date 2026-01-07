@@ -73,9 +73,9 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   }
 
   private registerDefaultExtensions(): void {
-    // 默认注册数学公式扩展
+    // 注册行内公式扩展 $...$
     this.registerExtension({
-      name: 'math',
+      name: 'mathInline',
       priority: 100,
       tokenizer: {
         name: 'mathInline',
@@ -98,6 +98,35 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
           }
           const text = token?.text || '';
           return `$${text}$`;
+        }
+      }
+    });
+
+    // 注册块级公式扩展 $$...$$
+    this.registerExtension({
+      name: 'mathBlock',
+      priority: 100,
+      tokenizer: {
+        name: 'mathBlock',
+        level: 'block',
+        start(src: string) { return src.match(/^\$\$/)?.index; },
+        tokenizer(src: string) {
+          const rule = /^\$\$([\s\S]+?)\$\$/;
+          const match = rule.exec(src);
+          if (match) {
+            return {
+              type: 'mathBlock',
+              raw: match[0],
+              text: match[1].trim()
+            };
+          }
+        },
+        renderer: (token: any) => {
+          if (this.mathRenderer && token?.text) {
+            return this.mathRenderer.renderBlock(token.text);
+          }
+          const text = token?.text || '';
+          return `$$${text}$$`;
         }
       }
     });
@@ -136,8 +165,11 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
     // 这是为了确保即使扩展的postProcess没有正确工作，也能移除重复的代码块
     html = this.removeDuplicateMermaidCodeBlocks(html);
 
-    // 安全清理
-    const result = DOMPurify.sanitize(html);
+    // 安全清理（配置允许 KaTeX 生成的标签和属性）
+    const result = DOMPurify.sanitize(html, {
+      ADD_TAGS: ['annotation', 'semantics', 'mtext', 'mn', 'mo', 'mi', 'mspace', 'mrow', 'ms', 'mprescripts'],
+      ADD_ATTR: ['mathvariant', 'displaystyle', 'scriptlevel', 'data-lexer', 'encoding']
+    });
 
     return result;
   }

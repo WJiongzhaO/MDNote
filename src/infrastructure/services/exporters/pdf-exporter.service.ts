@@ -3,7 +3,9 @@ import { TYPES } from '../../../core/container/container.types';
 import type { DocumentExportService, ExportOptions, ExportResult } from '../../../domain/services/document-export.interface';
 import { ExportFormat } from '../../../domain/services/document-export.interface';
 import type { ExtensibleMarkdownProcessor } from '../../../domain/services/extensible-markdown-processor.domain.service';
+import { ExportPresets } from '../../../domain/types/export-config.types';
 import { processImagesInHTML, getKaTeXStyles } from './export-utils';
+import { generateStylesFromConfig, generateTableOfContents } from './export-style-generator';
 
 // 动态导入 puppeteer，只在 Node.js 环境中使用
 let puppeteer: any;
@@ -30,6 +32,9 @@ export class PDFExporter implements DocumentExportService {
   async export(options: ExportOptions): Promise<ExportResult> {
     const { title, content, documentId, variables = {} } = options;
 
+    // 使用配置（如果没有提供，使用默认配置）
+    const exportConfig = options.config || ExportPresets.default;
+
     // 1. 处理Markdown内容（包括片段引用、变量替换等）
     let html = await this.markdownProcessor.processMarkdown(content, variables);
 
@@ -38,13 +43,19 @@ export class PDFExporter implements DocumentExportService {
       html = await processImagesInHTML(html, documentId);
     }
 
-    // 3. 创建完整的HTML文档（包含 KaTeX CSS）
-    const fullHtml = this.createHTMLDocument(title, html, options.customStyles);
+    // 3. 生成目录（如果需要）
+    let tocHtml = '';
+    if (exportConfig.includeTableOfContents) {
+      tocHtml = generateTableOfContents(html);
+    }
 
-    // 4. 使用Puppeteer生成PDF
-    const pdfBuffer = await this.htmlToPDF(fullHtml);
+    // 4. 创建完整的HTML文档（包含 KaTeX CSS 和配置样式）
+    const fullHtml = this.createHTMLDocument(title, html, exportConfig, tocHtml);
 
-    // 5. 生成文件名
+    // 5. 使用Puppeteer生成PDF
+    const pdfBuffer = await this.htmlToPDF(fullHtml, exportConfig);
+
+    // 6. 生成文件名
     const filename = this.sanitizeFilename(title) + '.pdf';
 
     return {
@@ -58,116 +69,9 @@ export class PDFExporter implements DocumentExportService {
   /**
    * 创建完整的HTML文档
    */
-  private createHTMLDocument(title: string, content: string, customStyles?: string): string {
-    const defaultStyles = `
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          padding: 2cm;
-          font-size: 12pt;
-        }
-        h1 {
-          font-size: 24pt;
-          margin-top: 1em;
-          margin-bottom: 0.5em;
-          page-break-after: avoid;
-        }
-        h2 {
-          font-size: 20pt;
-          margin-top: 1em;
-          margin-bottom: 0.5em;
-          page-break-after: avoid;
-        }
-        h3 {
-          font-size: 16pt;
-          margin-top: 0.8em;
-          margin-bottom: 0.4em;
-          page-break-after: avoid;
-        }
-        h4, h5, h6 {
-          margin-top: 0.6em;
-          margin-bottom: 0.3em;
-          page-break-after: avoid;
-        }
-        p {
-          margin: 0.5em 0;
-          text-align: justify;
-        }
-        ul, ol {
-          margin: 0.5em 0;
-          padding-left: 2em;
-        }
-        li {
-          margin: 0.2em 0;
-        }
-        code {
-          background-color: #f4f4f4;
-          padding: 2px 6px;
-          border-radius: 3px;
-          font-family: "Consolas", "Monaco", monospace;
-          font-size: 0.9em;
-        }
-        pre {
-          background-color: #f4f4f4;
-          padding: 1em;
-          border-radius: 5px;
-          overflow-x: auto;
-          margin: 1em 0;
-          page-break-inside: avoid;
-        }
-        pre code {
-          background-color: transparent;
-          padding: 0;
-        }
-        blockquote {
-          border-left: 4px solid #ddd;
-          padding-left: 1em;
-          margin-left: 0;
-          color: #666;
-          font-style: italic;
-        }
-        table {
-          border-collapse: collapse;
-          width: 100%;
-          margin: 1em 0;
-          page-break-inside: avoid;
-        }
-        table th, table td {
-          border: 1px solid #ddd;
-          padding: 8px;
-          text-align: left;
-        }
-        table th {
-          background-color: #f2f2f2;
-          font-weight: bold;
-        }
-        img {
-          max-width: 100%;
-          height: auto;
-          page-break-inside: avoid;
-        }
-        hr {
-          border: none;
-          border-top: 1px solid #ddd;
-          margin: 2em 0;
-        }
-        @page {
-          margin: 2cm;
-          @bottom-right {
-            content: "第 " counter(page) " 页 / 共 " counter(pages) " 页";
-            font-size: 9pt;
-            color: #666;
-          }
-        }
-      </style>
-    `;
+  private createHTMLDocument(title: string, content: string, config: any, tocHtml: string): string {
+    // 生成基于配置的样式
+    const configStyles = generateStylesFromConfig(config);
 
     // 添加 KaTeX CSS 支持
     const katexStyles = getKaTeXStyles();
@@ -180,11 +84,10 @@ export class PDFExporter implements DocumentExportService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${this.escapeHtml(title)}</title>
           ${katexStyles}
-          ${defaultStyles}
-          ${customStyles || ''}
+          ${configStyles}
         </head>
         <body>
-          <h1>${this.escapeHtml(title)}</h1>
+          ${tocHtml}
           ${content}
         </body>
       </html>
@@ -194,7 +97,7 @@ export class PDFExporter implements DocumentExportService {
   /**
    * 将HTML转换为PDF
    */
-  private async htmlToPDF(html: string): Promise<Buffer> {
+  private async htmlToPDF(html: string, config: any): Promise<Buffer> {
     // 检查是否在 Node.js 环境中
     if (typeof window !== 'undefined' || !puppeteer) {
       throw new Error('PDF导出需要在 Node.js 环境中运行。请通过主进程调用。');
@@ -293,17 +196,24 @@ export class PDFExporter implements DocumentExportService {
         });
       });
 
-      // 生成PDF
+      // 生成PDF（使用配置中的页面设置）
       const pdfBuffer = await page.pdf({
-        format: 'A4',
+        format: config.page.pageSize,
+        landscape: config.page.orientation === 'landscape',
         margin: {
-          top: '2cm',
-          right: '2cm',
-          bottom: '2cm',
-          left: '2cm'
+          top: `${config.page.marginTop}cm`,
+          right: `${config.page.marginRight}cm`,
+          bottom: `${config.page.marginBottom}cm`,
+          left: `${config.page.marginLeft}cm`
         },
         printBackground: true,
-        preferCSSPageSize: false
+        preferCSSPageSize: true,
+        displayHeaderFooter: config.includeHeader || config.includeFooter || config.includePageNumbers,
+        headerTemplate: config.includeHeader && config.headerText ? 
+          `<div style="font-size:9pt;text-align:center;width:100%;color:#666;">${config.headerText}</div>` : '<div></div>',
+        footerTemplate: config.includeFooter && config.footerText ? 
+          `<div style="font-size:9pt;text-align:center;width:100%;color:#666;">${config.footerText}</div>` : 
+          (config.includePageNumbers ? '<div style="font-size:9pt;text-align:center;width:100%;color:#666;">第 <span class="pageNumber"></span> 页 / 共 <span class="totalPages"></span> 页</div>' : '<div></div>')
       });
 
       return Buffer.from(pdfBuffer);

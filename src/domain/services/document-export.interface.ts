@@ -3,8 +3,9 @@
  * 定义文档导出的统一接口
  */
 
+import type { ExportConfig } from '../types/export-config.types';
+
 export enum ExportFormat {
-  WORD = 'word',      // .docx
   PDF = 'pdf',        // .pdf
   HTML = 'html',      // .html
   MARKDOWN = 'markdown' // .md
@@ -45,6 +46,11 @@ export interface ExportOptions {
    * 自定义样式
    */
   customStyles?: string;
+  
+  /**
+   * 导出配置（字体、样式等）
+   */
+  config?: ExportConfig;
 }
 
 export interface ExportResult {
