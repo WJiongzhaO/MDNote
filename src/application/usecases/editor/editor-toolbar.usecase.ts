@@ -96,7 +96,13 @@ export class EditorToolbarUseCase {
         break;
       case 'heading':
         const level = request.data?.level || 1;
-        result = this.formatService.insertHeading(request.content, selection, level);
+        result = this.formatService.toggleHeading(request.content, selection, level);
+        break;
+      case 'ul':
+        result = this.formatService.toggleUnorderedList(request.content, selection);
+        break;
+      case 'ol':
+        result = this.formatService.toggleOrderedList(request.content, selection);
         break;
       case 'blockquote':
         result = this.formatService.insertBlockquote(request.content, selection);

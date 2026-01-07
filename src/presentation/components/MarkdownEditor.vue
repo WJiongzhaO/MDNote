@@ -210,6 +210,7 @@ import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
 import type { DocumentResponse } from '../../application';
 import { useAssetRenderer } from '../composables/useAssetRenderer';
 import { useImageUpload } from '../composables/useImageUpload';
+import { useEditorShortcuts } from '../composables/useShortcutManager';
 import { Application } from '../../core/application';
 import { TYPES } from '../../core/container/container.types';
 
@@ -252,6 +253,27 @@ const { useAutoRender, triggerRender } = useAssetRenderer();
 // 图片上传
 const { handleDroppedImages, insertImageReference } = useImageUpload();
 const isDragging = ref(false);
+
+// 快捷键系统（需要在顶层调用，确保内部的 onMounted 能正确执行）
+useEditorShortcuts({
+  editor: editorElement,
+  content: mainContent,
+  onContentUpdate: (newContent, cursorPosition) => {
+    // 当快捷键命令更新内容时，同步到编辑器
+    mainContent.value = newContent;
+    hasChanges.value = true;
+
+    // 重新渲染预览
+    renderContent();
+
+    // 如果提供了光标位置，设置光标
+    if (cursorPosition !== undefined && editorElement.value) {
+      nextTick(() => {
+        setCursorPosition(editorElement.value!, cursorPosition);
+      });
+    }
+  }
+});
 
 // Mermaid编辑器相关状态
 const showMermaidEditor = ref(false);

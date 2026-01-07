@@ -43,6 +43,15 @@ export const TYPES = {
   EditorToolbarUseCase: Symbol.for('EditorToolbarUseCase'),
   ShortcutManager: Symbol.for('ShortcutManager'),
 
+  // 快捷键系统
+  ShortcutRepository: Symbol.for('ShortcutRepository'),
+  ShortcutRegistry: Symbol.for('ShortcutRegistry'),
+  ConflictDetector: Symbol.for('ConflictDetector'),
+  CommandExecutor: Symbol.for('CommandExecutor'),
+  ShortcutCommandsFactory: Symbol.for('ShortcutCommandsFactory'),
+  KeyboardEventProcessor: Symbol.for('KeyboardEventProcessor'),
+  PlatformAdapter: Symbol.for('PlatformAdapter'),
+
   // 导出服务
   ExportFactory: Symbol.for('ExportFactory'),
 

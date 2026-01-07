@@ -46,6 +46,16 @@ import { FormatEditorService } from '../../domain/services/editor/format-editor.
 import { InsertContentService } from '../../domain/services/editor/insert-content.service';
 import { EditorToolbarUseCase } from '../../application/usecases/editor/editor-toolbar.usecase';
 
+// 快捷键系统相关
+import { ShortcutRegistry } from '../../domain/services/ShortcutRegistry.service';
+import { ConflictDetector } from '../../domain/services/ConflictDetector.service';
+import { CommandExecutor } from '../../domain/services/CommandExecutor.service';
+import { ShortcutManager } from '../../domain/services/ShortcutManager.service';
+import { ShortcutCommandsFactory } from '../../application/usecases/shortcut/shortcut-commands.factory';
+import { LocalStorageShortcutRepository } from '../../infrastructure/repositories/LocalStorageShortcutRepository';
+import { KeyboardEventProcessor } from '../../infrastructure/services/KeyboardEventProcessor.service';
+import { PlatformAdapter } from '../../infrastructure/services/PlatformAdapter.service';
+
 // 文件打开策略
 import { MarkdownFileOpenerStrategy } from '../../domain/services/markdown-file-opener.strategy';
 import { TextFileOpenerStrategy } from '../../domain/services/text-file-opener.strategy';
@@ -194,6 +204,50 @@ export class ApplicationModule {
 
     container.bind<EditorToolbarUseCase>(TYPES.EditorToolbarUseCase)
       .toSingleton(EditorToolbarUseCase);
+
+    // 配置快捷键系统
+    // 仓储（使用单例模式）
+    container.bind(TYPES.ShortcutRepository)
+      .toSingleton(LocalStorageShortcutRepository);
+
+    // 领域服务（按照依赖顺序绑定）
+    // 1. CommandExecutor - 最底层，不依赖其他快捷键服务
+    container.bind<CommandExecutor>(TYPES.CommandExecutor)
+      .toSingleton(CommandExecutor);
+
+    // 1.5 ShortcutCommandsFactory - 依赖 EditorToolbarUseCase
+    container.bind<ShortcutCommandsFactory>(TYPES.ShortcutCommandsFactory)
+      .toSingleton(ShortcutCommandsFactory);
+
+    // 2. ShortcutRegistry - 依赖仓储
+    container.bind<ShortcutRegistry>(TYPES.ShortcutRegistry)
+      .toSingleton(ShortcutRegistry);
+
+    // 3. ConflictDetector - 依赖 ShortcutRegistry
+    container.bind<ConflictDetector>(TYPES.ConflictDetector)
+      .toSingleton(ConflictDetector);
+
+    // 基础设施服务
+    container.bind<KeyboardEventProcessor>(TYPES.KeyboardEventProcessor)
+      .toSingleton(KeyboardEventProcessor);
+
+    container.bind<PlatformAdapter>(TYPES.PlatformAdapter)
+      .toSingleton(PlatformAdapter);
+
+    // 4. ShortcutManager（门面） - 最后绑定，依赖上述所有服务
+    container.bind<ShortcutManager>(TYPES.ShortcutManager)
+      .toSingleton(ShortcutManager);
+
+    // 配置 ShortcutManager 和 KeyboardEventProcessor 的关系（避免循环依赖）
+    Promise.resolve().then(() => {
+      try {
+        const shortcutManager = container.get<ShortcutManager>(TYPES.ShortcutManager);
+        const keyboardProcessor = container.get<KeyboardEventProcessor>(TYPES.KeyboardEventProcessor);
+        shortcutManager.setKeyboardProcessor(keyboardProcessor);
+      } catch (error) {
+        console.error('[ApplicationModule] 设置快捷键系统依赖失败:', error);
+      }
+    });
 
     // 配置文件打开策略
     container.bind(TYPES.MarkdownFileOpenerStrategy)

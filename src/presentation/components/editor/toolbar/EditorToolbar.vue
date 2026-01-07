@@ -23,6 +23,19 @@
         :tooltip="btn.tooltip"
         @click="() => handleInsert(btn.action)"
       />
+    </ToolbarGroup>
+
+    <div class="toolbar-divider"></div>
+
+    <!-- 列表按钮组 -->
+    <ToolbarGroup title="列表">
+      <ToolbarButton
+        v-for="btn in listButtons"
+        :key="btn.id"
+        :icon="btn.icon"
+        :tooltip="btn.tooltip"
+        @click="() => handleFormat(btn.action)"
+      />
 
       <!-- 标题下拉菜单 -->
       <ToolbarButton
@@ -147,6 +160,9 @@ const formatButtons = [
 const insertButtons = [
   { id: 'link', action: 'link', icon: icons.link, tooltip: '链接 (Ctrl+K)' },
   { id: 'image', action: 'image', icon: icons.image, tooltip: '图片 (Ctrl+Shift+I)' },
+];
+
+const listButtons = [
   { id: 'ul', action: 'ul', icon: icons.list, tooltip: '无序列表' },
   { id: 'ol', action: 'ol', icon: icons.list, tooltip: '有序列表' },
 ];
