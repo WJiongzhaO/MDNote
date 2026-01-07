@@ -168,6 +168,17 @@ export function createDefaultEditorShortcuts(): Shortcut[] {
     false // 不可自定义，避免覆盖浏览器快捷键
   ));
 
+  // 快速搜索 - Ctrl+F / Cmd+F
+  shortcuts.push(new Shortcut(
+    'editor.quickSearch',
+    'editor.quickSearch',
+    KeyBinding.fromString('Ctrl+F'),
+    'search',
+    '快速搜索',
+    'editor',
+    true
+  ));
+
   return shortcuts;
 }
 

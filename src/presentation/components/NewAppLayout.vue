@@ -20,6 +20,7 @@
           ref="fileExplorerRef"
           @select-file="handleSelectFile"
           @open-folder="handleOpenLocalFolder"
+          @create-from-template="handleCreateFromTemplate"
         />
 
         <!-- 知识片段库侧边栏 -->
@@ -28,6 +29,12 @@
           ref="knowledgeFragmentSidebarRef"
           @insert="(fragment) => handleInsertFragment(fragment.id)"
           @fragment-updated="handleFragmentUpdated"
+        />
+
+        <!-- 文档模板侧边栏 -->
+        <DocumentTemplateSidebar
+          v-if="activeSidebar === 'templates'"
+          @open-template="handleOpenTemplate"
         />
 
         <!-- Git 侧边栏 -->
@@ -47,8 +54,8 @@
 
       <!-- 主编辑区域 -->
       <!-- 图片预览区域 -->
-      <div v-if="currentDocument?.fileType === 'image'" class="image-preview-container">
-        <div class="image-preview-content" v-html="currentDocument.content"></div>
+      <div v-if="currentDocument && (currentDocument as any).fileType === 'image'" class="image-preview-container">
+        <div class="image-preview-content" v-html="currentDocument?.content"></div>
       </div>
       <!-- Markdown 编辑器 -->
       <MarkdownEditor
@@ -59,6 +66,84 @@
         ref="markdownEditorRef"
       />
     </div>
+
+    <!-- 通过模板创建文档对话框（沿用“新建文件”窗口样式） -->
+    <div
+      v-if="showTemplateCreateDialog"
+      class="modal-overlay"
+      @click.self="cancelCreateFromTemplate"
+    >
+      <div class="modal" @click.stop>
+        <h3>通过模板创建文档</h3>
+        <input
+          type="text"
+          v-model="templateFileName"
+          placeholder="文件名（如：meeting-notes.md）"
+          @keyup.enter="confirmCreateFromTemplate"
+        />
+
+        <div class="template-dialog-main">
+          <div class="template-dialog-list">
+            <div
+              v-for="tpl in templateList"
+              :key="tpl.fullPath"
+              class="template-dialog-item"
+              :class="{ active: selectedTemplatePath === tpl.fullPath }"
+              @click="selectDialogTemplate(tpl)"
+            >
+              <div class="name">{{ tpl.name }}</div>
+              <div class="file">{{ tpl.fileName }}</div>
+            </div>
+            <div v-if="templateList.length === 0" class="template-dialog-empty">
+              暂无可用模板，请先在“文档模板”侧边栏中创建。
+            </div>
+          </div>
+
+          <div class="template-dialog-preview">
+            <div class="title">模板预览</div>
+            <div
+              v-if="selectedTemplatePath"
+              class="content"
+              v-html="templatePreviewHtml[selectedTemplatePath] || '加载预览中...'"
+            ></div>
+            <div v-else class="placeholder">
+              请选择左侧模板查看预览
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="cancelCreateFromTemplate">取消</button>
+          <button
+            class="btn btn-primary"
+            :disabled="!templateFileName.trim() || !selectedTemplatePath"
+            @click="confirmCreateFromTemplate"
+          >
+            创建
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快速搜索弹窗 -->
+    <QuickSearchDialog
+      :visible="showQuickSearch"
+      :query="searchQuery"
+      :replace="replaceText"
+      :case-sensitive="searchCaseSensitive"
+      :use-regex="searchUseRegex"
+      :scope="searchScope"
+      :total="searchTotal"
+      :current="searchCurrentIndex"
+      @close="closeQuickSearch"
+      @update:query="handleSearchQueryChange"
+      @update:replace="value => (replaceText = value)"
+      @options-change="handleSearchOptionsChange"
+      @next="goToNextMatch"
+      @prev="goToPrevMatch"
+      @replace-one="replaceCurrent"
+      @replace-all="replaceAll"
+    />
 
     <div v-if="error" class="error-toast">
       {{ error }}
@@ -75,11 +160,15 @@ import { useFolders } from '../composables/useFolders';
 import MarkdownEditor from './MarkdownEditor.vue';
 import FileExplorer from './FileExplorer.vue';
 import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue';
+import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue';
 import VariableSidebar from './VariableSidebar.vue';
 import GitPanel from './git/GitPanel.vue';
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue';
 import ResizableSidebar from './ResizableSidebar.vue';
 import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-fragment.dto';
+import { FileSystemTemplateService, type DocumentTemplateInfo } from '../../infrastructure/services/template.service';
+import { INITIAL_DOCUMENT_TEMPLATES } from '../../infrastructure/services/default-templates';
+import QuickSearchDialog from './QuickSearchDialog.vue';
 
 const {
   documents,
@@ -110,6 +199,33 @@ const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null
 const currentFilePath = ref<string>('');
 const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
 const dataPath = ref<string>(''); // Git 仓库路径 - 从 Electron API 获取
+
+// 模板创建对话框状态
+const showTemplateCreateDialog = ref(false);
+const templateTargetFolder = ref<string>('');
+const templateFileName = ref<string>('');
+const templateList = ref<DocumentTemplateInfo[]>([]);
+const selectedTemplatePath = ref<string | null>(null);
+const templatePreviewHtml = ref<Record<string, string>>({});
+
+const templateService = new FileSystemTemplateService();
+
+// 快速搜索状态
+const showQuickSearch = ref(false);
+const searchQuery = ref('');
+const replaceText = ref('');
+const searchCaseSensitive = ref(false);
+const searchUseRegex = ref(false);
+const searchScope = ref<'document' | 'project'>('document');
+const searchTotal = ref(0);
+const searchCurrentIndex = ref(0);
+
+interface SearchMatch {
+  index: number;
+  length: number;
+}
+
+let currentDocumentMatches: SearchMatch[] = [];
 
 // 为VariableSidebar提供依赖
 const currentDocumentContent = ref('');
@@ -144,7 +260,7 @@ const handleSelectFile = async (filePath: string) => {
       const result = await fileOpenerManager.openFile(filePath, content);
 
       // 创建临时文档对象以兼容现有组件
-      const tempDocument = {
+      const tempDocument: any = {
         id: `external-${Date.now()}`,
         title: result.title,
         content: result.content,
@@ -218,6 +334,98 @@ const handleSwitchSidebar = async (type: SidebarType) => {
     await nextTick();
     updateFragmentSidebarContext();
   }
+};
+
+// 处理从文件树触发的“通过模板创建”事件
+const handleCreateFromTemplate = async (parentPath: string) => {
+  templateTargetFolder.value = parentPath || '';
+  templateFileName.value = '';
+  selectedTemplatePath.value = null;
+  templatePreviewHtml.value = {};
+
+  try {
+    templateList.value = await templateService.listTemplates();
+  } catch (error) {
+    console.error('加载模板列表失败:', error);
+    alert('加载模板列表失败，请先在模板侧边栏中配置模板。');
+    return;
+  }
+
+  if (templateList.value.length === 0) {
+    alert('当前还没有任何模板，请先在“文档模板”侧边栏中创建模板。');
+    return;
+  }
+
+  showTemplateCreateDialog.value = true;
+};
+
+const selectDialogTemplate = async (tpl: DocumentTemplateInfo) => {
+  selectedTemplatePath.value = tpl.fullPath;
+  if (!templateFileName.value) {
+    templateFileName.value = `${tpl.name}.md`;
+  }
+
+  if (!templatePreviewHtml.value[tpl.fullPath]) {
+    try {
+      const content = await templateService.readTemplate(tpl.fullPath);
+      const snippet = content.substring(0, 800);
+      templatePreviewHtml.value[tpl.fullPath] = await renderMarkdown(snippet, `file:${tpl.fullPath}`);
+    } catch (error) {
+      console.error('渲染模板预览失败:', error);
+      templatePreviewHtml.value[tpl.fullPath] = '<p>预览加载失败</p>';
+    }
+  }
+};
+
+const confirmCreateFromTemplate = async () => {
+  if (!templateTargetFolder.value) {
+    alert('未找到目标文件夹路径，请先在文件树中打开目标文件夹。');
+    return;
+  }
+  if (!templateFileName.value.trim()) {
+    alert('请填写新文档文件名');
+    return;
+  }
+  if (!selectedTemplatePath.value) {
+    alert('请选择要使用的模板');
+    return;
+  }
+
+  const finalName = templateFileName.value.trim().endsWith('.md')
+    ? templateFileName.value.trim()
+    : `${templateFileName.value.trim()}.md`;
+  const newFilePath = `${templateTargetFolder.value}/${finalName}`;
+
+  try {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI || !electronAPI.file || !electronAPI.file.writeFileContent || !electronAPI.file.readFileContent) {
+      alert('文件系统 API 不可用，无法创建文件');
+      return;
+    }
+
+    const content = await electronAPI.file.readFileContent(selectedTemplatePath.value);
+    await electronAPI.file.writeFileContent(newFilePath, content);
+
+    // 刷新文件树视图，确保新文件立刻可见
+    if (fileExplorerRef.value && templateTargetFolder.value) {
+      try {
+        (fileExplorerRef.value as any).loadFolder(templateTargetFolder.value);
+      } catch (e) {
+        console.warn('刷新文件树失败，但文件已经创建:', e);
+      }
+    }
+
+    showTemplateCreateDialog.value = false;
+    // 创建完成后直接在编辑器中打开新文件
+    await handleSelectFile(newFilePath);
+  } catch (error) {
+    console.error('通过模板创建文档失败:', error);
+    alert('创建文档失败：' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
+
+const cancelCreateFromTemplate = () => {
+  showTemplateCreateDialog.value = false;
 };
 
 // 更新知识片段侧边栏的文档上下文
@@ -480,6 +688,18 @@ onMounted(async () => {
       folderId: null
     });
   }
+
+  // 确保默认模板已经写入到全局模板库（如果已存在则不会覆盖）
+  try {
+    await templateService.ensureInitialTemplates(INITIAL_DOCUMENT_TEMPLATES);
+  } catch (e) {
+    console.error('初始化默认模板失败:', e);
+  }
+
+  // 监听快捷键命令触发的快速搜索事件
+  if (typeof window !== 'undefined') {
+    window.addEventListener('mdnote:open-quick-search', handleOpenQuickSearch);
+  }
 });
 
 const handleCreateFolder = async (name: string, parentId: string | null = null) => {
@@ -561,6 +781,200 @@ const handleInsertVariable = async (variableName: string) => {
   }
 };
 
+// 从模板侧边栏打开模板：复用文件打开逻辑
+const handleOpenTemplate = async (fullPath: string) => {
+  await handleSelectFile(fullPath);
+};
+
+// ===== 快速搜索相关逻辑 =====
+
+const buildSearchRegex = (): RegExp | null => {
+  if (!searchQuery.value) return null;
+  try {
+    const source = searchUseRegex.value ? searchQuery.value : searchQuery.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flags = searchCaseSensitive.value ? 'g' : 'gi';
+    return new RegExp(source, flags);
+  } catch (error) {
+    console.error('构建搜索正则失败:', error);
+    return null;
+  }
+};
+
+const performDocumentSearch = () => {
+  currentDocumentMatches = [];
+  searchTotal.value = 0;
+  searchCurrentIndex.value = 0;
+
+  if (!markdownEditorRef.value || !searchQuery.value) return;
+
+  const editor = markdownEditorRef.value as any;
+  if (!editor.getContent) return;
+
+  // 获取完整内容（包含 frontmatter）
+  const fullContent = editor.getContent() as string;
+  const regex = buildSearchRegex();
+  if (!regex) return;
+
+  // 分离 frontmatter 和 mainContent，计算 frontmatter 长度
+  const frontmatterMatch = fullContent.trimStart().match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  const frontmatterLength = frontmatterMatch ? frontmatterMatch[0].length : 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(fullContent)) !== null) {
+    // 如果匹配在 frontmatter 中，跳过（因为编辑器只显示 mainContent）
+    if (match.index < frontmatterLength) {
+      continue;
+    }
+
+    // 将位置转换为相对于 mainContent 的位置
+    const mainContentIndex = match.index - frontmatterLength;
+    currentDocumentMatches.push({
+      index: mainContentIndex,
+      length: match[0].length
+    });
+    if (match[0].length === 0) {
+      regex.lastIndex++;
+    }
+  }
+
+  searchTotal.value = currentDocumentMatches.length;
+  searchCurrentIndex.value = 0;
+
+  // 更新预览中的高亮
+  if (markdownEditorRef.value) {
+    const editor = markdownEditorRef.value as any;
+    if (editor.setSearchHighlights) {
+      editor.setSearchHighlights(searchQuery.value, searchCaseSensitive.value, searchUseRegex.value);
+    }
+  }
+};
+
+const revealCurrentMatchInEditor = () => {
+  if (!markdownEditorRef.value) return;
+  const editor = markdownEditorRef.value as any;
+  if (!editor.setCurrentSearchMatch || currentDocumentMatches.length === 0) return;
+
+  const match = currentDocumentMatches[searchCurrentIndex.value];
+  if (!match) return;
+  // 只更新“当前匹配”的样式，不改变 selection，避免光标跑到文档里
+  editor.setCurrentSearchMatch(match.index, match.index + match.length);
+};
+
+const goToNextMatch = () => {
+  if (currentDocumentMatches.length === 0) return;
+  searchCurrentIndex.value = (searchCurrentIndex.value + 1) % currentDocumentMatches.length;
+  revealCurrentMatchInEditor();
+};
+
+const goToPrevMatch = () => {
+  if (currentDocumentMatches.length === 0) return;
+  searchCurrentIndex.value =
+    (searchCurrentIndex.value - 1 + currentDocumentMatches.length) % currentDocumentMatches.length;
+  revealCurrentMatchInEditor();
+};
+
+const replaceCurrent = () => {
+  if (!markdownEditorRef.value || currentDocumentMatches.length === 0) return;
+  const editor = markdownEditorRef.value as any;
+  if (!editor.replaceTextWithUndo) return;
+
+  const match = currentDocumentMatches[searchCurrentIndex.value];
+  if (!match) return;
+
+  // 使用支持撤销的替换方法
+  // 注意：这里使用的是 mainContent 中的位置，需要确保位置正确
+  const success = editor.replaceTextWithUndo(match.index, match.index + match.length, replaceText.value);
+
+  if (success) {
+    // 重新搜索并跳到下一处
+    performDocumentSearch();
+    if (currentDocumentMatches.length > 0) {
+      revealCurrentMatchInEditor();
+    }
+  }
+};
+
+const replaceAll = () => {
+  if (!markdownEditorRef.value || !searchQuery.value || currentDocumentMatches.length === 0) return;
+  const editor = markdownEditorRef.value as any;
+  if (!editor.replaceTextWithUndo) return;
+
+  // 从后往前替换，避免位置偏移问题
+  // 同时每个替换都会加入到撤销历史中
+  for (let i = currentDocumentMatches.length - 1; i >= 0; i--) {
+    const match = currentDocumentMatches[i];
+    if (match) {
+      editor.replaceTextWithUndo(match.index, match.index + match.length, replaceText.value);
+    }
+  }
+
+  // 替换后重新统计
+  performDocumentSearch();
+};
+
+const handleSearchQueryChange = (value: string) => {
+  searchQuery.value = value;
+  if (searchScope.value === 'document') {
+    performDocumentSearch();
+    revealCurrentMatchInEditor();
+  } else {
+    // 仅更新预览高亮（项目搜索的高亮逻辑可后续扩展）
+    if (markdownEditorRef.value) {
+      const editor = markdownEditorRef.value as any;
+      if (editor.setSearchHighlights) {
+        editor.setSearchHighlights(searchQuery.value, searchCaseSensitive.value, searchUseRegex.value);
+      }
+    }
+  }
+};
+
+const handleSearchOptionsChange = (options: {
+  caseSensitive: boolean;
+  useRegex: boolean;
+  scope: 'document' | 'project';
+}) => {
+  searchCaseSensitive.value = options.caseSensitive;
+  searchUseRegex.value = options.useRegex;
+  searchScope.value = options.scope;
+
+  if (searchScope.value === 'document') {
+    performDocumentSearch();
+    revealCurrentMatchInEditor();
+  }
+  // TODO: 项目搜索可以在这里触发（需要结合主进程或文件系统 API）
+};
+
+const closeQuickSearch = () => {
+  showQuickSearch.value = false;
+  // 关闭时清除高亮
+  if (markdownEditorRef.value) {
+    const editor = markdownEditorRef.value as any;
+    if (editor.setSearchHighlights) {
+      editor.setSearchHighlights('', searchCaseSensitive.value, searchUseRegex.value);
+    }
+  }
+};
+
+const handleOpenQuickSearch = () => {
+  showQuickSearch.value = true;
+
+  // 使用编辑器当前选中文本作为默认搜索词
+  if (markdownEditorRef.value) {
+    const editor = markdownEditorRef.value as any;
+    if (editor.getSelectedText) {
+      const selected = editor.getSelectedText() as string;
+      if (selected && selected.trim()) {
+        searchQuery.value = selected;
+      }
+    }
+  }
+
+  if (searchScope.value === 'document') {
+    performDocumentSearch();
+    revealCurrentMatchInEditor();
+  }
+};
+
 const findFolderById = (id: string): { id: string; name: string } | null => {
   const findInTree = (tree: any[]): any => {
     for (const item of tree) {
@@ -617,6 +1031,167 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   object-fit: contain;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 统一与 FileExplorer 新建窗口的样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modal {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  min-width: 480px;
+  max-width: 900px;
+}
+
+.modal h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+}
+
+.modal input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.modal-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
+/* 模板创建对话框中的模板列表与预览区域 */
+.template-dialog-main {
+  display: flex;
+  gap: 12px;
+  max-height: 420px;
+}
+
+.template-dialog-list {
+  width: 40%;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  overflow-y: auto;
+  padding: 4px;
+  background: #f8f9fa;
+}
+
+.template-dialog-item {
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.template-dialog-item:hover {
+  background: #e9ecef;
+}
+
+.template-dialog-item.active {
+  background: #e9f3ff;
+  border: 1px solid #007bff;
+}
+
+.template-dialog-item .name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.template-dialog-item .file {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.template-dialog-empty {
+  padding: 8px;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.template-dialog-preview {
+  flex: 1;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 8px 10px;
+  overflow-y: auto;
+}
+
+.template-dialog-preview .title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.template-dialog-preview .content {
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.template-dialog-preview .placeholder {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+/* 将弹窗预览中的 Mermaid 占位符压缩为单行提示 */
+.template-dialog-preview .content :deep(.mermaid-placeholder) {
+  min-height: 0;
+  padding: 2px 4px;
+  background: transparent;
+  box-shadow: none;
+  display: inline-block;
+  font-size: 0.8rem;
+}
+
+.template-dialog-preview .content :deep(.mermaid-placeholder)::before {
+  content: '此处放置 mermaid 图表或图片';
 }
 
 .error-toast {

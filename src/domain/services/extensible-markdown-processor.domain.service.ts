@@ -396,16 +396,14 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
       <div class="mermaid-placeholder" data-cache-key="${cacheKey}" style="
         border: 1px dashed #ccc;
         background-color: #f8f9fa;
-        padding: 1rem;
-        margin: 1rem 0;
+        padding: 0.5rem 1rem;
+        margin: 0.5rem 0;
         border-radius: 4px;
-        text-align: center;
+        display: inline-block;
         color: #666;
-        font-family: monospace;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
       ">
-        <div style="margin-bottom: 0.5rem;">🔄 正在渲染Mermaid图表...</div>
-        <div style="font-size: 0.8rem; opacity: 0.7;">${this.escapeHtml(diagram.substring(0, 100))}...</div>
+        此处放置 mermaid 图表或图片
       </div>
     `;
   }
