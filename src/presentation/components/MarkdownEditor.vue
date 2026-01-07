@@ -393,7 +393,7 @@ watch(() => props.document, (newDocument, oldDocument) => {
   // 重置光标位置状态
   currentSelectionStart.value = 0;
   currentSelectionEnd.value = 0;
-  
+
   // 如果文档被删除（从有文档变为无文档），将焦点移到隐藏的焦点接收器
   // 这样可以避免 Selection 持有对已删除 DOM 节点的引用
   if (oldDocument && !newDocument) {
@@ -433,11 +433,27 @@ watch(() => props.document, (newDocument, oldDocument) => {
       // 更新编辑器内容（始终应用标注）
       const editor = editorElement.value;
       if (editor) {
+        // 先确保焦点接收器没有焦点（如果之前删除文档时焦点在它上面）
+        if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
+          focusSinkElement.value.blur();
+        }
+
         await applyEditorAnnotations();
+
         // 在新文档加载后，将光标设置到文档开头，确保光标可见
-        // 使用 setTimeout 确保 DOM 已完全更新
+        // 使用 setTimeout 确保 DOM 已完全更新，特别是 applyEditorAnnotations 可能重新渲染了 DOM
         setTimeout(() => {
           if (editor && editor.textContent) {
+            // 再次确保焦点接收器没有焦点（applyEditorAnnotations 可能改变了焦点状态）
+            if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
+              focusSinkElement.value.blur();
+            }
+
+            // 确保没有其他元素持有焦点
+            if (document.activeElement && document.activeElement !== editor && document.activeElement !== document.body) {
+              (document.activeElement as HTMLElement).blur();
+            }
+
             // 先设置光标位置
             setCursorPosition(editor, 0);
             // 关键：让编辑器获得焦点，这样光标才会显示
@@ -448,35 +464,66 @@ watch(() => props.document, (newDocument, oldDocument) => {
             // 更新焦点状态
             isEditorFocused.value = true;
           }
-        }, 100);
+        }, 150); // 增加延迟时间，确保 applyEditorAnnotations 完全完成
       }
     });
   }
-  // 注意：当document为null时，不清空内容，因为可能是外部文件
-  // 但如果之前有document，现在变为null，且没有外部文件路径，则清空
-  else if (!currentFilePath.value && !content.value) {
-    // 只有在既没有document也没有外部文件且内容为空时才清空
+  // 当document为null时，需要清空编辑器内容
+  // 如果之前有document，现在变为null，说明文档被删除了，必须清空
+  else if (oldDocument && !newDocument) {
+    // 文档被删除，强制清空所有内容
     title.value = '';
     content.value = '';
+    frontmatter.value = '';
+    mainContent.value = '';
     renderedContent.value = '';
     hasChanges.value = false;
-    
-    // 当文档被删除时，将焦点移到隐藏的焦点接收器
-    // 这样可以避免 Selection 持有对已删除 DOM 节点的引用
+    currentFilePath.value = ''; // 清空外部文件路径
+
+    // 清理编辑器状态和DOM内容
     nextTick(() => {
-      if (focusSinkElement.value) {
-        focusSinkElement.value.focus();
-      }
-      // 清理编辑器状态
       const editor = editorElement.value;
       if (editor) {
+        // 先清理 Selection，避免持有对已删除 DOM 节点的引用
         const selection = window.getSelection();
         if (selection) {
           selection.removeAllRanges();
         }
+
+        // 如果编辑器有焦点，先移除焦点
+        if (document.activeElement === editor) {
+          editor.blur();
+        }
+
+        // 清空编辑器DOM内容
+        editor.textContent = '';
+        editor.innerHTML = '';
         isEditorFocused.value = false;
+
+        // 将焦点移到 body，而不是隐藏的焦点接收器
+        // 这样可以确保后续点击编辑器时能正常获得焦点
+        // 使用 setTimeout 确保在 nextTick 之后执行
+        setTimeout(() => {
+          // 确保焦点不在任何元素上，让焦点回到 body
+          if (document.activeElement && document.activeElement !== document.body) {
+            (document.activeElement as HTMLElement).blur();
+          }
+          // 如果焦点接收器有焦点，也移除
+          if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
+            focusSinkElement.value.blur();
+          }
+        }, 0);
       }
     });
+  }
+  // 如果既没有document也没有外部文件路径，且内容为空，也清空（兜底逻辑）
+  else if (!currentFilePath.value && !content.value) {
+    title.value = '';
+    content.value = '';
+    frontmatter.value = '';
+    mainContent.value = '';
+    renderedContent.value = '';
+    hasChanges.value = false;
   }
 }, { immediate: true });
 
@@ -673,15 +720,35 @@ const handleEditorFocus = () => {
 };
 
 // 处理编辑器鼠标按下事件（在失去焦点之前保存光标位置）
-const handleEditorMouseDown = () => {
+const handleEditorMouseDown = (event: MouseEvent) => {
   const editor = editorElement.value;
   if (!editor) return;
 
+  // 如果编辑器没有焦点，确保它能获得焦点
+  // 这很重要，特别是删除文档后，焦点可能在焦点接收器上
+  if (!isEditorFocused.value || document.activeElement !== editor) {
+    // 如果焦点在焦点接收器上，先移除
+    if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
+      focusSinkElement.value.blur();
+    }
+    // 确保没有其他元素持有焦点
+    if (document.activeElement && document.activeElement !== editor && document.activeElement !== document.body) {
+      (document.activeElement as HTMLElement).blur();
+    }
+    // 让编辑器获得焦点
+    editor.focus();
+    // 更新焦点状态
+    isEditorFocused.value = true;
+  }
+
   // 如果编辑器有焦点，保存当前光标位置
   if (isEditorFocused.value || document.activeElement === editor) {
-    const { start, end } = getCursorPosition(editor);
-    currentSelectionStart.value = start;
-    currentSelectionEnd.value = end;
+    // 使用 nextTick 确保焦点已经设置完成
+    nextTick(() => {
+      const { start, end } = getCursorPosition(editor);
+      currentSelectionStart.value = start;
+      currentSelectionEnd.value = end;
+    });
   }
 };
 

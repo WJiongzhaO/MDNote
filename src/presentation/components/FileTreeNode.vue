@@ -69,7 +69,13 @@ const emit = defineEmits<{
   (e: 'expand', node: FileNode): void;
 }>();
 
-const isSelected = computed(() => props.selectedPath === props.node.path);
+// 路径标准化函数（统一处理 Windows 路径分隔符）
+const normalizePath = (p: string) => p.replace(/\\/g, '/');
+
+const isSelected = computed(() => {
+  if (!props.selectedPath || !props.node.path) return false;
+  return normalizePath(props.selectedPath) === normalizePath(props.node.path);
+});
 
 const handleClick = () => {
   if (props.node.type === 'folder') {

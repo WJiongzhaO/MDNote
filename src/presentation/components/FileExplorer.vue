@@ -116,6 +116,18 @@
         </div>
       </div>
     </div>
+
+    <!-- 删除确认对话框 -->
+    <div v-if="showDeleteConfirmDialog" class="modal-overlay" @click="cancelDelete">
+      <div class="modal" @click.stop>
+        <h3>确认删除</h3>
+        <p v-if="nodeToDelete">确定要删除 {{ nodeToDelete.name }} 吗？</p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="cancelDelete">取消</button>
+          <button class="btn btn-primary" @click="confirmDelete">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -149,6 +161,8 @@ const contextMenu = ref({
 const showNewFileDialog = ref(false);
 const showNewFolderDialog = ref(false);
 const showRenameDialog = ref(false);
+const showDeleteConfirmDialog = ref(false);
+const nodeToDelete = ref<FileNode | null>(null);
 const newFileName = ref('');
 const newFolderName = ref('');
 const renameName = ref('');
@@ -235,10 +249,23 @@ const handleNewFromTemplate = () => {
 const handleDelete = () => {
   if (!contextMenu.value.node) return;
   const node = contextMenu.value.node;
-  if (confirm(`确定要删除 ${node.name} 吗？`)) {
-    deleteNode(node.path);
-  }
+  // 使用自定义对话框而不是原生 confirm，避免焦点丢失
+  nodeToDelete.value = node;
+  showDeleteConfirmDialog.value = true;
   contextMenu.value.visible = false;
+};
+
+const confirmDelete = () => {
+  if (nodeToDelete.value) {
+    deleteNode(nodeToDelete.value.path);
+    nodeToDelete.value = null;
+  }
+  showDeleteConfirmDialog.value = false;
+};
+
+const cancelDelete = () => {
+  nodeToDelete.value = null;
+  showDeleteConfirmDialog.value = false;
 };
 
 const handleRename = () => {
@@ -339,6 +366,23 @@ const cancelRename = () => {
   renameNode.value = null;
 };
 
+// 在文件树中查找文件节点（递归查找）
+const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null => {
+  const normalizePath = (p: string) => p.replace(/\\/g, '/');
+  const normalizedTarget = normalizePath(targetPath);
+  
+  for (const node of nodes) {
+    if (normalizePath(node.path) === normalizedTarget) {
+      return node;
+    }
+    if (node.children) {
+      const found = findNodeByPath(node.children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 const createNewFile = async () => {
   if (!newFileName.value.trim()) return;
 
@@ -350,6 +394,22 @@ const createNewFile = async () => {
     if (electronAPI && electronAPI.file && electronAPI.file.writeFileContent) {
       await electronAPI.file.writeFileContent(filePath, '');
       await loadFolder(currentPath.value);
+      
+      // 等待文件树更新后，从文件树中找到新创建的文件并使用其实际路径
+      await nextTick();
+      
+      // 在文件树中查找新创建的文件节点
+      const newNode = findNodeByPath(fileTree.value, filePath);
+      if (newNode) {
+        // 使用文件树中的实际路径（确保路径格式一致）
+        selectedPath.value = newNode.path;
+        emit('select-file', newNode.path);
+      } else {
+        // 如果找不到，使用原始路径（向后兼容）
+        selectedPath.value = filePath;
+        emit('select-file', filePath);
+      }
+      
       showNewFileDialog.value = false;
       newFileName.value = '';
     }
@@ -383,7 +443,20 @@ const deleteNode = async (nodePath: string) => {
   try {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.file && electronAPI.file.deleteNode) {
+      // 检查删除的是否是当前选中的文件
+      const isSelectedFile = selectedPath.value === nodePath;
+      
       await electronAPI.file.deleteNode(nodePath);
+      
+      // 如果删除的是当前选中的文件，清空选中状态
+      // 这样编辑器也会清空内容，保持状态一致
+      if (isSelectedFile) {
+        selectedPath.value = '';
+        // 发出事件通知父组件清空当前文档
+        // 注意：这里不能直接访问 currentDocument，需要通过事件通知
+        emit('select-file', ''); // 传递空字符串表示清空选中
+      }
+      
       await loadFolder(currentPath.value);
     }
   } catch (error) {
@@ -555,12 +628,18 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
 });
 
+// 设置选中路径的方法，供外部调用
+const setSelectedPath = (path: string) => {
+  selectedPath.value = path;
+};
+
 // 暴露方法供外部调用
 defineExpose({
   loadFolder,
   closeFolder,
   handleNewFile,
-  handleNewFolder
+  handleNewFolder,
+  setSelectedPath
 });
 </script>
 
