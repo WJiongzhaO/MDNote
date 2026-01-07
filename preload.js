@@ -46,6 +46,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getFileCache: (filePath) => ipcRenderer.invoke('file:get-file-cache', filePath),
     deleteFileCache: (filePath) => ipcRenderer.invoke('file:delete-file-cache', filePath)
   },
+  // 知识片段库 API（使用全局路径，不随项目切换）
+  fragment: {
+    read: (filename) => ipcRenderer.invoke('fragment:read', filename),
+    write: (filename, data) => ipcRenderer.invoke('fragment:write', filename, data),
+    mkdir: (dirPath) => ipcRenderer.invoke('fragment:mkdir', dirPath),
+    getGlobalPath: () => ipcRenderer.invoke('fragment:get-global-path'),
+    getCustomGlobalPath: () => ipcRenderer.invoke('fragment:get-custom-global-path'),
+    setGlobalPath: (customPath) => ipcRenderer.invoke('fragment:set-global-path', customPath),
+    resetGlobalPath: () => ipcRenderer.invoke('fragment:reset-global-path'),
+    copy: (sourcePath, destPath) => ipcRenderer.invoke('fragment:copy', sourcePath, destPath),
+    deleteDir: (dirPath) => ipcRenderer.invoke('fragment:delete-dir', dirPath),
+    getFullPath: (relativePath) => ipcRenderer.invoke('fragment:get-full-path', relativePath)
+  },
   // Git 操作 API
   git: {
     init: () => ipcRenderer.invoke('git:init'),
@@ -80,7 +93,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     fetch: (remote) => ipcRenderer.invoke('git:fetch', remote)
   },
   dialog: {
-    openFolder: () => ipcRenderer.invoke('dialog:open-folder'),
+    openFolder: (options) => ipcRenderer.invoke('dialog:open-folder', options),
     openFile: () => ipcRenderer.invoke('dialog:open-file'),
     saveFile: (options) => ipcRenderer.invoke('dialog:save-file', options)
   },

@@ -102,72 +102,8 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
       }
     });
 
-    // 默认注册Mermaid扩展（使用占位符方案）
-    this.registerExtension({
-      name: 'mermaid',
-      priority: 90,
-      tokenizer: {
-        name: 'mermaid',
-        level: 'block',
-        start(src: string) {
-          return src.match(/^```mermaid\s*\n/)?.index;
-        },
-        tokenizer(src: string) {
-          const rule = /^```mermaid\s*\n([\s\S]*?)\n```/;
-          const match = rule.exec(src);
-
-          if (match) {
-            return {
-              type: 'mermaid',
-              raw: match[0],
-              text: match[1].trim(),
-              diagram: match[1].trim()
-            };
-          }
-        },
-        renderer: (token: any) => {
-          if (token?.diagram) {
-            // 使用占位符方案，避免异步Promise问题
-            // 占位符包含data属性存储Mermaid代码，由前端JavaScript异步渲染
-            const diagramId = 'mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-            const encodedDiagram = this.encodeDiagram(token.diagram);
-
-            return `
-              <div
-                class="mermaid-asset-placeholder"
-                data-asset-type="mermaid"
-                data-asset-id="${diagramId}"
-                data-diagram="${encodedDiagram}"
-                style="
-                  border: 1px solid #e0e0e0;
-                  border-radius: 4px;
-                  padding: 1rem;
-                  margin: 1rem 0;
-                  background-color: #f8f9fa;
-                  position: relative;
-                  min-height: 200px;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                "
-              >
-                <div class="mermaid-loading" style="
-                  text-align: center;
-                  color: #666;
-                ">
-                  <div style="margin-bottom: 0.5rem;">🔄 正在渲染Mermaid图表...</div>
-                  <div style="font-size: 0.8rem; opacity: 0.7;">请稍候</div>
-                </div>
-              </div>
-            `;
-          }
-
-          // 如果没有图表代码，返回原始代码块
-          const text = token?.text || '';
-          return `\n<pre><code class=\"language-mermaid\">${this.escapeHtml(text)}</code></pre>\n`;
-        }
-      }
-    });
+    // 注意：Mermaid扩展应该通过MarkdownProcessorInitializer注册
+    // 这里不再注册默认的mermaid扩展，避免重复注册
   }
 
   async processMarkdown(content: string, variables: Record<string, any> = {}): Promise<string> {
@@ -189,12 +125,16 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
     // Markdown 转换
     let html = marked(processedContent) as string;
 
-    // 后处理扩展
+    // 后处理扩展（按优先级从高到低）
     for (const extension of this.getExtensionsByPriority()) {
       if (extension.postProcess) {
         html = extension.postProcess(html);
       }
     }
+    
+    // 额外的后处理：移除所有独立的mermaid代码块（如果它们紧跟在占位符后面）
+    // 这是为了确保即使扩展的postProcess没有正确工作，也能移除重复的代码块
+    html = this.removeDuplicateMermaidCodeBlocks(html);
 
     // 安全清理
     const result = DOMPurify.sanitize(html);
@@ -361,6 +301,27 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
    */
   private encodeDiagram(diagram: string): string {
     return btoa(encodeURIComponent(diagram));
+  }
+
+  /**
+   * 移除重复的Mermaid代码块
+   * 如果HTML中同时存在占位符和对应的代码块，移除代码块
+   */
+  private removeDuplicateMermaidCodeBlocks(html: string): string {
+    // 使用正则表达式移除紧跟在占位符后面的mermaid代码块
+    // 匹配占位符后面的代码块
+    let result = html.replace(
+      /(<div[^>]*class="mermaid-asset-placeholder"[^>]*>[\s\S]*?<\/div>)\s*(<pre><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>[\s\S]*?<\/code><\/pre>)/g,
+      '$1'
+    );
+    
+    // 匹配占位符前面的代码块
+    result = result.replace(
+      /(<pre><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>[\s\S]*?<\/code><\/pre>)\s*(<div[^>]*class="mermaid-asset-placeholder"[^>]*>[\s\S]*?<\/div>)/g,
+      '$2'
+    );
+    
+    return result;
   }
 
   // Mermaid异步渲染和缓存管理方法

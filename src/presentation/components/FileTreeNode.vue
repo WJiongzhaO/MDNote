@@ -72,7 +72,11 @@ const emit = defineEmits<{
 const isSelected = computed(() => props.selectedPath === props.node.path);
 
 const handleClick = () => {
-  emit('select', props.node.path);
+  if (props.node.type === 'folder') {
+    toggleExpand();
+  } else {
+    emit('select', props.node.path);
+  }
 };
 
 const toggleExpand = () => {

@@ -106,14 +106,18 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
   private async getAllFragmentsFromFile(): Promise<KnowledgeFragmentData[]> {
     try {
       const electronAPI = (window as any).electronAPI;
-      if (!electronAPI || !electronAPI.file) {
-        throw new Error('electronAPI is not available');
+      // 知识片段库必须使用全局的 fragment API（知识片段库是全局共享的，不随项目切换）
+      // 不允许降级到 file API，因为 file API 使用项目路径，会导致知识片段库路径错误
+      if (!electronAPI || !electronAPI.fragment) {
+        console.error('知识片段库 API 不可用，知识片段库需要全局路径支持');
+        throw new Error('知识片段库 API 不可用');
       }
 
-      const data = await electronAPI.file.read(this.FILE_NAME);
+      const data = await electronAPI.fragment.read(this.FILE_NAME);
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error loading knowledge fragments from file:', error);
+      // 返回空数组而不是抛出错误，避免应用崩溃
       return [];
     }
   }
@@ -121,11 +125,14 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
   private async saveFragmentsToFile(fragments: KnowledgeFragmentData[]): Promise<void> {
     try {
       const electronAPI = (window as any).electronAPI;
-      if (!electronAPI || !electronAPI.file) {
-        throw new Error('electronAPI is not available');
+      // 知识片段库必须使用全局的 fragment API（知识片段库是全局共享的，不随项目切换）
+      // 不允许降级到 file API，因为 file API 使用项目路径，会导致知识片段库路径错误
+      if (!electronAPI || !electronAPI.fragment) {
+        console.error('知识片段库 API 不可用，知识片段库需要全局路径支持');
+        throw new Error('知识片段库 API 不可用');
       }
 
-      await electronAPI.file.write(this.FILE_NAME, fragments);
+      await electronAPI.fragment.write(this.FILE_NAME, fragments);
     } catch (error) {
       console.error('Error saving knowledge fragments to file:', error);
       throw new Error('Failed to save knowledge fragments to file system');

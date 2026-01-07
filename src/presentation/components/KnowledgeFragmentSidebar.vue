@@ -136,7 +136,7 @@
         </div>
         <div class="dialog-body">
           <div class="settings-item">
-            <label>存储位置：</label>
+            <label>知识片段库存储位置（全局）：</label>
             <div class="path-display">
               <input
                 type="text"
@@ -147,7 +147,10 @@
               <button class="btn btn-secondary" @click="selectStoragePath">选择位置</button>
             </div>
             <p class="settings-hint">当前知识片段库存储在：{{ currentDataPath }}</p>
-            <button v-if="hasCustomPath" class="btn btn-secondary" @click="resetStoragePath">重置为默认位置</button>
+            <p class="settings-hint" style="color: #666; font-size: 12px; margin-top: 4px;">
+              注意：知识片段库是全局共享的，不随项目切换而变化
+            </p>
+            <button v-if="hasCustomPath" class="btn btn-secondary" @click="resetStoragePath" style="margin-top: 8px;">重置为默认位置</button>
           </div>
         </div>
         <div class="dialog-footer">
@@ -157,11 +160,16 @@
     </div>
 
     <!-- 创建对话框 -->
-    <div v-if="showCreateDialog" class="dialog-overlay" @click="showCreateDialog = false">
-      <div class="dialog" @click.stop>
+    <div 
+      v-if="showCreateDialog" 
+      class="dialog-overlay" 
+      @mousedown="handleDialogOverlayMouseDown"
+      @click="handleDialogOverlayClick"
+    >
+      <div class="dialog" @click.stop @mousedown.stop>
         <div class="dialog-header">
           <h3>创建知识片段</h3>
-          <button class="btn btn-icon" @click="showCreateDialog = false">✕</button>
+          <button class="btn btn-icon" @click="handleCloseCreateDialog">✕</button>
         </div>
         <div class="dialog-body">
           <input
@@ -184,18 +192,23 @@
           />
         </div>
         <div class="dialog-footer">
-          <button class="btn btn-secondary" @click="showCreateDialog = false">取消</button>
+          <button class="btn btn-secondary" @click="handleCloseCreateDialog">取消</button>
           <button class="btn btn-primary" @click="handleCreateFragment">创建</button>
         </div>
       </div>
     </div>
 
     <!-- 编辑对话框 -->
-    <div v-if="showEditDialog" class="dialog-overlay" @click="showEditDialog = false">
-      <div class="dialog" @click.stop>
+    <div 
+      v-if="showEditDialog" 
+      class="dialog-overlay" 
+      @mousedown="handleDialogOverlayMouseDown"
+      @click="handleDialogOverlayClick"
+    >
+      <div class="dialog" @click.stop @mousedown.stop>
         <div class="dialog-header">
           <h3>编辑知识片段</h3>
-          <button class="btn btn-icon" @click="showEditDialog = false">✕</button>
+          <button class="btn btn-icon" @click="handleCloseEditDialog">✕</button>
         </div>
         <div class="dialog-body">
           <input
@@ -221,7 +234,7 @@
           </div>
         </div>
         <div class="dialog-footer">
-          <button class="btn btn-secondary" @click="showEditDialog = false">取消</button>
+          <button class="btn btn-secondary" @click="handleCloseEditDialog">取消</button>
           <button class="btn btn-primary" @click="handleUpdateFragment">保存</button>
         </div>
       </div>
@@ -244,6 +257,35 @@ const emit = defineEmits<{
   'fragment-updated': [fragmentId: string];
   'insert': [fragment: KnowledgeFragmentResponse];
 }>();
+
+// 恢复编辑器焦点（通过父组件）
+const restoreEditorFocus = () => {
+  // 通过 emit 事件通知父组件恢复编辑器焦点
+  // 或者直接查找编辑器元素并恢复焦点
+  nextTick(() => {
+    // 查找 MarkdownEditor 组件并恢复焦点
+    const editorElement = document.querySelector('.markdown-editor-content') as HTMLElement;
+    if (editorElement) {
+      editorElement.focus();
+      // 恢复光标位置
+      const selection = window.getSelection();
+      if (selection && editorElement.textContent) {
+        const range = document.createRange();
+        const textNode = editorElement.firstChild;
+        if (textNode) {
+          const textLength = textNode.textContent?.length || 0;
+          range.setStart(textNode, Math.min(textLength, editorElement.textContent.length));
+          range.setEnd(textNode, Math.min(textLength, editorElement.textContent.length));
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+      console.log('[KnowledgeFragmentSidebar] 已恢复编辑器焦点');
+    } else {
+      console.warn('[KnowledgeFragmentSidebar] 未找到编辑器元素');
+    }
+  });
+};
 
 const {
   fragments,
@@ -294,6 +336,21 @@ const getPreviewImageUrl = async (imagePath: string): Promise<string> => {
   
   try {
     const electronAPI = (window as any).electronAPI;
+    
+    // 知识片段的图片路径应该使用 fragment API（全局路径）
+    if (imagePath.startsWith('fragments/')) {
+      if (electronAPI && electronAPI.fragment && electronAPI.fragment.getFullPath) {
+        console.log('调用 electronAPI.fragment.getFullPath，路径:', imagePath);
+        const fullPath = await electronAPI.fragment.getFullPath(imagePath);
+        console.log('fragment.getFullPath 返回:', fullPath);
+        previewImageUrls.value[imagePath] = fullPath;
+        return fullPath;
+      } else {
+        console.warn('electronAPI.fragment.getFullPath 不可用，尝试使用 file.getFullPath');
+      }
+    }
+    
+    // 其他路径使用 file API（项目路径）
     if (electronAPI && electronAPI.file && electronAPI.file.getFullPath) {
       console.log('调用 electronAPI.file.getFullPath，路径:', imagePath);
       const fullPath = await electronAPI.file.getFullPath(imagePath);
@@ -449,6 +506,10 @@ const handleUpdateFragment = async () => {
     editingFragmentContent.value = '';
     editingFragmentTags.value = '';
     showEditDialog.value = false;
+    
+    // 恢复编辑器焦点
+    await nextTick();
+    restoreEditorFocus();
 
     // 刷新列表
     await loadFragments();
@@ -794,6 +855,10 @@ const handleCreateFragment = async () => {
     newFragmentContent.value = '';
     newFragmentTags.value = '';
     showCreateDialog.value = false;
+    
+    // 恢复编辑器焦点
+    await nextTick();
+    restoreEditorFocus();
   } catch (error) {
     console.error('Error creating fragment:', error);
     alert('创建失败：' + (error instanceof Error ? error.message : '未知错误'));
@@ -917,37 +982,46 @@ const handleFragmentDragEnd = () => {
   draggedFragment.value = null;
 };
 
-// 加载存储路径
+// 加载存储路径（知识片段库的全局路径）
 const loadStoragePath = async () => {
   try {
     const electronAPI = (window as any).electronAPI;
-    if (electronAPI && electronAPI.file) {
-      currentDataPath.value = await electronAPI.file.getDataPath();
-      const customPath = await electronAPI.file.getCustomDataPath();
+    // 使用 fragment API 获取全局知识片段库路径
+    if (electronAPI && electronAPI.fragment) {
+      currentDataPath.value = await electronAPI.fragment.getGlobalPath();
+      const customPath = await electronAPI.fragment.getCustomGlobalPath();
       hasCustomPath.value = !!customPath;
+    } else {
+      console.warn('知识片段库 API 不可用');
+      currentDataPath.value = '未知';
+      hasCustomPath.value = false;
     }
   } catch (error) {
     console.error('Error loading storage path:', error);
+    currentDataPath.value = '加载失败';
+    hasCustomPath.value = false;
   }
 };
 
-// 选择存储路径
+// 选择存储路径（知识片段库的全局路径）
 const selectStoragePath = async () => {
   try {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.dialog) {
-      const selectedPath = await electronAPI.dialog.openFolder();
+      // 使用 skipSaveLastFolder 选项，避免修改上次打开的文件夹
+      const selectedPath = await electronAPI.dialog.openFolder({ skipSaveLastFolder: true });
       if (selectedPath) {
-        const result = await electronAPI.file.setCustomDataPath(selectedPath);
-        if (result.success) {
-          // 同时将这个路径设置为上次打开的文件夹
-          if (electronAPI.file && electronAPI.file.saveLastOpenedFolder) {
-            await electronAPI.file.saveLastOpenedFolder(selectedPath);
+        // 使用 fragment API 设置全局知识片段库路径（不会影响项目数据路径和上次打开的文件夹）
+        if (electronAPI.fragment && electronAPI.fragment.setGlobalPath) {
+          const result = await electronAPI.fragment.setGlobalPath(selectedPath);
+          if (result.success) {
+            await loadStoragePath();
+            alert('知识片段库存储位置已更新，请重启应用以使更改生效');
+          } else {
+            alert('设置存储位置失败：' + (result.error || '未知错误'));
           }
-          await loadStoragePath();
-          alert('存储位置已更新，请重启应用以使更改生效');
         } else {
-          alert('设置存储位置失败：' + (result.error || '未知错误'));
+          alert('知识片段库 API 不可用，请确保应用已更新到最新版本');
         }
       }
     }
@@ -957,7 +1031,54 @@ const selectStoragePath = async () => {
   }
 };
 
-// 重置存储路径
+// 处理对话框 overlay 的 mousedown 事件（用于检测是否从对话框内拖动出来）
+let dialogMouseDownTarget: EventTarget | null = null;
+const handleDialogOverlayMouseDown = (event: MouseEvent) => {
+  // 记录 mousedown 时的目标元素
+  dialogMouseDownTarget = event.target;
+};
+
+// 关闭创建对话框并恢复编辑器焦点
+const handleCloseCreateDialog = () => {
+  showCreateDialog.value = false;
+  nextTick(() => {
+    restoreEditorFocus();
+  });
+};
+
+// 关闭编辑对话框并恢复编辑器焦点
+const handleCloseEditDialog = () => {
+  showEditDialog.value = false;
+  nextTick(() => {
+    restoreEditorFocus();
+  });
+};
+
+// 处理对话框 overlay 的 click 事件（只有在真正点击 overlay 时才关闭）
+const handleDialogOverlayClick = (event: MouseEvent) => {
+  // 只有当 mousedown 和 click 的目标都是 overlay 本身时，才关闭对话框
+  // 这样可以防止用户在输入框中选中文本并拖动超出对话框时关闭对话框
+  if (event.target === event.currentTarget && dialogMouseDownTarget === event.currentTarget) {
+    if (showCreateDialog.value) {
+      showCreateDialog.value = false;
+      // 恢复编辑器焦点
+      nextTick(() => {
+        restoreEditorFocus();
+      });
+    }
+    if (showEditDialog.value) {
+      showEditDialog.value = false;
+      // 恢复编辑器焦点
+      nextTick(() => {
+        restoreEditorFocus();
+      });
+    }
+  }
+  // 重置记录
+  dialogMouseDownTarget = null;
+};
+
+// 重置存储路径（知识片段库的全局路径）
 const resetStoragePath = async () => {
   if (!confirm('确定要重置为默认存储位置吗？')) {
     return;
@@ -965,14 +1086,17 @@ const resetStoragePath = async () => {
   
   try {
     const electronAPI = (window as any).electronAPI;
-    if (electronAPI && electronAPI.file) {
-      const result = await electronAPI.file.resetDataPath();
+    // 使用 fragment API 重置全局知识片段库路径（不会影响项目数据路径和上次打开的文件夹）
+    if (electronAPI && electronAPI.fragment && electronAPI.fragment.resetGlobalPath) {
+      const result = await electronAPI.fragment.resetGlobalPath();
       if (result.success) {
         await loadStoragePath();
         alert('已重置为默认存储位置，请重启应用以使更改生效');
       } else {
         alert('重置存储位置失败：' + (result.error || '未知错误'));
       }
+    } else {
+      alert('知识片段库 API 不可用，请确保应用已更新到最新版本');
     }
   } catch (error) {
     console.error('Error resetting storage path:', error);

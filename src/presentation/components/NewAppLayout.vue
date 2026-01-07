@@ -46,7 +46,13 @@
       </ResizableSidebar>
 
       <!-- 主编辑区域 -->
+      <!-- 图片预览区域 -->
+      <div v-if="currentDocument?.fileType === 'image'" class="image-preview-container">
+        <div class="image-preview-content" v-html="currentDocument.content"></div>
+      </div>
+      <!-- Markdown 编辑器 -->
       <MarkdownEditor
+        v-else
         :document="currentDocument"
         :render-markdown="renderMarkdown"
         @update-document="handleUpdateDocument"
@@ -116,26 +122,43 @@ provide('currentDocumentContent', currentDocumentContent);
 // 处理选择文件（从文件资源管理器）
 const handleSelectFile = async (filePath: string) => {
   currentFilePath.value = filePath;
-  currentDocumentPath.value = filePath; // 更新供VariableSidebar使用
-
-  // 清空当前文档（因为选择了外部文件）
-  currentDocument.value = null;
+  currentDocumentPath.value = filePath;
 
   try {
     const electronAPI = (window as any).electronAPI;
-    if (electronAPI && electronAPI.file && electronAPI.file.readFileContent) {
-      const content = await electronAPI.file.readFileContent(filePath);
-      const fileName = filePath.split(/[/\\]/).pop() || '未命名';
+    if (electronAPI && electronAPI.file) {
+      // 使用策略模式的FileOpenerManager
+      const { InversifyContainer } = await import('../../core/container/inversify.container');
+      const { TYPES } = await import('../../core/container/container.types');
+      const container = InversifyContainer.getInstance();
+      const fileOpenerManager = container.get<any>(TYPES.FileOpenerManager);
 
-      // 更新currentDocumentContent供VariableSidebar使用
-      currentDocumentContent.value = content || '';
+      // 检查是否为图片文件（图片不需要读取文本内容）
+      const isImageFile = /\.(png|jpg|jpeg|gif|bmp|webp|svg|ico|tiff|tif)$/i.test(filePath);
 
-      // 直接设置编辑器内容（不依赖document对象）
-      if (markdownEditorRef.value) {
-        (markdownEditorRef.value as any).setContent(fileName, content || '', filePath);
+      let content: string | undefined;
+      if (!isImageFile && electronAPI.file.readFileContent) {
+        content = await electronAPI.file.readFileContent(filePath);
       }
 
-      // 更新知识片段侧边栏的文档上下文
+      const result = await fileOpenerManager.openFile(filePath, content);
+
+      // 创建临时文档对象以兼容现有组件
+      const tempDocument = {
+        id: `external-${Date.now()}`,
+        title: result.title,
+        content: result.content,
+        folderId: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        filePath: filePath,
+        fileType: result.fileType,
+        metadata: result.metadata
+      };
+
+      currentDocument.value = tempDocument;
+      currentDocumentContent.value = result.content;
+
       await nextTick();
       updateFragmentSidebarContext();
     }
@@ -221,6 +244,19 @@ const updateFragmentSidebarContext = () => {
   if (!context.documentId && !context.filePath) {
     if (currentDocument.value) {
       context.documentId = currentDocument.value.id;
+      // 如果文档对象包含 filePath（外部文件），也要传递
+      if ((currentDocument.value as any).filePath) {
+        context.filePath = (currentDocument.value as any).filePath;
+      }
+    } else if (currentFilePath.value) {
+      context.filePath = currentFilePath.value;
+    }
+  }
+
+  // 如果已经有 documentId 但没有 filePath，尝试从 currentDocument 或 currentFilePath 获取
+  if (context.documentId && !context.filePath) {
+    if (currentDocument.value && (currentDocument.value as any).filePath) {
+      context.filePath = (currentDocument.value as any).filePath;
     } else if (currentFilePath.value) {
       context.filePath = currentFilePath.value;
     }
@@ -557,6 +593,30 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   display: flex;
   overflow: hidden;
   min-height: 0;
+}
+
+.image-preview-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+  overflow: auto;
+  padding: 20px;
+}
+
+.image-preview-content {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.image-preview-content :deep(img) {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .error-toast {

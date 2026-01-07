@@ -28,7 +28,7 @@ export class DocumentUseCases {
       // 通过依赖注入容器获取引用解析器
       const { InversifyContainer } = await import('../../core/container/inversify.container');
       const container = InversifyContainer.getInstance();
-      
+
       // 检查服务是否已注册
       if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
         this.referenceResolver = container.get<FragmentReferenceResolver>(TYPES.FragmentReferenceResolver);
@@ -144,7 +144,7 @@ export class DocumentUseCases {
     }));
   }
 
-  async renderMarkdown(content: string, documentId?: string, variables?: Record<string, any>): Promise<string> {
+  async renderMarkdown(content: string, documentId?: string, variables?: Record<string, any>, fileCache?: any): Promise<string> {
     // 如果有documentId，先解析引用标志并替换为片段内容
     let processedContent = content;
     if (documentId && !documentId.startsWith('fragment:')) {
@@ -159,7 +159,9 @@ export class DocumentUseCases {
           const actualDocId = documentId.startsWith('file:')
             ? documentId.substring(5) // 移除 'file:' 前缀，使用实际文件路径
             : documentId;
-          processedContent = await this.referenceResolver.resolveReferences(content, actualDocId);
+
+          // 如果提供了文件缓存，使用缓存以提高性能
+          processedContent = await this.referenceResolver.resolveReferences(content, actualDocId, fileCache);
         } catch (error) {
           console.error('Error resolving fragment references:', error);
           // 出错时使用原始内容
@@ -209,8 +211,8 @@ export class DocumentUseCases {
         // 外部文件的documentId可能是：
         // 1. 以 'file:' 开头：file:E:\path\to\file.md
         // 2. 包含路径分隔符的绝对路径：E:\path\to\file.md 或 E:/path/to/file.md
-        const isExternalFile = documentId.startsWith('file:') || 
-                               documentId.includes('/') || 
+        const isExternalFile = documentId.startsWith('file:') ||
+                               documentId.includes('/') ||
                                documentId.includes('\\') ||
                                (documentId.length > 0 && (documentId[1] === ':' || documentId.startsWith('/')));
 
@@ -220,11 +222,31 @@ export class DocumentUseCases {
           if (filePath.startsWith('file:')) {
             filePath = filePath.substring(5); // 移除 'file:' 前缀
           }
-          // 提取文件所在目录（去掉文件名）
-          const pathParts = filePath.split(/[/\\]/);
-          pathParts.pop(); // 移除文件名
-          const fileDir = pathParts.join('/');
-          relativePath = `${fileDir}/assets/${fileName}`;
+
+          // 判断是文件路径还是目录路径
+          const commonExtensions = ['.md', '.txt', '.json', '.html', '.htm', '.css', '.js', '.ts', '.vue', '.jsx', '.tsx'];
+          const isFilePath = commonExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
+
+          let fileDir: string;
+          if (isFilePath) {
+            // 是文件路径，提取文件所在目录
+            const pathParts = filePath.split(/[/\\]/);
+            pathParts.pop(); // 移除文件名
+            // 在 Windows 上，使用反斜杠；在 Unix 上，使用正斜杠
+            // 但为了确保 path.isAbsolute() 能正确识别，我们保持原始路径的格式
+            // 如果原始路径包含反斜杠，使用反斜杠；否则使用正斜杠
+            const separator = filePath.includes('\\') ? '\\' : '/';
+            fileDir = pathParts.join(separator);
+          } else {
+            // 已经是目录路径，直接使用
+            fileDir = filePath;
+          }
+
+          // 使用原始路径的分隔符来构建assets路径，确保是绝对路径格式
+          const separator = fileDir.includes('\\') ? '\\' : '/';
+          relativePath = `${fileDir}${separator}assets${separator}${fileName}`;
+
+          console.log('[processImagePaths] Built relativePath for external file:', relativePath, 'documentId:', documentId);
         } else if (documentId.startsWith('fragment:')) {
           // 知识片段：使用片段路径
           const fragmentId = documentId.substring(9); // 移除 'fragment:' 前缀
@@ -241,11 +263,30 @@ export class DocumentUseCases {
     // 批量处理所有图片路径
     for (const { originalSrc, fullPath: relativePath } of imagePaths) {
       try {
-        const fullPath = await electronAPI.file.getFullPath(relativePath);
+        console.log('[processImagePaths] Processing:', { originalSrc, relativePath, documentId });
+        let fullPath: string;
+        // 知识片段使用全局路径
+        if (relativePath.startsWith('fragments/')) {
+          // 优先使用 fragment API
+          if (electronAPI.fragment && electronAPI.fragment.getFullPath) {
+            fullPath = await electronAPI.fragment.getFullPath(relativePath);
+          } else {
+            // 降级：使用 file API
+            fullPath = await electronAPI.file.getFullPath(relativePath);
+          }
+        } else {
+          // 项目文档使用项目路径
+          console.log('[processImagePaths] Calling getFullPath with:', relativePath);
+          fullPath = await electronAPI.file.getFullPath(relativePath);
+          console.log('[processImagePaths] getFullPath returned:', fullPath);
+        }
         // 使用全局替换，但只替换完全匹配的路径（避免部分匹配）
-        html = html.replace(new RegExp(originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), fullPath);
+        const regex = new RegExp(originalSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+        const beforeReplace = html;
+        html = html.replace(regex, fullPath);
+        console.log('[processImagePaths] Replaced', originalSrc, 'with', fullPath, 'matched:', beforeReplace !== html);
       } catch (error) {
-        console.error('Error processing image path:', error, 'documentId:', documentId, 'originalSrc:', originalSrc, 'relativePath:', relativePath);
+        console.error('[processImagePaths] Error processing image path:', error, 'documentId:', documentId, 'originalSrc:', originalSrc, 'relativePath:', relativePath);
       }
     }
 
