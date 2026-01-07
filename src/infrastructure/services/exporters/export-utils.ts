@@ -29,14 +29,20 @@ export async function convertImageToBase64(imagePath: string): Promise<string | 
           filePath = filePath.substring(7); // 移除 'file://' 前缀
         }
 
+        console.log('[convertImageToBase64] 尝试读取图片:', filePath);
         const buffer = await electronAPI.file.readBinary(filePath);
         if (buffer) {
+          console.log('[convertImageToBase64] 图片读取成功，大小:', buffer.length || buffer.byteLength);
           // 检测图片类型
           const mimeType = detectImageMimeType(filePath, buffer);
-          return arrayBufferToBase64(buffer, mimeType);
+          const base64Result = arrayBufferToBase64(buffer, mimeType);
+          console.log('[convertImageToBase64] 转换为 base64 成功，长度:', base64Result.length);
+          return base64Result;
+        } else {
+          console.warn('[convertImageToBase64] 图片读取返回空 buffer');
         }
       } catch (error) {
-        console.warn('Failed to read image via Electron API:', error);
+        console.warn('[convertImageToBase64] Failed to read image via Electron API:', error);
         // 继续尝试其他方法
       }
     }
@@ -228,7 +234,10 @@ export async function processImagesInHTML(html: string, documentId?: string): Pr
               fileDir = filePath;
             }
 
-            relativePath = `${fileDir}/assets/${fileName}`;
+            // 对于外部文件，直接使用绝对路径
+            // 规范化路径分隔符（统一使用正斜杠，然后由操作系统处理）
+            const normalizedFileDir = fileDir.replace(/\\/g, '/');
+            imagePath = `${normalizedFileDir}/assets/${fileName}`;
           } else if (documentId.startsWith('fragment:')) {
             const fragmentId = documentId.substring(9);
             relativePath = `fragments/assets/${fragmentId}/${fileName}`;
@@ -248,10 +257,14 @@ export async function processImagesInHTML(html: string, documentId?: string): Pr
       }
 
       // 转换为 base64
+      console.log('[processImagesInHTML] 处理图片:', { src, imagePath, documentId });
       const base64Src = await convertImageToBase64(imagePath);
       if (base64Src) {
+        console.log('[processImagesInHTML] 图片转换成功:', src);
         processedSrcs.set(src, base64Src);
         html = html.replace(fullMatch, `<img${attributes}src="${base64Src}"`);
+      } else {
+        console.warn('[processImagesInHTML] 图片转换失败:', src);
       }
     })();
 
@@ -266,16 +279,185 @@ export async function processImagesInHTML(html: string, documentId?: string): Pr
 
 /**
  * 获取 KaTeX CSS 样式（内联版本）
- * 这里使用 CDN 链接，也可以内联完整的 CSS
+ * 使用内联 CSS 确保 PDF 导出时公式正确渲染
  */
 export function getKaTeXStyles(): string {
-  // 使用 CDN 链接（更可靠）
+  // 内联基础的 KaTeX CSS（只包含核心样式）
+  // 这样可以确保 PDF 导出时不依赖网络，公式能正确渲染
   return `
+    <style>
+      /* KaTeX 核心样式 */
+      .katex {
+        font: normal 1.21em KaTeX_Main, Times New Roman, serif;
+        line-height: 1.2;
+        text-indent: 0;
+        text-rendering: auto;
+      }
+      .katex * {
+        -ms-high-contrast-adjust: none !important;
+        border-color: currentColor;
+      }
+      .katex .katex-html {
+        display: inline-block;
+      }
+      .katex .base {
+        position: relative;
+        white-space: nowrap;
+        width: min-content;
+      }
+      .katex .strut {
+        display: inline-block;
+      }
+      .katex .textbf {
+        font-weight: bold;
+      }
+      .katex .textit {
+        font-style: italic;
+      }
+      .katex .textrm {
+        font-family: KaTeX_Main;
+      }
+      .katex .textsf {
+        font-family: KaTeX_SansSerif;
+      }
+      .katex .texttt {
+        font-family: KaTeX_Typewriter;
+      }
+      .katex .mathdefault {
+        font-family: KaTeX_Math;
+        font-style: italic;
+      }
+      .katex .mathit {
+        font-family: KaTeX_Math;
+        font-style: italic;
+      }
+      .katex .mathrm {
+        font-style: normal;
+      }
+      .katex .mathbf {
+        font-family: KaTeX_Main;
+        font-weight: bold;
+      }
+      .katex .boldsymbol {
+        font-family: KaTeX_Math;
+        font-weight: bold;
+        font-style: italic;
+      }
+      .katex .amsrm {
+        font-family: KaTeX_AMS;
+      }
+      .katex .msupsub {
+        text-align: left;
+      }
+      .katex .mfrac > span > span {
+        text-align: center;
+      }
+      .katex .mfrac .frac-line {
+        border-bottom-style: solid;
+        border-bottom-width: 1px;
+      }
+      .katex .mspace {
+        display: inline-block;
+      }
+      .katex .mbin {
+        margin-left: 0.22222em;
+        margin-right: 0.22222em;
+      }
+      .katex .mrel {
+        margin-left: 0.27778em;
+        margin-right: 0.27778em;
+      }
+      .katex .mopen, .katex .mclose {
+        margin-left: 0;
+        margin-right: 0;
+      }
+      .katex .minner {
+        margin-left: 0.16667em;
+        margin-right: 0.16667em;
+      }
+      .katex .mpunct {
+        margin-left: 0;
+        margin-right: 0.16667em;
+      }
+      .katex .delimsizing.mult .delim-size1 > span {
+        font-family: KaTeX_Size1;
+      }
+      .katex .delimsizing.mult .delim-size4 > span {
+        font-family: KaTeX_Size4;
+      }
+      .katex .sqrt > .root {
+        margin-left: 0.27777778em;
+        margin-right: -0.55555556em;
+      }
+      .katex .fontsize-ensurer, .katex .sizing, .katex .delimsizing, .katex .nulldelimiter {
+        display: inline-block;
+      }
+      .katex .vlist-t {
+        display: inline-table;
+        table-layout: fixed;
+      }
+      .katex .vlist-r {
+        display: table-row;
+      }
+      .katex .vlist {
+        display: table-cell;
+        vertical-align: bottom;
+        position: relative;
+      }
+      .katex .vlist > span {
+        display: block;
+        height: 0;
+        position: relative;
+      }
+      .katex .vlist > span > span {
+        display: inline-block;
+      }
+      .katex .mord + .mbin {
+        margin-left: 0.22222em;
+      }
+      .katex .mord + .mrel {
+        margin-left: 0.27778em;
+      }
+      .katex .mord + .minner {
+        margin-left: 0.16667em;
+      }
+      .katex .mbin + .mord {
+        margin-left: 0.22222em;
+      }
+      .katex .mrel + .mord {
+        margin-left: 0.27778em;
+      }
+      .katex .minner + .mord {
+        margin-left: 0.16667em;
+      }
+      .katex .mop {
+        margin-left: 0;
+        margin-right: 0;
+      }
+      .katex .accent > .vlist-t {
+        text-align: center;
+      }
+      .katex .accent .accent-body {
+        position: relative;
+      }
+      /* Display mode (block) */
+      .katex-display {
+        display: block;
+        margin: 1em 0;
+        text-align: center;
+      }
+      .katex-display > .katex {
+        display: block;
+        text-align: center;
+        white-space: nowrap;
+      }
+      .katex-display > .katex > .katex-html {
+        display: block;
+        position: relative;
+      }
+    </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
   `;
-
-  // 如果需要内联 CSS（离线支持），可以读取 node_modules/katex/dist/katex.min.css
-  // 但会增加 HTML 文件大小，这里使用 CDN 更合适
 }
 
 /**

@@ -2,6 +2,7 @@ import { injectable, inject } from 'inversify';
 import { TYPES } from '../../core/container/container.types';
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
 import { ExportFormat, type ExportOptions, type ExportResult } from '../../domain/services/document-export.interface';
+import type { ExportConfig } from '../../domain/types/export-config.types';
 import { ExportFactory } from '../../infrastructure/services/export-factory.service';
 import type { FragmentReferenceResolver } from '../../domain/services/fragment-reference-resolver.service';
 
@@ -11,6 +12,7 @@ export interface ExportDocumentRequest {
   variables?: Record<string, any>;
   includeStyles?: boolean;
   customStyles?: string;
+  config?: ExportConfig;
 }
 
 /**
@@ -74,7 +76,8 @@ export class ExportUseCases {
       documentId: request.documentId,
       variables: request.variables || {},
       includeStyles: request.includeStyles !== false, // 默认包含样式
-      customStyles: request.customStyles
+      customStyles: request.customStyles,
+      config: request.config
     };
 
     // 5. 获取对应的导出器并执行导出
