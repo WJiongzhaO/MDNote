@@ -1147,6 +1147,14 @@ const checkChanges = () => {
   const titleChanged = title.value !== lastSavedTitle;
   const contentChanged = currentContent !== lastSavedContent;
   hasChanges.value = titleChanged || contentChanged;
+  
+  console.log('[实时保存] checkChanges 结果:', {
+    titleChanged,
+    contentChanged,
+    hasChanges: hasChanges.value,
+    currentContentLength: currentContent.length,
+    lastSavedContentLength: lastSavedContent.length
+  });
 };
 
 // 标志位：工具栏操作是否正在进行
@@ -1227,11 +1235,13 @@ const handleToolbarUpdate = (newContent: string) => {
 };
 
 const debouncedSave = () => {
+  console.log('[实时保存] debouncedSave 被调用');
   if (debounceTimer) {
     clearTimeout(debounceTimer);
   }
 
   debounceTimer = setTimeout(() => {
+    console.log('[实时保存] 延迟结束，准备保存');
     saveDocument();
   }, 1000);
 };
@@ -1244,7 +1254,14 @@ const updateDocument = () => {
 };
 
 const saveDocument = async () => {
+  console.log('[实时保存] saveDocument 被调用', {
+    hasChanges: hasChanges.value,
+    currentFilePath: currentFilePath.value,
+    hasDocument: !!props.document
+  });
+  
   if (!hasChanges.value) {
+    console.log('[实时保存] 没有变化，跳过保存');
     return;
   }
 
@@ -1285,6 +1302,7 @@ const saveDocument = async () => {
         lastSavedTitle = title.value;
         lastSavedContent = content.value; // 保存编辑器中的内容（带引用标志）
         hasChanges.value = false;
+        console.log('[实时保存] 外部文件保存成功:', currentFilePath.value);
         return;
       } else {
         console.error('[保存] electronAPI.file.writeFileContent 不可用');
@@ -1303,12 +1321,13 @@ const saveDocument = async () => {
     lastSavedTitle = title.value;
     lastSavedContent = content.value;
     hasChanges.value = false;
+    console.log('[实时保存] 数据库文档保存成功:', props.document.id);
   } catch (error) {
       console.error('[保存] 保存数据库文档失败:', error);
       // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
     }
   } else {
-    console.warn('[保存] 既没有 currentFilePath 也没有 document，无法保存');
+    console.warn('[实时保存] 既没有 currentFilePath 也没有 document，无法保存');
   }
 };
 
@@ -1906,31 +1925,34 @@ const openMermaidEditor = () => {
     content.value = mergeContent(frontmatter.value, mainContent.value);
   }
 
-  // 获取当前选择范围：
-  // 1. 如果编辑器有焦点，实时获取光标位置（更准确）
-  // 2. 否则使用保存的光标位置（从 handleEditorMouseDown 或 handleEditorBlur 保存）
-  let start = currentSelectionStart.value;
-  let end = currentSelectionEnd.value;
+  // 强制获取当前光标位置（必须在编辑器失去焦点之前）
+  let start = 0;
+  let end = 0;
 
-  if (isEditorFocused.value || document.activeElement === editor) {
-    try {
-      const position = getCursorPosition(editor);
-      // 只有在位置有效时才使用实时位置
-      if (position.start >= 0 && position.end >= 0) {
-        start = position.start;
-        end = position.end;
-        // 更新保存的位置
-  currentSelectionStart.value = start;
-  currentSelectionEnd.value = end;
-      }
-    } catch (e) {
-      console.warn('[Mermaid编辑器] 获取光标位置失败，使用保存的位置:', e);
+  try {
+    // 总是尝试获取当前光标位置，无论编辑器是否有焦点
+    const position = getCursorPosition(editor);
+    if (position.start >= 0 && position.end >= 0) {
+      start = position.start;
+      end = position.end;
+      console.log('[Mermaid编辑器] 获取到光标位置:', { start, end });
+    } else {
+      // 如果获取失败，使用保存的位置
+      start = currentSelectionStart.value;
+      end = currentSelectionEnd.value;
+      console.log('[Mermaid编辑器] 使用保存的光标位置:', { start, end });
     }
+  } catch (e) {
+    console.warn('[Mermaid编辑器] 获取光标位置失败，使用保存的位置:', e);
+    start = currentSelectionStart.value;
+    end = currentSelectionEnd.value;
   }
 
   // 确保位置在有效范围内
   const validStart = Math.max(0, Math.min(start, mainContent.value.length));
   const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+
+  console.log('[Mermaid编辑器] 有效光标位置:', { validStart, validEnd, contentLength: mainContent.value.length });
 
   // 尝试提取Mermaid代码块（使用 mainContent，确保索引匹配）
   const mermaidCode = extractMermaidCode(mainContent.value, validStart, validEnd);
@@ -2082,35 +2104,39 @@ const openFormulaEditor = () => {
 
   // 先同步编辑器内容到 mainContent（如果编辑器有焦点，内容可能不同步）
   const currentEditorText = getTextContent(editor);
-
-  // 获取光标位置：优先使用保存的位置，如果编辑器有焦点则获取当前位置
-  let start = currentSelectionStart.value;
-  let end = currentSelectionEnd.value;
-
-  // 如果编辑器有焦点，尝试获取当前光标位置（可能更准确）
-  if (isEditorFocused.value || document.activeElement === editor) {
-    try {
-      const position = getCursorPosition(editor);
-      // 只有在位置有效时才使用
-      if (position.start >= 0 && position.end >= 0) {
-        start = position.start;
-        end = position.end;
-      }
-    } catch (e) {
-      // 如果获取位置失败，使用保存的位置
-      console.warn('[公式编辑器] 获取光标位置失败，使用保存的位置:', e);
-    }
-  }
-
-  // 同步内容
   if (currentEditorText !== mainContent.value) {
     mainContent.value = currentEditorText;
     content.value = mergeContent(frontmatter.value, mainContent.value);
   }
 
+  // 强制获取当前光标位置（必须在编辑器失去焦点之前）
+  let start = 0;
+  let end = 0;
+
+  try {
+    // 总是尝试获取当前光标位置，无论编辑器是否有焦点
+    const position = getCursorPosition(editor);
+    if (position.start >= 0 && position.end >= 0) {
+      start = position.start;
+      end = position.end;
+      console.log('[公式编辑器] 获取到光标位置:', { start, end });
+    } else {
+      // 如果获取失败，使用保存的位置
+      start = currentSelectionStart.value;
+      end = currentSelectionEnd.value;
+      console.log('[公式编辑器] 使用保存的光标位置:', { start, end });
+    }
+  } catch (e) {
+    console.warn('[公式编辑器] 获取光标位置失败，使用保存的位置:', e);
+    start = currentSelectionStart.value;
+    end = currentSelectionEnd.value;
+  }
+
   // 确保位置在有效范围内
   const validStart = Math.max(0, Math.min(start, mainContent.value.length));
   const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+
+  console.log('[公式编辑器] 有效光标位置:', { validStart, validEnd, contentLength: mainContent.value.length });
 
   // 尝试提取公式代码（使用 mainContent，确保索引匹配）
   const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd);
@@ -2197,7 +2223,7 @@ const determineFormulaType = (content: string, start: number, end: number): 'inl
   return 'inline';
 };
 
-const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inline' | 'block' } | string) => {
+const handleFormulaSave = async (formulaData: { latexCode: string; formulaType: 'inline' | 'block' } | string) => {
   const editor = editorElement.value;
   if (!editor) return;
 
@@ -2221,13 +2247,56 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   let newMainContent = mainContent.value;
 
   // 根据公式类型格式化代码
-  const formattedFormula = formulaType === 'block'
+  let formattedFormula = formulaType === 'block'
     ? `$$${latexCode}$$`
     : `$${latexCode}$`;
 
   // 确保位置有效
   const validStart = Math.max(0, Math.min(start, newMainContent.length));
   const validEnd = Math.max(validStart, Math.min(end, newMainContent.length));
+
+  // 对于块级公式，需要确保前后有空行
+  if (formulaType === 'block') {
+    const textBefore = newMainContent.substring(0, validStart);
+    const textAfter = newMainContent.substring(validEnd);
+
+    // 检查前面是否需要空行
+    // 如果不在文档开头，且前面不是两个换行符（空行），则添加换行
+    let prefixNewlines = '';
+    if (textBefore.length > 0) {
+      // 检查前面是否已有足够的换行（至少一个空行）
+      if (!textBefore.endsWith('\n\n')) {
+        if (textBefore.endsWith('\n')) {
+          // 如果只有一个换行，再添加一个
+          prefixNewlines = '\n';
+        } else {
+          // 如果没有换行，添加两个（形成空行）
+          prefixNewlines = '\n\n';
+        }
+      }
+    }
+
+    // 检查后面是否需要空行
+    let suffixNewlines = '';
+    if (textAfter.length > 0) {
+      // 检查后面是否已有足够的换行（至少一个空行）
+      if (!textAfter.startsWith('\n\n')) {
+        if (textAfter.startsWith('\n')) {
+          // 如果只有一个换行，再添加一个
+          suffixNewlines = '\n';
+        } else {
+          // 如果没有换行，添加两个（形成空行）
+          suffixNewlines = '\n\n';
+        }
+      }
+    }
+
+    // 更新格式化后的公式，包含必要的空行
+    formattedFormula = prefixNewlines + formattedFormula + suffixNewlines;
+  }
+
+  // 计算新的光标位置（插入公式后的位置）
+  let newCursorPosition = validStart + formattedFormula.length;
 
   // 替换或插入公式
   if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
@@ -2240,18 +2309,36 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   mainContent.value = newMainContent;
   content.value = mergeContent(frontmatter.value, mainContent.value);
 
-  // 更新编辑器显示
-  if (!isEditorFocused.value) {
-    // 编辑器没有焦点时，应用标注
-    applyEditorAnnotations();
-  } else {
-    // 编辑器有焦点时，直接更新文本内容
-    editor.textContent = mainContent.value;
+  // 关闭编辑器对话框
+  closeFormulaEditor();
+
+  // 更新编辑器显示（使用与 Mermaid 相同的方式）
+  const wasFocused = isEditorFocused.value;
+  isEditorFocused.value = false;
+
+  // 应用标注（异步等待完成）
+  await applyEditorAnnotations();
+
+  // 等待DOM更新
+  await nextTick();
+
+  // 设置光标位置
+  setCursorPosition(editor, newCursorPosition);
+
+  // 更新保存的光标位置
+  currentSelectionStart.value = newCursorPosition;
+  currentSelectionEnd.value = newCursorPosition;
+
+  // 给编辑器焦点
+  editor.focus();
+  
+  // 恢复焦点状态
+  if (wasFocused) {
+    isEditorFocused.value = true;
   }
 
   checkChanges();
   renderContent();
-  showFormulaEditor.value = false;
 };
 
 const closeFormulaEditor = () => {

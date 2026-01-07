@@ -1111,14 +1111,26 @@ ipcMain.handle('export:pdf', async (event, options) => {
       page.setDefaultTimeout(30000);
       page.setDefaultNavigationTimeout(30000);
 
-      // 设置内容，使用更宽松的等待策略
+      // 设置内容，等待网络资源（包括 KaTeX CSS）加载完成
       await page.setContent(options.html || options.content || '', { 
-        waitUntil: 'domcontentloaded',  // 改用 domcontentloaded，更快且更稳定
-        timeout: 20000 
+        waitUntil: 'networkidle0',  // 等待网络空闲，确保外部资源（CSS、字体）加载完成
+        timeout: 30000 
       });
 
-      // 等待基础渲染完成
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // 额外等待，确保 KaTeX 字体加载完成
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // 检查页面加载状态
+      const loadStatus = await page.evaluate(() => {
+        const katexElements = document.querySelectorAll('.katex');
+        const katexStyles = document.querySelector('link[href*="katex"]');
+        return {
+          katexCount: katexElements.length,
+          hasKatexCSS: !!katexStyles,
+          katexCSSHref: katexStyles ? katexStyles.getAttribute('href') : null
+        };
+      });
+      console.log('[PDF Export] 页面加载状态:', loadStatus);
 
       // 等待 KaTeX 和 Mermaid 渲染（带超时保护）
       try {
