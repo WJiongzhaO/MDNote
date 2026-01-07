@@ -88,24 +88,76 @@ export function useDocuments() {
   };
 
   const deleteDocument = async (id: string) => {
+    console.log('[useDocuments] 开始删除文档:', id);
+    console.log('[useDocuments] 当前文档:', currentDocument.value?.id);
+    console.log('[useDocuments] 文档列表长度:', documents.value.length);
+    
     isLoading.value = true;
     error.value = null;
 
     try {
-      await documentUseCases.deleteDocument(id);
-      documents.value = documents.value.filter(doc => doc.id !== id);
+      const isCurrentDocument = currentDocument.value?.id === id;
+      console.log('[useDocuments] 是否删除当前文档:', isCurrentDocument);
+      
+      // 如果删除的是当前文档，先找到下一个要打开的文档
+      let nextDocToOpen: DocumentListItem | null = null;
+      if (isCurrentDocument && documents.value.length > 1) {
+        // 找到当前文档的索引
+        const currentIndex = documents.value.findIndex(doc => doc.id === id);
+        console.log('[useDocuments] 当前文档索引:', currentIndex);
+        
+        if (currentIndex !== -1) {
+          // 优先选择下一个文档，如果是最后一个则选择上一个
+          if (currentIndex < documents.value.length - 1) {
+            nextDocToOpen = documents.value[currentIndex + 1];
+            console.log('[useDocuments] 将打开下一个文档:', nextDocToOpen.title);
+          } else if (currentIndex > 0) {
+            nextDocToOpen = documents.value[currentIndex - 1];
+            console.log('[useDocuments] 将打开上一个文档:', nextDocToOpen.title);
+          }
+        }
+      }
 
-      if (currentDocument.value?.id === id) {
+      // 执行删除操作
+      await documentUseCases.deleteDocument(id);
+      console.log('[useDocuments] 删除操作完成');
+      
+      // 从列表中移除
+      documents.value = documents.value.filter(doc => doc.id !== id);
+      console.log('[useDocuments] 更新后文档列表长度:', documents.value.length);
+
+      // 如果删除的是当前文档
+      if (isCurrentDocument) {
+        console.log('[useDocuments] 清理当前文档状态');
+        // 立即设置为null，触发清理
         currentDocument.value = null;
+        
+        // 强制等待一帧，确保 Vue 的响应式更新完成
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        
+        // 如果有下一个文档要打开
+        if (nextDocToOpen) {
+          console.log('[useDocuments] 准备加载下一个文档:', nextDocToOpen.id);
+          try {
+            // 立即加载，不要延迟
+            await loadDocument(nextDocToOpen.id);
+            console.log('[useDocuments] 成功加载下一个文档');
+          } catch (err) {
+            console.error('[useDocuments] 加载下一个文档失败:', err);
+          }
+        } else {
+          console.log('[useDocuments] 没有下一个文档要打开');
+        }
       }
 
       return true;
     } catch (err) {
       error.value = 'Failed to delete document';
-      console.error('Error deleting document:', err);
+      console.error('[useDocuments] 删除文档错误:', err);
       return false;
     } finally {
       isLoading.value = false;
+      console.log('[useDocuments] 删除操作结束');
     }
   };
 

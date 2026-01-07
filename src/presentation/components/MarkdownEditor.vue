@@ -61,6 +61,11 @@
       />
     </div>
 
+    <!-- 调试信息 -->
+    <div v-if="!document && !currentFilePath" style="padding: 20px; color: red; background: #ffe;">
+      ⚠️ 调试：document={{!!document}}, currentFilePath={{currentFilePath}}
+    </div>
+    
     <div class="editor-content" v-if="document || currentFilePath">
       <div class="editor-pane">
         <div class="editor-label">Markdown 编辑器</div>
@@ -382,17 +387,33 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastSavedTitle = '';
 let lastSavedContent = '';
 
-watch(() => props.document, (newDocument) => {
+watch(() => props.document, (newDocument, oldDocument) => {
+  console.log('[MarkdownEditor] watch触发 - 新文档:', newDocument?.id, '旧文档:', oldDocument?.id);
+  console.log('[MarkdownEditor] 当前props.document:', !!newDocument, 'currentFilePath:', currentFilePath.value);
+  
   if (newDocument) {
+    console.log('[MarkdownEditor] 加载新文档:', newDocument.title);
+    // 每次加载新文档前，先强制关闭所有模态框
+    showMermaidEditor.value = false;
+    showFormulaEditor.value = false;
+    showExportConfigModal.value = false;
+    showExportProgress.value = false;
+    showExportMenu.value = false;
+    referenceContextMenu.value.visible = false;
+    console.log('[MarkdownEditor] ✅ 已关闭所有模态框');
+    
     // 检查是否是外部文件（包含 filePath 属性）
     const filePath = (newDocument as any).filePath;
+    console.log('[MarkdownEditor] 文档filePath:', filePath);
 
     // 如果是外部文件，保留 currentFilePath
     if (filePath) {
       currentFilePath.value = filePath;
+      console.log('[MarkdownEditor] 更新currentFilePath为:', currentFilePath.value);
     } else {
       // 数据库文档，清空外部文件路径
       currentFilePath.value = '';
+      console.log('[MarkdownEditor] 清空currentFilePath（数据库文档）');
     }
 
     title.value = newDocument.title;
@@ -408,22 +429,159 @@ watch(() => props.document, (newDocument) => {
 
     // 确保内容渲染
     nextTick(async () => {
+      console.log('[MarkdownEditor] 开始渲染新文档内容');
+      console.log('[MarkdownEditor] 文档标题:', title.value);
+      console.log('[MarkdownEditor] mainContent长度:', mainContent.value.length);
     renderContent();
+      console.log('[MarkdownEditor] renderContent调用完成');
+      
       // 更新编辑器内容（始终应用标注）
       const editor = editorElement.value;
       if (editor) {
-        await applyEditorAnnotations();
+      console.log('[MarkdownEditor] 应用编辑器标注');
+      await applyEditorAnnotations();
+      console.log('[MarkdownEditor] 标注应用完成，editor.textContent前100字符:', editor.textContent?.substring(0, 100));
+      
+      // 强制DOM重绘
+      if (editor) {
+        // 触发重排以确保浏览器更新视图
+        void editor.offsetHeight;
+        console.log('[MarkdownEditor] 强制DOM重绘完成');
+      }
+      
+      // 等待多次 nextTick 确保 DOM 完全更新
+      await nextTick();
+      await nextTick();
+      
+      console.log('[MarkdownEditor] 准备设置焦点，editor存在且已连接:', !!editor && editor.isConnected);
+      console.log('[MarkdownEditor] 编辑器当前textContent前50字符:', editor.textContent?.substring(0, 50));
+        
+        // 强制恢复焦点能力（无论什么情况下都设置）
+        if (editor && editor.isConnected) {
+          // 确保 contenteditable 属性存在
+          editor.removeAttribute('contenteditable'); // 先移除
+          editor.setAttribute('contenteditable', 'true'); // 再添加，强制浏览器重新识别
+          
+          // 移除任何可能阻止焦点的属性
+          editor.style.pointerEvents = 'auto';
+          editor.style.userSelect = 'text';
+          
+          // 强制聚焦（无论oldDocument是什么值）
+          console.log('[MarkdownEditor] 调用 editor.focus()');
+          // 使用 requestAnimationFrame 确保在浏览器渲染后执行
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => { // 再次使用 requestAnimationFrame 确保在 DOM 渲染后执行
+              if (editor && editor.isConnected) {
+                // 先 blur 再 focus，强制重置光标状态
+                editor.blur();
+                console.log('[MarkdownEditor] 已blur编辑器');
+                
+                // 等待一帧后再 focus，确保 blur 生效
+                requestAnimationFrame(() => {
+                  editor.focus();
+                  isEditorFocused.value = true;
+                  console.log('[MarkdownEditor] 焦点已设置');
+                  console.log('[MarkdownEditor] document.activeElement === editor:', document.activeElement === editor);
+                  
+                  // 将光标设置到开头
+                  const range = document.createRange();
+                  const selection = window.getSelection();
+                  if (editor.firstChild) {
+                    range.setStart(editor.firstChild, 0);
+                    range.collapse(true);
+                    selection?.removeAllRanges();
+                    selection?.addRange(range);
+                    console.log('[MarkdownEditor] 光标已设置到开头');
+                  } else {
+                    // 如果编辑器为空，确保光标在可编辑区域内
+                    // 对于空编辑器，需要特殊处理以确保光标可见
+                    const range = document.createRange();
+                    const selection = window.getSelection();
+                    range.selectNodeContents(editor);
+                    range.collapse(true);
+                    selection?.removeAllRanges();
+                    selection?.addRange(range);
+                    console.log('[MarkdownEditor] 编辑器为空，已设置光标到空容器');
+                  }
+                  
+                  // 强制触发光标渲染：插入零宽字符再删除
+                  // 这是一种更可靠的方法，适用于打包后的 Electron 应用
+                  try {
+                    // 方法1: 使用 document.execCommand (兼容性更好)
+                    if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+                      document.execCommand('insertText', false, '\u200B'); // 插入零宽空格
+                      document.execCommand('delete', false, null); // 立即删除
+                      console.log('[MarkdownEditor] 使用 execCommand 强制光标渲染');
+                    } else {
+                      // 方法2: 手动插入文本节点
+                      const textNode = document.createTextNode('\u200B');
+                      const selection = window.getSelection();
+                      if (selection && selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        range.insertNode(textNode);
+                        range.setStartAfter(textNode);
+                        range.collapse(true);
+                        textNode.remove();
+                        console.log('[MarkdownEditor] 使用文本节点强制光标渲染');
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('[MarkdownEditor] 强制光标渲染失败:', e);
+                  }
+                  
+                  console.log('[MarkdownEditor] 光标渲染优化完成');
+                });
+              } else {
+                console.warn('[MarkdownEditor] 编辑器元素未连接到DOM，无法设置焦点');
+              }
+            });
+          });
+        } else {
+          console.warn('[MarkdownEditor] 编辑器元素不存在或未连接到DOM，无法设置焦点');
+        }
       }
     });
   }
-  // 注意：当document为null时，不清空内容，因为可能是外部文件
-  // 但如果之前有document，现在变为null，且没有外部文件路径，则清空
-  else if (!currentFilePath.value && !content.value) {
-    // 只有在既没有document也没有外部文件且内容为空时才清空
+  // 当文档变为null时（如删除文档），强制关闭所有模态框并重置状态
+  else {
+    console.log('[MarkdownEditor] 文档变为null，清理状态');
+    console.log('[MarkdownEditor] 当前currentFilePath:', currentFilePath.value);
+    
+    // 关闭所有可能打开的模态框（这些模态框可能会阻止焦点）
+    showMermaidEditor.value = false;
+    showFormulaEditor.value = false;
+    showExportConfigModal.value = false;
+    showExportProgress.value = false;
+    showExportMenu.value = false;
+    referenceContextMenu.value.visible = false;
+    console.log('[MarkdownEditor] 已关闭所有模态框');
+    
+    // ⚠️ 关键修复：无论 currentFilePath 是否存在，都清空状态
+    // 因为文档已经变为 null，说明没有文档被选中
+    console.log('[MarkdownEditor] 强制清空所有状态（因为document为null）');
+    
+    // 先清空 currentFilePath
+    currentFilePath.value = '';
+    
+    // 然后清空所有内容和状态
     title.value = '';
     content.value = '';
     renderedContent.value = '';
+    mainContent.value = '';
+    frontmatter.value = '';
     hasChanges.value = false;
+    isEditorFocused.value = false;
+    
+    // 清空编辑器内容
+    const editor = editorElement.value;
+    if (editor) {
+      editor.textContent = '';
+      editor.blur();
+      editor.removeAttribute('contenteditable'); // 移除 contenteditable 属性
+      console.log('[MarkdownEditor] 编辑器内容已清空，contenteditable已移除');
+    }
+    
+    console.log('[MarkdownEditor] 状态清理完成');
   }
 }, { immediate: true });
 
@@ -617,6 +775,12 @@ const handleEditorFocus = () => {
   // 不立即切换为纯文本，保持标注显示
   // 只有在用户真正输入时才处理
   isEditorFocused.value = true;
+  
+  // 防御性检查：确保 contenteditable 属性正确
+  const editor = editorElement.value;
+  if (editor && (!editor.hasAttribute('contenteditable') || editor.getAttribute('contenteditable') !== 'true')) {
+    editor.setAttribute('contenteditable', 'true');
+  }
 };
 
 // 处理编辑器鼠标按下事件（在失去焦点之前保存光标位置）
@@ -1257,6 +1421,7 @@ const getReferenceMetadata = async (docId?: string): Promise<Array<{ fragmentId:
 
 // 渲染预览内容
 const renderContent = async () => {
+  console.log('[renderContent] 开始渲染，mainContent长度:', mainContent.value?.length);
   // 只要有内容就渲染，即使是空字符串也要渲染（可能是新文件）
   if (mainContent.value !== undefined && mainContent.value !== null) {
     try {
@@ -1407,6 +1572,8 @@ const renderContent = async () => {
           // 切换活动缓冲区索引（这会触发CSS类变化，实现平滑过渡）
           activePreviewIndex.value = nextBufferIndex;
           renderedContent.value = newRenderedContent;
+          console.log('[renderContent] 渲染完成，HTML前100字符:', newRenderedContent.substring(0, 100));
+          console.log('[renderContent] 预览区域元素存在:', !!nextPreviewElement.value);
 
           // 更新 previewElement 引用以保持兼容性
           previewElement.value = nextPreviewElement.value || undefined;
@@ -3322,6 +3489,21 @@ const handleEditorClick = async (event: MouseEvent) => {
   } else {
     // 点击其他地方，关闭菜单
     referenceContextMenu.value.visible = false;
+    
+    // 确保编辑器可以获得焦点（修复删除文件后打开新文件光标消失的问题）
+    if (!isEditorFocused.value) {
+      // 确保 contenteditable 属性存在
+      if (!editor.hasAttribute('contenteditable') || editor.getAttribute('contenteditable') !== 'true') {
+        editor.setAttribute('contenteditable', 'true');
+      }
+      // 强制聚焦
+      setTimeout(() => {
+        if (editor && editor.isConnected) {
+          editor.focus();
+          isEditorFocused.value = true;
+        }
+      }, 0);
+    }
   }
 };
 
@@ -3974,6 +4156,11 @@ defineExpose({
   overflow-x: hidden;
   white-space: pre-wrap;
   word-wrap: break-word;
+  /* 确保光标可见 - 关键属性 */
+  caret-color: var(--editor-text);
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
 }
 
 .markdown-editor-content:empty:before {

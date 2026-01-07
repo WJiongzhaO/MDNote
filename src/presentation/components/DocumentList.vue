@@ -24,16 +24,26 @@
         class="document-item"
         :class="{ active: document.id === activeDocumentId }"
         @click="$emit('select-document', document.id)"
+        @contextmenu.prevent="handleContextMenu($event, document)"
         draggable="true"
         @dragstart="handleDragStart($event, document)"
         @dragend="handleDragEnd"
       >
+        <div class="document-content">
         <div class="document-title">
           {{ document.title || '无标题' }}
         </div>
         <div class="document-date">
           {{ formatDate(document.updatedAt) }}
         </div>
+        </div>
+        <button 
+          class="delete-btn" 
+          @click.stop="handleDeleteClick(document)"
+          title="删除文档"
+        >
+          🗑️
+        </button>
       </div>
 
       <div v-if="documents.length === 0 && !isLoading" class="empty-state">
@@ -65,12 +75,17 @@ interface Emits {
   (e: 'create-new'): void;
   (e: 'search', query: string): void;
   (e: 'move-document', documentId: string, targetFolderId: string | null): void;
+  (e: 'delete-document', id: string): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const searchQuery = ref('');
+const contextMenuVisible = ref(false);
+const contextMenuX = ref(0);
+const contextMenuY = ref(0);
+const contextMenuDocument = ref<DocumentListItem | null>(null);
 
 const filteredDocuments = computed(() => {
   if (!searchQuery.value.trim()) {
@@ -108,6 +123,19 @@ const formatDate = (date: Date): string => {
     const years = Math.floor(diffDays / 365);
     return `${years} 年前`;
   }
+};
+
+const handleDeleteClick = (document: DocumentListItem) => {
+  if (confirm(`确定要删除文档"${document.title}"吗？此操作不可撤销。`)) {
+    emit('delete-document', document.id);
+  }
+};
+
+const handleContextMenu = (event: MouseEvent, document: DocumentListItem) => {
+  contextMenuDocument.value = document;
+  contextMenuX.value = event.clientX;
+  contextMenuY.value = event.clientY;
+  contextMenuVisible.value = true;
 };
 
 const handleDragStart = (event: DragEvent, document: any) => {
@@ -202,6 +230,10 @@ const handleDragEnd = () => {
   border-bottom: 1px solid var(--border-secondary);
   cursor: pointer;
   transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .document-item:hover {
@@ -211,6 +243,11 @@ const handleDragEnd = () => {
 .document-item.active {
   background: var(--bg-active);
   border-left: 3px solid var(--accent-primary);
+}
+
+.document-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .document-title {
@@ -225,6 +262,28 @@ const handleDragEnd = () => {
 .document-date {
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+.delete-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+}
+
+.document-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: var(--accent-danger);
+  color: white;
+  transform: scale(1.1);
 }
 
 .empty-state {

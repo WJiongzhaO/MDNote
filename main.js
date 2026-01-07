@@ -1072,36 +1072,73 @@ ipcMain.handle('export:pdf', async (event, options) => {
       });
 
       const page = await browser.newPage();
+      
+      // 设置页面默认超时（30秒）
+      page.setDefaultTimeout(30000);
+      page.setDefaultNavigationTimeout(30000);
 
-      // 设置内容，等待所有资源加载完成（包括图片和 CSS）
-      await page.setContent(options.html || options.content || '', { waitUntil: 'networkidle0' });
-
-      // 等待 KaTeX 公式渲染
-      await page.evaluate(() => {
-        return new Promise((resolve) => {
-          // 给 KaTeX 一些时间来渲染
-          setTimeout(resolve, 500);
-        });
+      // 设置内容，使用更宽松的等待策略
+      await page.setContent(options.html || options.content || '', { 
+        waitUntil: 'domcontentloaded',  // 改用 domcontentloaded，更快且更稳定
+        timeout: 20000 
       });
 
-      // 等待 Mermaid 图表渲染（如果有）
-      await page.evaluate(async () => {
-        const maxAttempts = 20; // 最多尝试 20 次
-        const delay = 500; // 每次尝试间隔 500ms
-        let attempts = 0;
+      // 等待基础渲染完成
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-        while (attempts < maxAttempts) {
-          const mermaidPlaceholders = document.querySelectorAll('.mermaid-asset-placeholder');
-          if (mermaidPlaceholders.length === 0) {
-            console.log('所有Mermaid图表已渲染。');
-            return; // 所有占位符都已消失，渲染完成
-          }
-          console.log(`等待Mermaid图表渲染... 剩余 ${mermaidPlaceholders.length} 个占位符。尝试 ${attempts + 1}/${maxAttempts}`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          attempts++;
-        }
-        console.warn('Mermaid图表渲染超时，可能部分图表未渲染。');
-      });
+      // 等待 KaTeX 和 Mermaid 渲染（带超时保护）
+      try {
+        await Promise.race([
+          // 主渲染逻辑
+          page.evaluate(() => {
+            return new Promise((resolve) => {
+              // 等待 KaTeX 渲染
+              setTimeout(() => {
+                // 检查 Mermaid 占位符
+                const checkAndWaitMermaid = () => {
+                  const placeholders = document.querySelectorAll('.mermaid-asset-placeholder');
+                  
+                  if (placeholders.length === 0) {
+                    console.log('[PDF Export] 所有资源已就绪');
+                    resolve();
+                    return;
+                  }
+
+                  console.log(`[PDF Export] 等待 ${placeholders.length} 个 Mermaid 图表渲染`);
+                  
+                  // 使用 setInterval 定期检查，最多等待 8 秒
+                  let attempts = 0;
+                  const maxAttempts = 16;
+                  const interval = setInterval(() => {
+                    attempts++;
+                    const remaining = document.querySelectorAll('.mermaid-asset-placeholder');
+                    
+                    if (remaining.length === 0) {
+                      clearInterval(interval);
+                      console.log('[PDF Export] Mermaid 图表渲染完成');
+                      resolve();
+                    } else if (attempts >= maxAttempts) {
+                      clearInterval(interval);
+                      console.warn(`[PDF Export] 部分图表可能未完全渲染（剩余 ${remaining.length} 个）`);
+                      resolve(); // 超时后也继续，不中断导出
+                    }
+                  }, 500);
+                };
+
+                checkAndWaitMermaid();
+              }, 500);
+            });
+          }),
+          // 超时保护（12秒）
+          new Promise((resolve) => setTimeout(() => {
+            console.warn('[PDF Export] 渲染等待超时，继续生成PDF');
+            resolve();
+          }, 12000))
+        ]);
+      } catch (evaluateError) {
+        console.warn('[PDF Export] 渲染等待出错，继续生成PDF:', evaluateError.message);
+        // 即使等待失败也继续生成 PDF
+      }
 
       // 生成 PDF
       const pdfBuffer = await page.pdf({
@@ -1129,24 +1166,72 @@ ipcMain.handle('export:pdf', async (event, options) => {
         filename: (options.title || 'document').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '.pdf'
       };
 
-      // 关闭浏览器并处理可能的错误
-      try {
-        await browser.close();
-        // 添加短暂延迟以确保资源完全释放
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (closeError) {
-        console.warn('[Main Process] Browser close warning:', closeError.message);
-        // 即使关闭失败也继续，因为 PDF 已经生成
+      // 改进的浏览器关闭逻辑
+      if (browser) {
+        try {
+          // 先尝试关闭所有页面
+          const pages = await browser.pages();
+          await Promise.all(pages.map(async (p) => {
+            try {
+              if (!p.isClosed()) {
+                await p.close();
+              }
+            } catch (e) {
+              // 忽略单个页面关闭错误
+            }
+          }));
+          
+          // 然后关闭浏览器
+          await browser.close();
+          
+          // 添加延迟确保资源释放
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (closeError) {
+          console.warn('[Main Process] Browser close warning:', closeError.message);
+          // 尝试强制终止浏览器进程
+          try {
+            const browserProcess = browser.process();
+            if (browserProcess && !browserProcess.killed) {
+              browserProcess.kill('SIGTERM');
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+          } catch (killError) {
+            // 忽略终止错误
+          }
+        }
       }
 
       return result;
     } catch (error) {
-      // 确保浏览器被关闭
+      console.error('[Main Process] PDF export error:', error);
+      
+      // 确保浏览器被关闭（增强的错误处理）
       if (browser) {
         try {
+          const pages = await browser.pages();
+          await Promise.all(pages.map(async (p) => {
+            try {
+              if (!p.isClosed()) {
+                await p.close();
+              }
+            } catch (e) {
+              // 忽略
+            }
+          }));
+          
           await browser.close();
+          await new Promise(resolve => setTimeout(resolve, 300));
         } catch (closeError) {
           console.warn('[Main Process] Error closing browser after failure:', closeError.message);
+          // 强制终止
+          try {
+            const browserProcess = browser.process();
+            if (browserProcess && !browserProcess.killed) {
+              browserProcess.kill('SIGTERM');
+            }
+          } catch (killError) {
+            // 忽略
+          }
         }
       }
       throw error;
