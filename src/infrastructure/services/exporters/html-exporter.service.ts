@@ -3,7 +3,9 @@ import { TYPES } from '../../../core/container/container.types';
 import type { DocumentExportService, ExportOptions, ExportResult } from '../../../domain/services/document-export.interface';
 import { ExportFormat } from '../../../domain/services/document-export.interface';
 import type { ExtensibleMarkdownProcessor } from '../../../domain/services/extensible-markdown-processor.domain.service';
+import { ExportPresets } from '../../../domain/types/export-config.types';
 import { processImagesInHTML, getKaTeXStyles } from './export-utils';
+import { generateStylesFromConfig, generateTableOfContents } from './export-style-generator';
 
 /**
  * HTML导出器
@@ -23,6 +25,9 @@ export class HTMLExporter implements DocumentExportService {
   async export(options: ExportOptions): Promise<ExportResult> {
     const { title, content, documentId, variables = {} } = options;
 
+    // 使用配置（如果没有提供，使用默认配置）
+    const exportConfig = options.config || ExportPresets.default;
+
     // 1. 处理Markdown内容（包括片段引用、变量替换等）
     let html = await this.markdownProcessor.processMarkdown(content, variables);
 
@@ -34,10 +39,16 @@ export class HTMLExporter implements DocumentExportService {
     // 3. 处理 Mermaid 图表：确保所有图表都已渲染为 SVG
     html = await this.processMermaidDiagrams(html);
 
-    // 4. 创建完整的HTML文档（包含 KaTeX CSS 和所有内联样式）
-    const fullHtml = this.createHTMLDocument(title, html, options.customStyles);
+    // 4. 生成目录（如果需要）
+    let tocHtml = '';
+    if (exportConfig.includeTableOfContents) {
+      tocHtml = generateTableOfContents(html);
+    }
 
-    // 5. 生成文件名
+    // 5. 创建完整的HTML文档（使用配置样式）
+    const fullHtml = this.createHTMLDocument(title, html, exportConfig, tocHtml);
+
+    // 6. 生成文件名
     const filename = this.sanitizeFilename(title) + '.html';
 
     // 使用 TextEncoder 生成 ArrayBuffer（浏览器兼容）
@@ -133,122 +144,37 @@ export class HTMLExporter implements DocumentExportService {
   /**
    * 创建完整的HTML文档
    */
-  private createHTMLDocument(title: string, content: string, customStyles?: string): string {
-    const defaultStyles = `
+  private createHTMLDocument(title: string, content: string, config: any, tocHtml: string): string {
+    // 生成基于配置的样式
+    const configStyles = generateStylesFromConfig(config);
+
+    // 添加 KaTeX CSS 支持
+    const katexStyles = getKaTeXStyles();
+
+    // 额外的网页优化样式
+    const webOptimizedStyles = `
       <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
         body {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          max-width: 800px;
+          max-width: 900px;
           margin: 0 auto;
-          padding: 2em;
-          background-color: #fff;
+          background-color: white;
         }
-        h1 {
-          font-size: 2em;
-          margin-top: 1em;
-          margin-bottom: 0.5em;
-          border-bottom: 2px solid #ddd;
-          padding-bottom: 0.3em;
+        
+        .table-of-contents {
+          background: #f8f9fa;
+          padding: 1.5rem;
+          border-radius: 6px;
+          margin-bottom: 2rem;
+          border-left: 4px solid #007bff;
         }
-        h2 {
-          font-size: 1.5em;
-          margin-top: 1em;
-          margin-bottom: 0.5em;
-          border-bottom: 1px solid #eee;
-          padding-bottom: 0.2em;
-        }
-        h3 {
-          font-size: 1.25em;
-          margin-top: 0.8em;
-          margin-bottom: 0.4em;
-        }
-        h4, h5, h6 {
-          margin-top: 0.6em;
-          margin-bottom: 0.3em;
-        }
-        p {
-          margin: 0.5em 0;
-        }
-        ul, ol {
-          margin: 0.5em 0;
-          padding-left: 2em;
-        }
-        li {
-          margin: 0.2em 0;
-        }
-        code {
-          background-color: #f4f4f4;
-          padding: 2px 6px;
-          border-radius: 3px;
-          font-family: "Consolas", "Monaco", monospace;
-          font-size: 0.9em;
-        }
-        pre {
-          background-color: #f4f4f4;
-          padding: 1em;
-          border-radius: 5px;
-          overflow-x: auto;
-          margin: 1em 0;
-        }
-        pre code {
-          background-color: transparent;
-          padding: 0;
-        }
-        blockquote {
-          border-left: 4px solid #ddd;
-          padding-left: 1em;
-          margin-left: 0;
-          color: #666;
-          font-style: italic;
-        }
-        table {
-          border-collapse: collapse;
-          width: 100%;
-          margin: 1em 0;
-        }
-        table th, table td {
-          border: 1px solid #ddd;
-          padding: 8px;
-          text-align: left;
-        }
-        table th {
-          background-color: #f2f2f2;
-          font-weight: bold;
-        }
-        img {
-          max-width: 100%;
-          height: auto;
-        }
-        hr {
-          border: none;
-          border-top: 1px solid #ddd;
-          margin: 2em 0;
-        }
-        a {
-          color: #0066cc;
-          text-decoration: none;
-        }
-        a:hover {
-          text-decoration: underline;
-        }
-        @media print {
+        
+        @media screen and (max-width: 768px) {
           body {
-            max-width: 100%;
-            padding: 0;
+            padding: 1rem;
           }
         }
       </style>
     `;
-
-    // 添加 KaTeX CSS 支持
-    const katexStyles = getKaTeXStyles();
 
     return `
       <!DOCTYPE html>
@@ -258,12 +184,17 @@ export class HTMLExporter implements DocumentExportService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${this.escapeHtml(title)}</title>
           ${katexStyles}
-          ${defaultStyles}
-          ${customStyles || ''}
+          ${configStyles}
+          ${webOptimizedStyles}
         </head>
         <body>
-          <h1>${this.escapeHtml(title)}</h1>
+          ${tocHtml}
           ${content}
+          ${config.includeFooter && config.footerText ? `
+            <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 0.9em;">
+              ${config.footerText}
+            </footer>
+          ` : ''}
         </body>
       </html>
     `;

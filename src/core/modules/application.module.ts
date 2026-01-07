@@ -36,7 +36,6 @@ import { VariableUseCases } from '../../application/usecases/variable.usecases';
 // 导出服务
 import { ExportUseCases } from '../../application/usecases/export.usecases';
 import { ExportFactory } from '../../infrastructure/services/export-factory.service';
-import { WordExporter } from '../../infrastructure/services/exporters/word-exporter.service';
 import { PDFExporter } from '../../infrastructure/services/exporters/pdf-exporter.service';
 import { HTMLExporter } from '../../infrastructure/services/exporters/html-exporter.service';
 import { MarkdownExporter } from '../../infrastructure/services/exporters/markdown-exporter.service';
@@ -167,9 +166,6 @@ export class ApplicationModule {
       .toSingleton(VariableUseCases);
 
     // 配置导出服务（使用类作为标识符，因为它们是具体的类）
-    container.bind<WordExporter>(WordExporter as any)
-      .to(WordExporter);
-
     container.bind<PDFExporter>(PDFExporter as any)
       .to(PDFExporter);
 

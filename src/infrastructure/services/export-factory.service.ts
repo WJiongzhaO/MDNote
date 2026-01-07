@@ -1,7 +1,6 @@
 import { injectable, inject } from 'inversify';
 import type { DocumentExportService } from '../../domain/services/document-export.interface';
 import { ExportFormat } from '../../domain/services/document-export.interface';
-import { WordExporter } from './exporters/word-exporter.service';
 import { PDFExporter } from './exporters/pdf-exporter.service';
 import { HTMLExporter } from './exporters/html-exporter.service';
 import { MarkdownExporter } from './exporters/markdown-exporter.service';
@@ -15,13 +14,11 @@ export class ExportFactory {
   private exporters: Map<ExportFormat, DocumentExportService> = new Map();
 
   constructor(
-    @inject(WordExporter) private readonly wordExporter: WordExporter,
     @inject(PDFExporter) private readonly pdfExporter: PDFExporter,
     @inject(HTMLExporter) private readonly htmlExporter: HTMLExporter,
     @inject(MarkdownExporter) private readonly markdownExporter: MarkdownExporter
   ) {
     // 注册所有导出器
-    this.exporters.set(ExportFormat.WORD, wordExporter);
     this.exporters.set(ExportFormat.PDF, pdfExporter);
     this.exporters.set(ExportFormat.HTML, htmlExporter);
     this.exporters.set(ExportFormat.MARKDOWN, markdownExporter);

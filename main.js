@@ -605,6 +605,17 @@ ipcMain.handle('fragment:get-full-path', async (event, relativePath) => {
   }
 });
 
+// ==================== 对话框 IPC 处理 ====================
+ipcMain.handle('dialog:showSaveDialog', async (event, options) => {
+  try {
+    const result = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow(), options);
+    return result;
+  } catch (error) {
+    console.error('Error showing save dialog:', error);
+    throw error;
+  }
+});
+
 // ==================== 图片和文件操作 IPC 处理 ====================
 ipcMain.handle('file:copy', async (event, sourcePath, destPath) => {
   try {
@@ -1036,7 +1047,9 @@ ipcMain.handle('file:delete-file-cache', async (event, filePath) => {
 // ==================== PDF 导出 IPC 处理器 ====================
 ipcMain.handle('export:pdf', async (event, options) => {
   try {
-    console.log('[Main Process] PDF export requested:', options.title);
+    // 从 options 中提取文件名（如果有的话）
+    const fileName = options.filename || options.title || 'document';
+    console.log('[Main Process] PDF export requested:', fileName);
 
     // 直接使用 Puppeteer 生成 PDF，不依赖 TypeScript 编译后的文件
     // 渲染进程已经准备好了 HTML 内容，我们只需要使用 Puppeteer 生成 PDF
@@ -1044,16 +1057,32 @@ ipcMain.handle('export:pdf', async (event, options) => {
 
     let browser;
     try {
-      // 启动浏览器
+      // 启动浏览器（添加更多参数以避免文件锁定问题）
       browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
       });
 
       const page = await browser.newPage();
 
       // 设置内容，等待所有资源加载完成（包括图片和 CSS）
       await page.setContent(options.html || options.content || '', { waitUntil: 'networkidle0' });
+
+      // 等待 KaTeX 公式渲染
+      await page.evaluate(() => {
+        return new Promise((resolve) => {
+          // 给 KaTeX 一些时间来渲染
+          setTimeout(resolve, 500);
+        });
+      });
 
       // 等待 Mermaid 图表渲染（如果有）
       await page.evaluate(async () => {
@@ -1086,23 +1115,39 @@ ipcMain.handle('export:pdf', async (event, options) => {
         printBackground: true
       });
 
-      await browser.close();
-
       console.log('[Main Process] PDF export completed, buffer size:', pdfBuffer.length);
 
       // 将 Buffer 转换为 Array（用于 IPC 传输）
       const bufferArray = Array.from(pdfBuffer);
 
-      return {
+      // 先准备返回值，然后关闭浏览器
+      const result = {
         success: true,
         buffer: bufferArray,
         extension: 'pdf',
         mimeType: 'application/pdf',
         filename: (options.title || 'document').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '.pdf'
       };
-    } catch (error) {
-      if (browser) {
+
+      // 关闭浏览器并处理可能的错误
+      try {
         await browser.close();
+        // 添加短暂延迟以确保资源完全释放
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (closeError) {
+        console.warn('[Main Process] Browser close warning:', closeError.message);
+        // 即使关闭失败也继续，因为 PDF 已经生成
+      }
+
+      return result;
+    } catch (error) {
+      // 确保浏览器被关闭
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (closeError) {
+          console.warn('[Main Process] Error closing browser after failure:', closeError.message);
+        }
       }
       throw error;
     }

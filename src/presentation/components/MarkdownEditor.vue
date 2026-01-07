@@ -9,18 +9,18 @@
         @blur="updateDocument"
       />
       <div v-else class="title-placeholder">请选择或创建文档</div>
-
+      
       <div v-if="document || currentFilePath" class="editor-toolbar">
-        <button
-          class="toolbar-btn"
+        <button 
+          class="toolbar-btn" 
           @click="openMermaidEditor"
           title="编辑Mermaid图表"
         >
           📊 Mermaid编辑器
         </button>
         <!-- 添加公式编辑器按钮 -->
-        <button
-          class="toolbar-btn"
+        <button 
+          class="toolbar-btn" 
           @click="openFormulaEditor"
           title="编辑数学公式"
         >
@@ -36,9 +36,6 @@
             📤 导出
           </button>
           <div v-if="showExportMenu" class="export-dropdown" @click.stop>
-            <div class="export-item" @click="handleExport('word')">
-              📄 Word (.docx)
-            </div>
             <div class="export-item" @click="handleExport('pdf')">
               📕 PDF (.pdf)
             </div>
@@ -49,8 +46,8 @@
               📝 Markdown (.md)
             </div>
           </div>
-        </div>
       </div>
+    </div>
 
       <!-- 新增：格式化工具栏 -->
       <EditorToolbar
@@ -199,6 +196,26 @@
         />
       </div>
     </div>
+
+    <!-- 导出配置模态框 -->
+    <ExportConfigModal
+      :show="showExportConfigModal"
+      :format="pendingExportFormat"
+      :default-file-name="getDefaultFileName()"
+      @confirm="handleExportConfigConfirm"
+      @cancel="handleExportConfigCancel"
+    />
+
+    <!-- 导出进度模态框 -->
+    <ExportProgressModal
+      :show="showExportProgress"
+      :file-name="exportingFileName"
+      :format="exportingFormat"
+      :progress="exportProgress"
+      :status="exportStatus"
+      :status-message="exportStatusMessage"
+      @close="showExportProgress = false"
+    />
   </div>
 </template>
 
@@ -207,7 +224,10 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import MermaidEditor from './MermaidEditor.vue';
 import FormulaEditor from './FormulaEditor.vue';
 import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
+import ExportConfigModal from './ExportConfigModal.vue';
+import ExportProgressModal from './ExportProgressModal.vue';
 import type { DocumentResponse } from '../../application';
+import type { ExportConfig } from '../../domain/types/export-config.types';
 import { useAssetRenderer } from '../composables/useAssetRenderer';
 import { useImageUpload } from '../composables/useImageUpload';
 import { Application } from '../../core/application';
@@ -267,6 +287,18 @@ const currentFormulaType = ref<'inline' | 'block'>('inline');
 // 导出相关状态
 const showExportMenu = ref(false);
 const isExporting = ref(false);
+const showExportConfigModal = ref(false);
+const pendingExportFormat = ref<'pdf' | 'html' | 'markdown'>('pdf');
+const currentExportConfig = ref<ExportConfig | null>(null);
+
+// 进度条相关状态
+const showExportProgress = ref(false);
+const exportProgress = ref(0);
+const exportStatus = ref<'processing' | 'success' | 'error'>('processing');
+const exportStatusMessage = ref('');
+const exportingFileName = ref('');
+const exportingFormat = ref('');
+const exportingSavePath = ref('');
 
 /**
  * 分离 frontmatter 和正文内容
@@ -350,7 +382,7 @@ watch(() => props.document, (newDocument) => {
 
     // 确保内容渲染
     nextTick(async () => {
-      renderContent();
+    renderContent();
       // 更新编辑器内容（始终应用标注）
       const editor = editorElement.value;
       if (editor) {
@@ -1170,12 +1202,12 @@ const saveDocument = async () => {
 
   // 如果有document，保存到数据库
   if (props.document) {
-    try {
-      emit('update-document', props.document.id, title.value, content.value);
-      lastSavedTitle = title.value;
-      lastSavedContent = content.value;
-      hasChanges.value = false;
-    } catch (error) {
+  try {
+    emit('update-document', props.document.id, title.value, content.value);
+    lastSavedTitle = title.value;
+    lastSavedContent = content.value;
+    hasChanges.value = false;
+  } catch (error) {
       console.error('[保存] 保存数据库文档失败:', error);
       // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
     }
@@ -1694,9 +1726,9 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
   try {
     const selection = window.getSelection();
     if (!selection) {
-      return;
-    }
-
+    return;
+  }
+  
     // 确保位置在有效范围内
     const textContent = element.textContent || '';
     const maxPosition = textContent.length;
@@ -1822,25 +1854,25 @@ const extractMermaidCode = (content: string, start: number, end: number): string
     }
     return selectedText;
   }
-
+  
   // 如果没有选择文本，查找光标位置附近的Mermaid代码块
   const lines = content.split('\n');
   let currentLine = 0;
   let charCount = 0;
-
+  
   // 更精确地计算当前行号
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
     const lineLength = line.length + 1; // +1 for newline
-
+    
     if (charCount <= start && start < charCount + lineLength) {
       currentLine = i;
       break;
     }
     charCount += lineLength;
   }
-
+  
   // 向前查找Mermaid代码块开始
   let mermaidStart = -1;
   for (let i = currentLine; i >= 0; i--) {
@@ -1850,7 +1882,7 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       break;
     }
   }
-
+  
   // 向后查找Mermaid代码块结束
   if (mermaidStart !== -1) {
     for (let i = mermaidStart + 1; i < lines.length; i++) {
@@ -1860,7 +1892,7 @@ const extractMermaidCode = (content: string, start: number, end: number): string
       }
     }
   }
-
+  
   // 如果没有找到Mermaid代码块，返回默认的流程图模板
   return `graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]`;
 };
@@ -1868,17 +1900,17 @@ const extractMermaidCode = (content: string, start: number, end: number): string
 const handleMermaidSave = async (mermaidCode: string) => {
   const editor = editorElement.value;
   if (!editor) return;
-
+  
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
-
+  
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
 
   // 构建 Mermaid 代码块
   const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
   let newCursorPosition = start;
-
+  
   // 如果之前有选中的Mermaid代码块，替换它
   if (start !== end && start < newMainContent.length && end <= newMainContent.length) {
     const selectedText = newMainContent.substring(start, end);
@@ -1987,10 +2019,10 @@ const openFormulaEditor = () => {
   // 尝试提取公式代码（使用 mainContent，确保索引匹配）
   const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd);
   currentFormulaCode.value = formulaCode;
-
+  
   // 确定公式类型 - 更精确的判断逻辑
   currentFormulaType.value = determineFormulaType(mainContent.value, validStart, validEnd);
-
+  
   currentSelectionStart.value = validStart;
   currentSelectionEnd.value = validEnd;
   showFormulaEditor.value = true;
@@ -2005,31 +2037,31 @@ const extractFormulaCode = (content: string, start: number, end: number): string
       return selectedText.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
     }
     // 检查是否为行内公式
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
         !selectedText.trim().startsWith('$$')) {
       return selectedText.replace(/^\$/, '').replace(/\$$/, '').trim();
     }
     return selectedText;
   }
-
+  
   // 如果没有选中文本，尝试查找光标位置附近的公式
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-
+  
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch && inlineBeforeMatch[1] !== undefined && inlineAfterMatch[1] !== undefined) {
     return (inlineBeforeMatch[1] + inlineAfterMatch[1]).trim();
   }
-
+  
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch && blockBeforeMatch[1] !== undefined && blockAfterMatch[1] !== undefined) {
     return (blockBeforeMatch[1] + blockAfterMatch[1]).trim();
   }
-
+  
   return '';
 };
 
@@ -2041,30 +2073,30 @@ const determineFormulaType = (content: string, start: number, end: number): 'inl
       return 'block';
     }
     // 检查是否为行内公式（以$开头和结尾，但不是$$）
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
+    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') && 
         !selectedText.trim().startsWith('$$')) {
       return 'inline';
     }
   }
-
+  
   // 如果没有选中文本，检查光标位置附近的公式类型
   const textBefore = content.substring(0, start);
   const textAfter = content.substring(start);
-
+  
   // 检查行内公式
   const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
   const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
   if (inlineBeforeMatch && inlineAfterMatch) {
     return 'inline';
   }
-
+  
   // 检查块级公式
   const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
   const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
   if (blockBeforeMatch && blockAfterMatch) {
     return 'block';
   }
-
+  
   // 默认返回行内公式
   return 'inline';
 };
@@ -2085,22 +2117,22 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
     latexCode = formulaData.latexCode;
     formulaType = formulaData.formulaType;
   }
-
+  
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
-
+  
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
-
+  
   // 根据公式类型格式化代码
-  const formattedFormula = formulaType === 'block'
+  const formattedFormula = formulaType === 'block' 
     ? `$$${latexCode}$$`
     : `$${latexCode}$`;
 
   // 确保位置有效
   const validStart = Math.max(0, Math.min(start, newMainContent.length));
   const validEnd = Math.max(validStart, Math.min(end, newMainContent.length));
-
+  
   // 替换或插入公式
   if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
     newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validEnd);
@@ -2140,14 +2172,78 @@ const handleClickOutsideExport = (event: MouseEvent) => {
 };
 
 // 导出相关方法
-const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
+const handleExport = async (format: 'pdf' | 'html' | 'markdown') => {
   // 检查是否有文档或外部文件
   if ((!props.document && !currentFilePath.value) || isExporting.value) {
     return;
   }
 
   showExportMenu.value = false;
+  
+  // Markdown 导出不需要配置，直接导出
+  if (format === 'markdown') {
+    await performExport(format, null);
+    return;
+  }
+  
+  // PDF 和 HTML 导出需要配置
+  pendingExportFormat.value = format;
+  showExportConfigModal.value = true;
+};
+
+// 获取默认文件名（使用文件名而非标题）
+const getDefaultFileName = (): string => {
+  // 优先使用当前文件路径的文件名
+  if (currentFilePath.value) {
+    const pathParts = currentFilePath.value.split(/[/\\]/);
+    const fileName = pathParts[pathParts.length - 1];
+    // 移除扩展名
+    return fileName.replace(/\.(md|markdown|txt)$/i, '');
+  }
+  
+  // 其次使用文档标题
+  if (title.value) {
+    return title.value;
+  }
+  
+  // 最后使用默认名称
+  return '未命名文档';
+};
+
+// 处理导出配置确认
+const handleExportConfigConfirm = async (config: ExportConfig, fileName: string, savePath: string) => {
+  showExportConfigModal.value = false;
+  currentExportConfig.value = config;
+  exportingFileName.value = fileName;
+  exportingSavePath.value = savePath;
+  exportingFormat.value = pendingExportFormat.value;
+  
+  // 显示进度条
+  showExportProgress.value = true;
+  exportProgress.value = 0;
+  exportStatus.value = 'processing';
+  exportStatusMessage.value = '正在准备导出...';
+  
+  try {
+    await performExport(pendingExportFormat.value, config, fileName, savePath);
+  } catch (error) {
+    exportStatus.value = 'error';
+    exportStatusMessage.value = '导出失败: ' + (error instanceof Error ? error.message : '未知错误');
+  }
+};
+
+// 处理导出配置取消
+const handleExportConfigCancel = () => {
+  showExportConfigModal.value = false;
+};
+
+// 执行实际的导出操作
+const performExport = async (format: 'pdf' | 'html' | 'markdown', config: ExportConfig | null, fileName?: string, savePath?: string) => {
   isExporting.value = true;
+  
+  // 更新进度：10%
+  exportProgress.value = 10;
+  exportStatusMessage.value = '正在处理文档内容...';
 
   try {
     const app = Application.getInstance();
@@ -2156,9 +2252,6 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
 
     let exportFormat;
     switch (format) {
-      case 'word':
-        exportFormat = ExportFormat.WORD;
-        break;
       case 'pdf':
         exportFormat = ExportFormat.PDF;
         break;
@@ -2185,48 +2278,43 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
         throw new Error('PDF导出需要在Electron环境中运行');
       }
 
-      // 如果是数据库文档，使用 ExportUseCases 准备数据
+      // 确定文档 ID 和类型
+      // 对于外部文档（ID 以 external- 开头），使用文件路径而不是 ID
+      const isExternalDoc = props.document?.id?.startsWith?.('external-');
+      let documentId = isExternalDoc ? currentFilePath.value : (props.document?.id || currentFilePath.value);
+      
+      console.log('[Export] PDF 导出 - 文档信息:', { 
+        hasDocument: !!props.document, 
+        documentId: documentId,
+        isExternalDoc: isExternalDoc,
+        currentFilePath: currentFilePath.value 
+      });
+
+      // 准备数据
       let processedContent = documentContent;
-      let documentId = props.document?.id || currentFilePath.value;
 
-      if (props.document) {
-        const exportUseCases = app.getExportUseCases();
-        // 先处理内容（包括片段引用等）
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
+      // 处理片段引用（对于所有文档类型）
+      const { InversifyContainer } = await import('../../core/container/inversify.container');
+      const container = InversifyContainer.getInstance();
 
-        try {
-          if (container.isBound(TYPES.FragmentReferenceResolver)) {
-            const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
-            if (resolver && typeof resolver.resolveReferences === 'function') {
-              processedContent = await resolver.resolveReferences(processedContent, documentId);
-            }
+      try {
+        if (container.isBound(TYPES.FragmentReferenceResolver)) {
+          const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+          if (resolver && typeof resolver.resolveReferences === 'function') {
+            processedContent = await resolver.resolveReferences(processedContent, documentId);
           }
-        } catch (error) {
-          console.warn('解析片段引用失败，使用原始内容:', error);
         }
-      } else {
-        // 外部文件：处理片段引用
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
-
-        try {
-          if (container.isBound(TYPES.FragmentReferenceResolver)) {
-            const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
-            if (resolver && typeof resolver.resolveReferences === 'function') {
-              processedContent = await resolver.resolveReferences(processedContent, currentFilePath.value);
-            }
-          }
-        } catch (error) {
-          console.warn('解析片段引用失败，使用原始内容:', error);
-        }
+      } catch (error) {
+        console.warn('解析片段引用失败，使用原始内容:', error);
       }
 
       // 准备 HTML 内容（渲染进程中处理 Markdown 和资源）
-      const { InversifyContainer } = await import('../../core/container/inversify.container');
-      const container = InversifyContainer.getInstance();
-        const exportFactory = container.get<any>(TYPES.ExportFactory);
-        const htmlExporter = exportFactory.getExporter(ExportFormat.HTML);
+      const exportFactory = container.get<any>(TYPES.ExportFactory);
+      const htmlExporter = exportFactory.getExporter(ExportFormat.HTML);
+
+      // 更新进度：30%
+      exportProgress.value = 30;
+      exportStatusMessage.value = '正在生成 HTML...';
 
       // 先导出为 HTML（包含所有样式和资源）
       const htmlResult = await htmlExporter.export({
@@ -2235,8 +2323,13 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
         content: processedContent,
         documentId: documentId,
         variables: {},
-        includeStyles: true
+        includeStyles: true,
+        config: config
       });
+
+      // 更新进度：60%
+      exportProgress.value = 60;
+      exportStatusMessage.value = '正在生成 PDF...';
 
       // 将 HTML buffer 转换为字符串
       const htmlString = new TextDecoder('utf-8').decode(htmlResult.buffer);
@@ -2244,7 +2337,8 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
       // 通过 IPC 调用主进程的 PDF 导出（传递完整的 HTML）
       const pdfResult = await electronAPI.export.pdf({
         title: documentTitle,
-        html: htmlString
+        html: htmlString,
+        filename: fileName || documentTitle  // 传递实际文件名用于日志
       });
 
       if (!pdfResult.success) {
@@ -2260,18 +2354,28 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
         filename: pdfResult.filename
       };
     } else {
-      // 其他格式（Word、HTML、Markdown）在渲染进程中处理
-      // 如果是数据库文档，使用 ExportUseCases
-      if (props.document) {
+      // 其他格式（HTML、Markdown）在渲染进程中处理
+      // 判断是否是外部文档
+      const isExternalDoc = props.document?.id?.startsWith?.('external-');
+      
+      console.log('[Export] HTML/Markdown 导出 - 文档信息:', { 
+        hasDocument: !!props.document, 
+        documentId: props.document?.id,
+        isExternalDoc: isExternalDoc,
+        currentFilePath: currentFilePath.value 
+      });
+      
+      // 如果是数据库文档（非外部文档），使用 ExportUseCases
+      if (props.document && !isExternalDoc) {
         const exportUseCases = app.getExportUseCases() as any;
         result = await exportUseCases.exportDocument({
           documentId: props.document.id,
           format: exportFormat,
-          variables: {} // 可以添加变量支持
+          variables: {}, // 可以添加变量支持
+          config: config
         });
       } else {
-        // 如果是外部文件，直接使用 ExportFactory 和导出器
-        // 使用 InversifyContainer 直接获取容器
+        // 外部文件或外部文档：直接使用 ExportFactory 和导出器
         const { InversifyContainer } = await import('../../core/container/inversify.container');
         const container = InversifyContainer.getInstance();
 
@@ -2282,40 +2386,94 @@ const handleExport = async (format: 'word' | 'pdf' | 'html' | 'markdown') => {
         const exportFactory = container.get<any>(TYPES.ExportFactory);
         const exporter = exportFactory.getExporter(exportFormat);
 
+        // 确定文档 ID（外部文档使用文件路径）
+        const isExternalDoc = props.document?.id?.startsWith?.('external-');
+        const documentId = isExternalDoc ? currentFilePath.value : currentFilePath.value;
+
         // 处理片段引用（如果有）
         let processedContent = documentContent;
         try {
           if (container.isBound(TYPES.FragmentReferenceResolver)) {
             const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
             if (resolver && typeof resolver.resolveReferences === 'function') {
-              processedContent = await resolver.resolveReferences(processedContent, currentFilePath.value);
+              processedContent = await resolver.resolveReferences(processedContent, documentId);
             }
           }
         } catch (error) {
           console.warn('解析片段引用失败，使用原始内容:', error);
         }
 
+        // 更新进度：50%
+        exportProgress.value = 50;
+        exportStatusMessage.value = '正在生成文档...';
+
         // 执行导出
         result = await exporter.export({
           format: exportFormat,
           title: documentTitle,
           content: processedContent,
-          documentId: currentFilePath.value,
+          documentId: documentId,
           variables: {},
-          includeStyles: true
+          includeStyles: true,
+          config: config
         });
       }
     }
 
-    // 保存文件
-    await saveExportFile(result, format);
+    // 更新进度：80%
+    exportProgress.value = 80;
+    exportStatusMessage.value = '正在保存文件...';
 
-    alert(`文档已成功导出为 ${format.toUpperCase()} 格式！`);
+    // 保存文件到指定路径
+    if (savePath) {
+      await saveExportFileToPath(result, savePath);
+    } else {
+      await saveExportFile(result, format);
+    }
+
+    // 更新进度：100%
+    exportProgress.value = 100;
+    exportStatus.value = 'success';
+    exportStatusMessage.value = '导出成功！';
   } catch (error) {
     console.error('导出失败:', error);
-    alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    exportProgress.value = 100;
+    exportStatus.value = 'error';
+    exportStatusMessage.value = '导出失败: ' + (error instanceof Error ? error.message : '未知错误');
+    throw error;
   } finally {
     isExporting.value = false;
+  }
+};
+
+// 保存文件到指定路径
+const saveExportFileToPath = async (result: any, filePath: string) => {
+  const electronAPI = (window as any).electronAPI;
+  
+  if (!electronAPI || !electronAPI.file || !electronAPI.file.writeBinary) {
+    throw new Error('文件写入功能需要在 Electron 环境中运行');
+  }
+
+  try {
+    // 处理 buffer（可能是 Buffer 或 ArrayBuffer）
+    let arrayBuffer: ArrayBuffer;
+    if (result.buffer instanceof ArrayBuffer) {
+      arrayBuffer = result.buffer;
+    } else if (result.buffer instanceof Uint8Array) {
+      arrayBuffer = result.buffer.buffer.slice(
+        result.buffer.byteOffset,
+        result.buffer.byteOffset + result.buffer.byteLength
+      );
+    } else {
+      // 尝试从 buffer 对象创建 ArrayBuffer
+      arrayBuffer = result.buffer;
+    }
+
+    // 写入文件
+    await electronAPI.file.writeBinary(filePath, arrayBuffer);
+  } catch (error) {
+    console.error('保存文件失败:', error);
+    throw new Error('保存文件失败: ' + (error instanceof Error ? error.message : '未知错误'));
   }
 };
 
@@ -2327,9 +2485,6 @@ const saveExportFile = async (result: any, format: string) => {
     // Electron环境：使用保存对话框
     const filters = [];
     switch (format) {
-      case 'word':
-        filters.push({ name: 'Word文档', extensions: ['docx'] });
-        break;
       case 'pdf':
         filters.push({ name: 'PDF文档', extensions: ['pdf'] });
         break;
