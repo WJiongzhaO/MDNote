@@ -296,7 +296,7 @@ const handleRevert = async (hash: string) => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: var(--bg-secondary);
   position: relative;
 }
 
@@ -309,8 +309,8 @@ const handleRevert = async (hash: string) => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .branch-info {
@@ -335,13 +335,13 @@ const handleRevert = async (hash: string) => {
 }
 
 .btn-icon:hover {
-  background: #f0f0f0;
+  background: var(--bg-hover);
 }
 
 .tabs {
   display: flex;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .tab {
@@ -351,7 +351,7 @@ const handleRevert = async (hash: string) => {
   border: none;
   cursor: pointer;
   font-weight: 500;
-  color: #666;
+  color: var(--text-secondary);
   border-bottom: 2px solid transparent;
   transition: all 0.2s;
   display: flex;
@@ -361,17 +361,17 @@ const handleRevert = async (hash: string) => {
 }
 
 .tab:hover {
-  color: #333;
-  background: #f9f9f9;
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .tab.active {
-  color: #0066cc;
-  border-bottom-color: #0066cc;
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
 }
 
 .badge {
-  background: #e0e0e0;
+  background: var(--bg-tertiary);
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 12px;
@@ -379,8 +379,8 @@ const handleRevert = async (hash: string) => {
 }
 
 .tab.active .badge {
-  background: #0066cc;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .tab-content {
@@ -400,13 +400,13 @@ const handleRevert = async (hash: string) => {
 }
 
 .init-desc {
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 24px;
 }
 
 .btn-primary {
-  background: #0066cc;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
   border: none;
   padding: 10px 24px;
   border-radius: 6px;
@@ -417,7 +417,7 @@ const handleRevert = async (hash: string) => {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #0052a3;
+  filter: brightness(0.9);
 }
 
 .btn-primary:disabled {
@@ -426,8 +426,8 @@ const handleRevert = async (hash: string) => {
 }
 
 .btn-danger {
-  background: #ff4444;
-  color: white;
+  background: var(--accent-danger);
+  color: var(--text-inverse);
   border: none;
   padding: 8px 16px;
   border-radius: 6px;
@@ -437,13 +437,13 @@ const handleRevert = async (hash: string) => {
 }
 
 .btn-danger:hover {
-  background: #cc0000;
+  filter: brightness(0.9);
 }
 
 .clean-state {
   text-align: center;
   padding: 40px 20px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .clean-icon {
@@ -462,27 +462,29 @@ const handleRevert = async (hash: string) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .commit-section {
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-primary);
 }
 
 .commit-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   font-size: 14px;
   margin-bottom: 12px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .commit-input:focus {
   outline: none;
-  border-color: #0066cc;
+  border-color: var(--accent-primary);
 }
 
 .commit-actions {
@@ -495,14 +497,14 @@ const handleRevert = async (hash: string) => {
   bottom: 20px;
   left: 20px;
   right: 20px;
-  background: #ffebee;
-  color: #c62828;
+  background: var(--accent-danger);
+  color: var(--text-inverse);
   padding: 12px 16px;
   border-radius: 6px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .close-btn {
@@ -510,7 +512,7 @@ const handleRevert = async (hash: string) => {
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: #c62828;
+  color: var(--text-inverse);
   padding: 0;
   line-height: 1;
 }
@@ -521,7 +523,7 @@ const handleRevert = async (hash: string) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -530,8 +532,8 @@ const handleRevert = async (hash: string) => {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f0f0f0;
-  border-top-color: #0066cc;
+  border: 4px solid var(--bg-tertiary);
+  border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

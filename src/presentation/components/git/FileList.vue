@@ -44,21 +44,21 @@ const toggleSelect = (file: string) => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .file-item:hover {
-  background: #f9f9f9;
-  border-color: #0066cc;
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
 }
 
 .file-item.selected {
-  background: #e3f2fd;
-  border-color: #0066cc;
+  background: var(--bg-active);
+  border-color: var(--accent-primary);
 }
 
 .file-icon {
@@ -69,11 +69,12 @@ const toggleSelect = (file: string) => {
   flex: 1;
   font-size: 13px;
   word-break: break-all;
+  color: var(--text-primary);
 }
 
 .check-icon {
   font-size: 14px;
-  color: #0066cc;
+  color: var(--accent-primary);
   font-weight: bold;
 }
 </style>

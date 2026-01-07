@@ -1015,7 +1015,7 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
   overflow: auto;
   padding: 20px;
 }
@@ -1030,7 +1030,7 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   max-height: 80vh;
   object-fit: contain;
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
 }
 
 /* 统一与 FileExplorer 新建窗口的样式 */
@@ -1040,7 +1040,7 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1048,11 +1048,12 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
 }
 
 .modal {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   padding: 20px;
   min-width: 480px;
   max-width: 900px;
+  color: var(--text-primary);
 }
 
 .modal h3 {
@@ -1063,10 +1064,12 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
 .modal input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 0.9rem;
   margin-bottom: 16px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .modal-actions {
@@ -1085,12 +1088,12 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
 }
 
 .btn-primary {
-  background: #007bff;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #0056b3;
+  opacity: 0.9;
 }
 
 .btn-primary:disabled {
@@ -1099,12 +1102,12 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
 }
 
 .btn-secondary {
-  background: #6c757d;
-  color: white;
+  background: var(--text-tertiary);
+  color: var(--text-inverse);
 }
 
 .btn-secondary:hover {
-  background: #5a6268;
+  opacity: 0.9;
 }
 
 /* 模板创建对话框中的模板列表与预览区域 */
@@ -1116,11 +1119,11 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
 
 .template-dialog-list {
   width: 40%;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
   overflow-y: auto;
   padding: 4px;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
 }
 
 .template-dialog-item {
@@ -1131,53 +1134,55 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
 }
 
 .template-dialog-item:hover {
-  background: #e9ecef;
+  background: var(--bg-hover);
 }
 
 .template-dialog-item.active {
-  background: #e9f3ff;
-  border: 1px solid #007bff;
+  background: var(--bg-active);
+  border: 1px solid var(--accent-primary);
 }
 
 .template-dialog-item .name {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .template-dialog-item .file {
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .template-dialog-empty {
   padding: 8px;
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .template-dialog-preview {
   flex: 1;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
   padding: 8px 10px;
   overflow-y: auto;
+  background: var(--bg-primary);
 }
 
 .template-dialog-preview .title {
   font-size: 0.85rem;
   font-weight: 600;
   margin-bottom: 6px;
+  color: var(--text-primary);
 }
 
 .template-dialog-preview .content {
   font-size: 0.85rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .template-dialog-preview .placeholder {
   font-size: 0.8rem;
-  color: #888;
+  color: var(--text-tertiary);
 }
 
 /* 将弹窗预览中的 Mermaid 占位符压缩为单行提示 */
@@ -1199,11 +1204,11 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: #dc3545;
-  color: white;
+  background: var(--accent-danger);
+  color: var(--text-inverse);
   padding: 12px 20px;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1214,7 +1219,7 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
 .error-close {
   background: none;
   border: none;
-  color: white;
+  color: var(--text-inverse);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0;

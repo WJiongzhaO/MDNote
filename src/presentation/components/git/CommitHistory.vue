@@ -89,7 +89,7 @@ const formatDate = (date: Date | string) => {
 .empty-state {
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .commit-list {
@@ -99,15 +99,15 @@ const formatDate = (date: Date | string) => {
 }
 
 .commit-item {
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   padding: 12px;
   transition: box-shadow 0.2s;
 }
 
 .commit-item:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .commit-header {
@@ -120,25 +120,25 @@ const formatDate = (date: Date | string) => {
 .commit-hash {
   font-family: 'Courier New', monospace;
   font-size: 12px;
-  color: #0066cc;
+  color: var(--accent-primary);
   font-weight: bold;
 }
 
 .commit-date {
   font-size: 12px;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .commit-message {
   font-size: 14px;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 8px;
   line-height: 1.4;
 }
 
 .commit-author {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 12px;
 }
 
@@ -150,41 +150,43 @@ const formatDate = (date: Date | string) => {
 .btn-small {
   padding: 6px 12px;
   font-size: 12px;
-  border: 1px solid #ddd;
-  background: white;
+  border: 1px solid var(--border-secondary);
+  background: var(--bg-primary);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .btn-small:hover {
-  background: #f5f5f5;
-  border-color: #0066cc;
-  color: #0066cc;
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .btn-warning {
-  color: #ff6b6b;
+  color: var(--accent-danger);
 }
 
 .btn-warning:hover {
-  background: #fff5f5;
-  border-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  border-color: var(--accent-danger);
 }
 
 .load-more-btn {
   width: 100%;
   padding: 12px;
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .load-more-btn:hover {
-  background: #f5f5f5;
-  border-color: #0066cc;
-  color: #0066cc;
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 </style>

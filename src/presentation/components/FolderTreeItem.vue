@@ -76,12 +76,12 @@ const toggleExpanded = () => {
 }
 
 .folder-item:hover {
-  background: #f0f2f5;
+  background: var(--bg-hover);
 }
 
 .folder-item.active {
-  background: #e8f4ff;
-  border-left: 3px solid #667eea;
+  background: var(--bg-active);
+  border-left: 3px solid var(--accent-primary);
 }
 
 .folder-toggle {
@@ -89,7 +89,7 @@ const toggleExpanded = () => {
   text-align: center;
   font-size: 0.8rem;
   cursor: pointer;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .folder-toggle-placeholder {
@@ -110,7 +110,7 @@ const toggleExpanded = () => {
 
 .folder-children {
   padding-left: 20px;
-  border-left: 1px solid #e9ecef;
+  border-left: 1px solid var(--border-secondary);
   margin-left: 8px;
 }
 </style>

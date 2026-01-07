@@ -492,7 +492,7 @@ watch(() => props.show, (newShow) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -501,14 +501,14 @@ watch(() => props.show, (newShow) => {
 }
 
 .export-config-modal {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 12px;
   width: 100%;
   max-width: 900px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
@@ -516,14 +516,14 @@ watch(() => props.show, (newShow) => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .close-btn {
@@ -531,7 +531,7 @@ watch(() => props.show, (newShow) => {
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--text-secondary);
   padding: 0;
   width: 32px;
   height: 32px;
@@ -543,8 +543,8 @@ watch(() => props.show, (newShow) => {
 }
 
 .close-btn:hover {
-  background: #f8f9fa;
-  color: #495057;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 .modal-body {
@@ -561,7 +561,7 @@ watch(() => props.show, (newShow) => {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .preset-buttons {
@@ -571,8 +571,8 @@ watch(() => props.show, (newShow) => {
 }
 
 .preset-btn {
-  background: white;
-  border: 2px solid #dee2e6;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-primary);
   border-radius: 8px;
   padding: 16px;
   cursor: pointer;
@@ -585,13 +585,13 @@ watch(() => props.show, (newShow) => {
 }
 
 .preset-btn:hover {
-  border-color: #007bff;
-  background: #f8f9fa;
+  border-color: var(--accent-info);
+  background: var(--bg-secondary);
 }
 
 .preset-btn.active {
-  border-color: #007bff;
-  background: #e7f1ff;
+  border-color: var(--accent-info);
+  background: var(--bg-active);
 }
 
 .preset-icon {
@@ -600,12 +600,12 @@ watch(() => props.show, (newShow) => {
 
 .preset-name {
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .preset-desc {
   font-size: 12px;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .config-tabs {
@@ -621,20 +621,20 @@ watch(() => props.show, (newShow) => {
   padding: 12px 20px;
   cursor: pointer;
   font-size: 14px;
-  color: #6c757d;
+  color: var(--text-secondary);
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: all 0.2s;
 }
 
 .tab-btn:hover {
-  color: #495057;
-  background: #f8f9fa;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
 }
 
 .tab-btn.active {
-  color: #007bff;
-  border-bottom-color: #007bff;
+  color: var(--accent-info);
+  border-bottom-color: var(--accent-info);
   font-weight: 600;
 }
 
@@ -651,7 +651,7 @@ watch(() => props.show, (newShow) => {
   margin-bottom: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .form-group input[type="text"],
@@ -659,7 +659,7 @@ watch(() => props.show, (newShow) => {
 .form-group select {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 14px;
   transition: border-color 0.2s;
@@ -668,7 +668,7 @@ watch(() => props.show, (newShow) => {
 .form-group input[type="color"] {
   width: 60px;
   height: 38px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -676,7 +676,7 @@ watch(() => props.show, (newShow) => {
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: var(--accent-info);
 }
 
 .form-row {
@@ -689,10 +689,10 @@ watch(() => props.show, (newShow) => {
 .form-group-title {
   font-size: 14px;
   font-weight: 600;
-  color: #495057;
+  color: var(--text-secondary);
   margin: 24px 0 12px 0;
   padding-top: 16px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--border-secondary);
 }
 
 .checkbox-label {
@@ -717,8 +717,8 @@ watch(() => props.show, (newShow) => {
 }
 
 .preview-hint {
-  background: #fff3cd;
-  border: 1px solid #ffc107;
+  background: var(--bg-primary)3cd;
+  border: 1px solid var(--accent-warning);
   border-radius: 8px;
   padding: 12px 16px;
   display: flex;
@@ -726,7 +726,7 @@ watch(() => props.show, (newShow) => {
   gap: 12px;
   margin-top: 24px;
   font-size: 14px;
-  color: #856404;
+  color: var(--text-primary);
 }
 
 .hint-icon {
@@ -738,7 +738,7 @@ watch(() => props.show, (newShow) => {
   justify-content: flex-end;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--border-secondary);
 }
 
 .btn {
@@ -753,7 +753,7 @@ watch(() => props.show, (newShow) => {
 
 .btn-secondary {
   background: #6c757d;
-  color: white;
+  color: var(--text-inverse);
 }
 
 .btn-secondary:hover {
@@ -761,8 +761,8 @@ watch(() => props.show, (newShow) => {
 }
 
 .btn-primary {
-  background: #007bff;
-  color: white;
+  background: var(--accent-info);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
@@ -782,7 +782,7 @@ watch(() => props.show, (newShow) => {
   padding: 30px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 12px;
-  color: white;
+  color: var(--text-inverse);
   margin-bottom: 24px;
 }
 
@@ -809,7 +809,7 @@ watch(() => props.show, (newShow) => {
 
 .btn-select-path-large {
   padding: 14px 28px;
-  background: white;
+  background: var(--bg-primary);
   color: #667eea;
   border: none;
   border-radius: 8px;
@@ -820,7 +820,7 @@ watch(() => props.show, (newShow) => {
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-select-path-large:hover {
@@ -849,10 +849,10 @@ watch(() => props.show, (newShow) => {
 
 .selected-path-value {
   padding: 12px;
-  background: white;
+  background: var(--bg-primary);
   border-radius: 6px;
   font-size: 14px;
-  color: #2c3e50;
+  color: var(--text-primary);
   word-break: break-all;
   margin-bottom: 12px;
   border: 1px solid #b3d9ff;
@@ -860,8 +860,8 @@ watch(() => props.show, (newShow) => {
 
 .btn-reselect {
   padding: 8px 16px;
-  background: #007bff;
-  color: white;
+  background: var(--accent-info);
+  color: var(--text-inverse);
   border: none;
   border-radius: 6px;
   font-size: 14px;
@@ -902,7 +902,7 @@ watch(() => props.show, (newShow) => {
 .info-list {
   margin: 0;
   padding-left: 20px;
-  color: #495057;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.6;
 }

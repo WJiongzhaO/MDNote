@@ -178,8 +178,8 @@ defineExpose({
 <style scoped>
 .top-menu-bar {
   height: 32px;
-  background: #f3f3f3;
-  border-bottom: 1px solid #d0d0d0;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
   display: flex;
   align-items: center;
   padding: 0 8px;
@@ -200,12 +200,12 @@ defineExpose({
   align-items: center;
   gap: 4px;
   font-size: 13px;
-  color: #333;
+  color: var(--text-primary);
   transition: background-color 0.2s;
 }
 
 .menu-item:hover {
-  background: #e0e0e0;
+  background: var(--bg-hover);
 }
 
 .menu-arrow {
@@ -217,10 +217,10 @@ defineExpose({
   position: absolute;
   top: 100%;
   left: 0;
-  background: white;
-  border: 1px solid #d0d0d0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   min-width: 250px;
   max-height: 400px;
   overflow-y: auto;
@@ -235,17 +235,17 @@ defineExpose({
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #333;
+  color: var(--text-primary);
   transition: background-color 0.1s;
 }
 
 .menu-dropdown-item:hover {
-  background: #f0f0f0;
+  background: var(--bg-hover);
 }
 
 .menu-dropdown-item .menu-section-title {
   font-weight: 600;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 11px;
   text-transform: uppercase;
   padding: 4px 0;
@@ -266,13 +266,13 @@ defineExpose({
 
 .menu-shortcut {
   margin-left: auto;
-  color: #999;
+  color: var(--text-tertiary);
   font-size: 11px;
 }
 
 .menu-divider {
   height: 1px;
-  background: #e0e0e0;
+  background: var(--border-secondary);
   margin: 4px 0;
 }
 </style>

@@ -128,24 +128,24 @@ const getFileIcon = (fileName: string): string => {
 }
 
 .node-item:hover {
-  background: #e9ecef;
+  background: var(--bg-hover);
 }
 
 .node-item.is-selected {
-  background: #007acc;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .expand-icon {
   width: 16px;
   text-align: center;
   font-size: 0.7rem;
-  color: #666;
+  color: var(--text-secondary);
   margin-right: 4px;
 }
 
 .node-item.is-selected .expand-icon {
-  color: white;
+  color: var(--text-inverse);
 }
 
 .expand-placeholder {

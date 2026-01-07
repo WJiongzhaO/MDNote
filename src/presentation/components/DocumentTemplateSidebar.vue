@@ -193,13 +193,13 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
-  border-right: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
 }
 
 .sidebar-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -208,7 +208,7 @@ onMounted(async () => {
 .sidebar-header h2 {
   margin: 0;
   font-size: 1.1rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .header-actions {
@@ -227,15 +227,16 @@ onMounted(async () => {
 .btn-icon {
   padding: 4px 8px;
   background: transparent;
+  color: var(--text-secondary);
 }
 
 .btn-icon:hover {
-  background: #e9ecef;
+  background: var(--bg-hover);
 }
 
 .btn-primary {
-  background: #007bff;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .btn-primary:disabled {
@@ -244,8 +245,8 @@ onMounted(async () => {
 }
 
 .btn-secondary {
-  background: #6c757d;
-  color: white;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .btn-secondary.btn-small {
@@ -257,23 +258,30 @@ onMounted(async () => {
   padding: 2px 6px;
   background: transparent;
   border-radius: 4px;
+  color: var(--text-secondary);
 }
 
 .btn-icon-small:hover {
-  background: #f1f3f5;
+  background: var(--bg-hover);
 }
 
 .search-box {
   padding: 10px 12px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .search-input {
   width: 100%;
   padding: 6px 10px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 0.85rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.search-input::placeholder {
+  color: var(--text-tertiary);
 }
 
 .content {
@@ -283,7 +291,7 @@ onMounted(async () => {
 }
 
 .template-list {
-  border-right: 1px solid #e9ecef;
+  border-right: 1px solid var(--border-primary);
   overflow-y: auto;
   padding: 6px;
 }
@@ -299,32 +307,32 @@ onMounted(async () => {
   border-radius: 4px;
   cursor: pointer;
   margin-bottom: 4px;
-  background: white;
+  background: var(--bg-primary);
   border: 1px solid transparent;
   display: flex;
   flex-direction: column;
 }
 
 .template-item:hover {
-  border-color: #007bff33;
-  background: #f8f9ff;
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
 }
 
 .template-item.active {
-  border-color: #007bff;
-  background: #e9f3ff;
+  border-color: var(--accent-primary);
+  background: var(--accent-secondary);
 }
 
 .template-name {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .template-path {
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -347,13 +355,13 @@ onMounted(async () => {
   padding: 20px 8px;
   text-align: center;
   font-size: 0.85rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -361,21 +369,26 @@ onMounted(async () => {
 }
 
 .dialog {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   min-width: 320px;
   max-width: 420px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
 }
 
 .dialog-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  color: var(--text-primary);
 }
 
 .dialog-body {
@@ -384,7 +397,7 @@ onMounted(async () => {
 
 .dialog-footer {
   padding: 10px 16px 12px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--border-primary);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -394,18 +407,24 @@ onMounted(async () => {
   width: 100%;
   padding: 6px 10px;
   border-radius: 4px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--border-primary);
   font-size: 0.85rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
 }
 
 .hint {
   margin-top: 8px;
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .placeholder {
-  color: #999;
+  color: var(--text-tertiary);
 }
 </style>
 

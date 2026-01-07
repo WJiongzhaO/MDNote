@@ -390,7 +390,7 @@ nextTick(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -400,8 +400,8 @@ nextTick(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .formula-type-selector {
@@ -412,14 +412,15 @@ nextTick(() => {
 
 .formula-type-selector label {
   font-weight: 500;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .formula-type-selector select {
   padding: 0.5rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
-  background: white;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .editor-actions {
@@ -437,7 +438,7 @@ nextTick(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e9ecef;
+  border-right: 1px solid var(--border-secondary);
 }
 
 .preview-panel {
@@ -449,14 +450,14 @@ nextTick(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .panel-header h3 {
   margin: 0;
   font-size: 1.1rem;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .symbol-toolbar {
@@ -466,17 +467,18 @@ nextTick(() => {
 
 .symbol-btn {
   padding: 0.5rem;
-  border: 1px solid #dee2e6;
-  background: white;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary);
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .symbol-btn:hover {
-  background: #e9ecef;
-  border-color: #adb5bd;
+  background: var(--bg-tertiary);
+  border-color: var(--border-primary);
 }
 
 .code-editor {
@@ -487,6 +489,8 @@ nextTick(() => {
   font-family: 'Courier New', monospace;
   font-size: 1rem;
   line-height: 1.5;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .code-editor:focus {
@@ -495,9 +499,9 @@ nextTick(() => {
 
 .error-message {
   padding: 0.75rem;
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  color: #856404;
+  background: rgba(255, 212, 59, 0.2);
+  border: 1px solid var(--accent-warning);
+  color: var(--text-primary);
   font-size: 0.9rem;
 }
 
@@ -523,14 +527,14 @@ nextTick(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .spinner {
   width: 1rem;
   height: 1rem;
-  border: 2px solid #e9ecef;
-  border-top: 2px solid #007bff;
+  border: 2px solid var(--border-secondary);
+  border-top: 2px solid var(--accent-info);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -542,7 +546,7 @@ nextTick(() => {
 
 .empty-preview {
   text-align: center;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .empty-icon {
@@ -556,7 +560,7 @@ nextTick(() => {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -564,7 +568,7 @@ nextTick(() => {
 }
 
 .modal-content {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   padding: 0;
   max-width: 600px;
@@ -577,8 +581,8 @@ nextTick(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .close-btn {
@@ -586,7 +590,7 @@ nextTick(() => {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .template-grid {
@@ -599,7 +603,7 @@ nextTick(() => {
 }
 
 .template-card {
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   padding: 1rem;
   cursor: pointer;
@@ -607,8 +611,8 @@ nextTick(() => {
 }
 
 .template-card:hover {
-  border-color: #007bff;
-  background: #f8f9fa;
+  border-color: var(--accent-info);
+  background: var(--bg-hover);
 }
 
 .template-icon {
@@ -623,7 +627,7 @@ nextTick(() => {
 
 .template-description {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .btn {
@@ -636,9 +640,9 @@ nextTick(() => {
 }
 
 .btn-primary {
-  background: #007bff;
-  border-color: #007bff;
-  color: white;
+  background: var(--accent-info);
+  border-color: var(--accent-info);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
@@ -649,7 +653,7 @@ nextTick(() => {
 .btn-secondary {
   background: #6c757d;
   border-color: #6c757d;
-  color: white;
+  color: var(--text-inverse);
 }
 
 .btn-secondary:hover {
@@ -658,9 +662,9 @@ nextTick(() => {
 }
 
 .btn-success {
-  background: #28a745;
-  border-color: #28a745;
-  color: white;
+  background: var(--accent-success);
+  border-color: var(--accent-success);
+  color: var(--text-inverse);
 }
 
 .btn-success:hover {
@@ -671,7 +675,7 @@ nextTick(() => {
 .btn-info {
   background: #17a2b8;
   border-color: #17a2b8;
-  color: white;
+  color: var(--text-inverse);
 }
 
 .btn-info:hover {
@@ -680,9 +684,9 @@ nextTick(() => {
 }
 
 .btn-danger {
-  background: #dc3545;
-  border-color: #dc3545;
-  color: white;
+  background: var(--accent-danger);
+  border-color: var(--accent-danger);
+  color: var(--text-inverse);
 }
 
 .btn-danger:hover {

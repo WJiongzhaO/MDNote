@@ -83,7 +83,7 @@ const handleClose = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,11 +91,11 @@ const handleClose = () => {
 }
 
 .export-progress-modal {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 12px;
   width: 100%;
   max-width: 500px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
   animation: slideDown 0.3s ease-out;
 }
 
@@ -112,14 +112,14 @@ const handleClose = () => {
 
 .progress-header {
   padding: 20px 24px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .progress-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .progress-body {
@@ -129,7 +129,7 @@ const handleClose = () => {
 .progress-info {
   margin-bottom: 20px;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
   border-radius: 6px;
 }
 
@@ -143,13 +143,13 @@ const handleClose = () => {
 .progress-filename .label,
 .progress-format .label {
   font-weight: 500;
-  color: #6c757d;
+  color: var(--text-secondary);
   min-width: 60px;
 }
 
 .progress-filename .value,
 .progress-format .value {
-  color: #2c3e50;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -159,7 +159,7 @@ const handleClose = () => {
 
 .progress-bar {
   height: 24px;
-  background: #e9ecef;
+  background: var(--bg-tertiary);
   border-radius: 12px;
   overflow: hidden;
   position: relative;
@@ -167,7 +167,7 @@ const handleClose = () => {
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #007bff, #0056b3);
+  background: linear-gradient(90deg, var(--accent-info), #0056b3);
   transition: width 0.3s ease;
   position: relative;
   overflow: hidden;
@@ -203,7 +203,7 @@ const handleClose = () => {
   margin-top: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .progress-status {
@@ -211,7 +211,7 @@ const handleClose = () => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
   border-radius: 6px;
   margin-top: 20px;
 }
@@ -228,16 +228,16 @@ const handleClose = () => {
 }
 
 .status-icon.status-processing {
-  background: #fff3cd;
+  background: rgba(255, 212, 59, 0.3);
   animation: pulse 1.5s infinite;
 }
 
 .status-icon.status-success {
-  background: #d4edda;
+  background: rgba(105, 219, 108, 0.3);
 }
 
 .status-icon.status-error {
-  background: #f8d7da;
+  background: rgba(255, 107, 107, 0.3);
 }
 
 @keyframes pulse {
@@ -251,13 +251,13 @@ const handleClose = () => {
 
 .status-message {
   flex: 1;
-  color: #495057;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
 .progress-footer {
   padding: 16px 24px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--border-secondary);
   display: flex;
   justify-content: flex-end;
 }
@@ -273,8 +273,8 @@ const handleClose = () => {
 }
 
 .btn-primary {
-  background: #007bff;
-  color: white;
+  background: var(--accent-info);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
