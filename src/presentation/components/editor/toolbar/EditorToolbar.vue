@@ -96,9 +96,28 @@ const emit = defineEmits<{
 
 // 使用工具栏 Composable
 const contentRef = computed({
-  get: () => props.content,
-  set: (value) => emit('update:content', value)
+  get: () => {
+    console.log('[EditorToolbar-contentRef-get] 获取内容:', props.content);
+    return props.content;
+  },
+  set: (value) => {
+    console.log('[EditorToolbar-contentRef-set] 设置内容:', value);
+    console.log('[EditorToolbar-contentRef-set] 触发 update:content 事件');
+    emit('update:content', value);
+  }
 });
+
+// 监听 contentRef 的变化
+watch(contentRef, (newVal, oldVal) => {
+  console.log('[EditorToolbar-watch-contentRef] 内容变化', {
+    oldLength: oldVal?.length || 0,
+    newLength: newVal?.length || 0,
+    isSame: newVal === oldVal,
+    oldPreview: oldVal?.substring(0, 50) + (oldVal?.length > 50 ? '...' : ''),
+    newPreview: newVal?.substring(0, 50) + (newVal?.length > 50 ? '...' : '')
+  });
+});
+
 const {
   isActive,
   applyFormat,
@@ -134,10 +153,14 @@ const insertButtons = [
 
 // 事件处理
 const handleFormat = (formatType: string) => {
+  console.log('[EditorToolbar-handleFormat] 按钮被点击', { formatType });
+  console.log('[EditorToolbar-handleFormat] 当前 content:', contentRef.value);
+  console.log('[EditorToolbar-handleFormat] 当前 isActive 状态:', isActive);
   applyFormat(formatType);
 };
 
 const handleInsert = (insertType: string) => {
+  console.log('[EditorToolbar-handleInsert] 按钮被点击', { insertType });
   insertContent(insertType);
 };
 </script>

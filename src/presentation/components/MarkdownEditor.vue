@@ -332,7 +332,6 @@ watch(() => props.document, (newDocument) => {
     // 如果是外部文件，保留 currentFilePath
     if (filePath) {
       currentFilePath.value = filePath;
-      console.log('[MarkdownEditor] 外部文件，设置 currentFilePath:', filePath);
     } else {
       // 数据库文档，清空外部文件路径
       currentFilePath.value = '';
@@ -343,7 +342,6 @@ watch(() => props.document, (newDocument) => {
     lastSavedTitle = newDocument.title;
     lastSavedContent = newDocument.content || '';
     hasChanges.value = false;
-    console.log('[MarkdownEditor] 文档已加载，初始化 lastSavedTitle 和 lastSavedContent');
 
     // 分离 frontmatter 和正文（关键：renderContent 使用 mainContent）
     const { frontmatter: fm, mainContent: main } = splitContent(newDocument.content || '');
@@ -578,25 +576,57 @@ const handleEditorMouseDown = () => {
 
 // 处理编辑器失去焦点
 const handleEditorBlur = async () => {
+  console.log('[handleEditorBlur] ========== 开始处理 blur 事件 ==========');
+  console.log('[handleEditorBlur] isToolbarOperation:', isToolbarOperation);
+  console.log('[handleEditorBlur] isEditorFocused:', isEditorFocused.value);
+  
+  // 如果工具栏操作正在进行，不处理 blur 事件
+  // 避免覆盖工具栏格式化后的内容
+  if (isToolbarOperation) {
+    console.log('[handleEditorBlur] 工具栏操作中，跳过 blur 处理');
+    return;
+  }
+
+  console.log('[handleEditorBlur] 开始保存编辑器内容');
   // 先保存当前内容（使用getTextContent而不是textContent，避免重复）
   const editor = editorElement.value;
   if (editor) {
     const currentMainText = getTextContent(editor);
     const currentFullContent = mergeContent(frontmatter.value, currentMainText);
+    
+    console.log('[handleEditorBlur] 编辑器内容:', {
+      currentMainText,
+      currentFullContent,
+      existingContent: content.value,
+      existingMainContent: mainContent.value,
+      isDifferent: currentFullContent !== content.value
+    });
+    
     if (currentFullContent !== content.value) {
+      console.log('[handleEditorBlur] 内容发生变化，更新 mainContent 和 content');
       mainContent.value = currentMainText;
       content.value = currentFullContent;
+    } else {
+      console.log('[handleEditorBlur] 内容未发生变化');
     }
 
     // 在失去焦点之前保存光标位置
     const { start, end } = getCursorPosition(editor);
     currentSelectionStart.value = start;
     currentSelectionEnd.value = end;
+    console.log('[handleEditorBlur] 保存光标位置:', { start, end });
+  } else {
+    console.warn('[handleEditorBlur] editorElement.value 为 null');
   }
 
   isEditorFocused.value = false;
+  console.log('[handleEditorBlur] 设置 isEditorFocused = false');
+  
   // 应用标注
+  console.log('[handleEditorBlur] 准备应用标注');
   await applyEditorAnnotations();
+  console.log('[handleEditorBlur] 标注应用完成');
+  console.log('[handleEditorBlur] ========== blur 事件处理完成 ==========');
 };
 
 // 处理粘贴事件
@@ -633,8 +663,6 @@ const applyEditorAnnotations = async () => {
     return;
   }
 
-  console.log('[标注] 开始应用编辑器标注，内容长度:', mainContent.value.length);
-
   try {
     // 保存当前光标位置
     const selection = window.getSelection();
@@ -652,7 +680,6 @@ const applyEditorAnnotations = async () => {
     const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
     const parser = new FragmentReferenceParser();
     const references = parser.parseReferences(mainContent.value);
-    console.log('[标注] 解析到引用数量:', references.length, references);
 
     // 解析代码块（包括mermaid）
     const codeBlocks: Array<{ start: number; end: number; type: 'mermaid' | 'code' | 'formula' }> = [];
@@ -712,10 +739,8 @@ const applyEditorAnnotations = async () => {
             fragmentTitles.set(result.fragmentId, result.title);
           }
         });
-
-        console.log('[标注] 获取到的片段标题数量:', fragmentTitles.size, Array.from(fragmentTitles.entries()));
       } catch (error) {
-        console.warn('获取知识片段标题失败:', error);
+        console.error('[标注] 获取知识片段标题失败:', error);
       }
     }
 
@@ -745,13 +770,6 @@ const applyEditorAnnotations = async () => {
             title: (ref as any).title
           };
           annotations.push(annotation);
-          console.log('[标注] 添加引用标注:', {
-            fragmentId: ref.fragmentId,
-            mode: mode,
-            start: ref.startIndex,
-            end: ref.endIndex,
-            text: mainContent.value.substring(ref.startIndex, ref.endIndex)
-          });
       }
     });
 
@@ -856,26 +874,9 @@ const applyEditorAnnotations = async () => {
     // 更新编辑器内容
     if (annotatedHtml) {
       editor.innerHTML = annotatedHtml;
-      console.log('[标注] 已更新编辑器HTML，长度:', annotatedHtml.length);
-
-      // 检查生成的HTML中是否有引用标注
-      await nextTick();
-      const refSpans = editor.querySelectorAll('.editor-reference.linked');
-      console.log('[标注] 生成的HTML中找到的linked引用span数量:', refSpans.length);
-      if (refSpans.length > 0 && refSpans[0]) {
-        const firstSpan = refSpans[0] as HTMLElement;
-        const computedStyle = window.getComputedStyle(firstSpan);
-        console.log('[标注] 第一个引用span样式检查:', {
-          className: firstSpan.className,
-          backgroundColor: computedStyle.backgroundColor,
-          borderColor: computedStyle.borderColor,
-          display: computedStyle.display
-        });
-      }
     } else {
       // 即使没有标注，也使用innerHTML以确保格式正确
       editor.innerHTML = escapeHtml(mainContent.value).replace(/\n/g, '<br>');
-      console.log('[标注] 没有标注，使用纯文本HTML');
     }
 
     // 恢复光标位置（仅当编辑器仍然有焦点时）
@@ -991,6 +992,15 @@ const detectAndHandleReferenceModification = async (
 };
 
 const checkChanges = () => {
+  // 如果工具栏操作正在进行，不检查更改
+  // 避免从编辑器读取旧内容覆盖新的格式化内容
+  if (isToolbarOperation) {
+    console.log('[checkChanges] 工具栏操作中，跳过更改检查');
+    // 但仍然需要标记为已更改
+    hasChanges.value = true;
+    return;
+  }
+
   // 确保使用最新的内容（从编辑器获取，而不是使用缓存的content.value）
   const editor = editorElement.value;
   let currentContent = content.value;
@@ -1009,53 +1019,83 @@ const checkChanges = () => {
   const titleChanged = title.value !== lastSavedTitle;
   const contentChanged = currentContent !== lastSavedContent;
   hasChanges.value = titleChanged || contentChanged;
-
-  // 添加调试日志
-  if (titleChanged || contentChanged) {
-    console.log('[MarkdownEditor] 检测到变化:', {
-      titleChanged,
-      contentChanged,
-      currentTitle: title.value,
-      lastSavedTitle,
-      currentContentLength: currentContent.length,
-      lastSavedContentLength: lastSavedContent.length,
-      contentDiff: currentContent !== lastSavedContent ? '内容不同' : '内容相同'
-    });
-  } else {
-    console.log('[MarkdownEditor] 没有变化:', {
-      currentContentLength: currentContent.length,
-      lastSavedContentLength: lastSavedContent.length
-    });
-  }
 };
+
+// 标志位：工具栏操作是否正在进行
+let isToolbarOperation = false;
 
 // 处理工具栏内容更新
 const handleToolbarUpdate = (newContent: string) => {
-  console.log('[工具栏] 内容更新:', {
-    oldLength: mainContent.value.length,
-    newLength: newContent.length
+  console.log('[handleToolbarUpdate] ========== 开始处理 ==========');
+  console.log('[handleToolbarUpdate] 接收到的新内容:', newContent);
+  console.log('[handleToolbarUpdate] 当前 mainContent.value:', mainContent.value);
+  console.log('[handleToolbarUpdate] 内容是否相同:', newContent === mainContent.value);
+  console.log('[handleToolbarUpdate] 内容长度对比:', {
+    newLength: newContent.length,
+    oldLength: mainContent.value.length
   });
 
+  // 设置标志位，阻止 handleEditorBlur 覆盖内容
+  isToolbarOperation = true;
+  console.log('[handleToolbarUpdate] 设置 isToolbarOperation = true');
+
   // 更新主内容
+  console.log('[handleToolbarUpdate] 准备更新 mainContent.value');
   mainContent.value = newContent;
+  console.log('[handleToolbarUpdate] mainContent.value 已更新:', mainContent.value);
 
   // 合并 frontmatter 和主内容
+  console.log('[handleToolbarUpdate] 准备更新 content.value (完整内容)');
   content.value = mergeContent(frontmatter.value, mainContent.value);
+  console.log('[handleToolbarUpdate] content.value 已更新:', content.value);
 
   // 更新编辑器显示
+  console.log('[handleToolbarUpdate] 准备在 nextTick 中更新编辑器 DOM');
   nextTick(() => {
     const editor = editorElement.value;
+    console.log('[handleToolbarUpdate] nextTick 回调执行');
+    console.log('[handleToolbarUpdate] editorElement.value:', editor);
+    console.log('[handleToolbarUpdate] 当前 mainContent.value:', mainContent.value);
+    console.log('[handleToolbarUpdate] mainContent.value 类型:', typeof mainContent.value);
+    console.log('[handleToolbarUpdate] mainContent.value 长度:', mainContent.value.length);
+
     if (editor) {
+      console.log('[handleToolbarUpdate] 更新编辑器前', {
+        editorTextContent: editor.textContent,
+        editorInnerHTML: editor.innerHTML,
+        mainContentValue: mainContent.value,
+        mainContentLength: mainContent.value.length
+      });
+
+      console.log('[handleToolbarUpdate] 执行 editor.textContent = mainContent.value');
       editor.textContent = mainContent.value;
+
+      console.log('[handleToolbarUpdate] 更新编辑器后', {
+        editorTextContent: editor.textContent,
+        editorInnerHTML: editor.innerHTML,
+        textContentLength: editor.textContent?.length
+      });
+
+      // 短暂延迟后清除标志位，确保 DOM 更新完成
+      console.log('[handleToolbarUpdate] 设置 100ms 后清除 isToolbarOperation');
+      setTimeout(() => {
+        console.log('[handleToolbarUpdate] 清除 isToolbarOperation = false');
+        isToolbarOperation = false;
+      }, 100);
+    } else {
+      console.error('[handleToolbarUpdate] editorElement.value 为 null，无法更新编辑器');
     }
   });
 
   // 渲染预览
+  console.log('[handleToolbarUpdate] 准备调用 renderContent()');
   renderContent();
 
   // 检查更改并保存
+  console.log('[handleToolbarUpdate] 准备调用 checkChanges() 和 debouncedSave()');
   checkChanges();
   debouncedSave();
+  console.log('[handleToolbarUpdate] ========== 处理结束 ==========');
 };
 
 const debouncedSave = () => {
@@ -1076,17 +1116,13 @@ const updateDocument = () => {
 };
 
 const saveDocument = async () => {
-  console.log('[MarkdownEditor] saveDocument called, hasChanges:', hasChanges.value, 'currentFilePath:', currentFilePath.value, 'document:', props.document?.id);
-
   if (!hasChanges.value) {
-    console.log('[MarkdownEditor] 没有变化，跳过保存');
     return;
   }
 
   // 如果有外部文件路径，保存到文件系统
   if (currentFilePath.value) {
     try {
-      console.log('[MarkdownEditor] 保存外部文件:', currentFilePath.value);
       const electronAPI = (window as any).electronAPI;
       if (electronAPI && electronAPI.file && electronAPI.file.writeFileContent) {
         // 确保使用最新的内容（从编辑器获取，而不是使用缓存的content.value）
@@ -1117,19 +1153,16 @@ const saveDocument = async () => {
           }
         }
 
-        console.log('[MarkdownEditor] 写入文件内容，长度:', contentToSave.length);
         await electronAPI.file.writeFileContent(currentFilePath.value, contentToSave);
-        console.log('[MarkdownEditor] 文件保存成功');
         lastSavedTitle = title.value;
         lastSavedContent = content.value; // 保存编辑器中的内容（带引用标志）
         hasChanges.value = false;
-        console.log('[MarkdownEditor] 已更新 lastSavedTitle 和 lastSavedContent');
         return;
       } else {
-        console.error('[MarkdownEditor] electronAPI.file.writeFileContent 不可用');
+        console.error('[保存] electronAPI.file.writeFileContent 不可用');
       }
     } catch (error) {
-      console.error('[MarkdownEditor] 保存文件失败:', error);
+      console.error('[保存] 保存文件失败:', error);
       // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
       return;
     }
@@ -1138,18 +1171,16 @@ const saveDocument = async () => {
   // 如果有document，保存到数据库
   if (props.document) {
     try {
-      console.log('[MarkdownEditor] 保存数据库文档:', props.document.id);
       emit('update-document', props.document.id, title.value, content.value);
       lastSavedTitle = title.value;
       lastSavedContent = content.value;
       hasChanges.value = false;
-      console.log('[MarkdownEditor] 数据库文档保存成功，已更新 lastSavedTitle 和 lastSavedContent');
     } catch (error) {
-      console.error('[MarkdownEditor] 保存数据库文档失败:', error);
+      console.error('[保存] 保存数据库文档失败:', error);
       // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
     }
   } else {
-    console.warn('[MarkdownEditor] 既没有 currentFilePath 也没有 document，无法保存');
+    console.warn('[保存] 既没有 currentFilePath 也没有 document，无法保存');
   }
 };
 
@@ -1244,9 +1275,8 @@ const renderContent = async () => {
         });
 
         variables = result.variables;
-        console.log('[renderContent] Variables for replacement:', variables);
       } catch (error) {
-        console.warn('Failed to get variables:', error);
+        console.error('[渲染] 获取变量失败:', error);
         // 如果获取变量失败，使用空对象
         variables = {};
       }
@@ -1272,17 +1302,10 @@ const renderContent = async () => {
 
         if (variables.hasOwnProperty(varName)) {
           const value = variables[varName];
-          console.log(`[renderContent] Replacing {{${varName}}} with ${value}`);
           return String(value);
         }
-        console.log(`[renderContent] Variable ${varName} not found, keeping ${match}`);
         return match; // 变量不存在，保持原样
       });
-
-      console.log('[renderContent] Content before markdown:', processedContent.substring(0, 200));
-      console.log('[renderContent] 内容中是否包含引用标志:', processedContent.includes('{{ref:'));
-      console.log('[renderContent] processedContent 完整长度:', processedContent.length);
-      console.log('[renderContent] processedContent 完整内容:', processedContent);
 
       // 渲染已替换变量的内容（不传递变量给 markdown 处理器）
       // renderMarkdown 会调用 resolveReferences 来解析引用标志
@@ -1299,11 +1322,7 @@ const renderContent = async () => {
         }
       }
 
-      console.log('[renderContent] 调用 renderMarkdown，docId:', docId, 'hasCache:', !!fileCache);
       const newRenderedContent = await props.renderMarkdown(processedContent, docId, fileCache);
-      console.log('[renderContent] renderMarkdown 返回的HTML长度:', newRenderedContent.length);
-      console.log('[renderContent] renderMarkdown 返回的HTML前200字符:', newRenderedContent.substring(0, 200));
-      console.log('[renderContent] renderMarkdown 返回的HTML完整内容:', newRenderedContent);
 
       // 获取编辑器的滚动百分比位置（这是我们要同步到预览的基准）
       const editor = editorElement.value;
@@ -1624,7 +1643,6 @@ onUnmounted(() => {
 
   // 组件卸载前，如果有未保存的更改，强制保存
   if (hasChanges.value) {
-    console.log('[MarkdownEditor] 组件卸载前检测到未保存的更改，强制保存');
     // 清除防抖定时器，立即保存
     if (debounceTimer) {
       clearTimeout(debounceTimer);
@@ -1632,7 +1650,7 @@ onUnmounted(() => {
     }
     // 同步保存（不使用 await，因为 onUnmounted 不支持异步）
     saveDocument().catch(error => {
-      console.error('[MarkdownEditor] 组件卸载前保存失败:', error);
+      console.error('[组件卸载] 保存失败:', error);
     });
   }
 });
@@ -1676,18 +1694,13 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
   try {
     const selection = window.getSelection();
     if (!selection) {
-      console.warn('[setCursorPosition] 无法获取 Selection 对象');
-    return;
-  }
+      return;
+    }
 
     // 确保位置在有效范围内
     const textContent = element.textContent || '';
     const maxPosition = textContent.length;
     const validPosition = Math.max(0, Math.min(position, maxPosition));
-
-    if (validPosition !== position) {
-      console.warn(`[setCursorPosition] 位置 ${position} 超出范围 [0, ${maxPosition}]，调整为 ${validPosition}`);
-    }
 
     const range = document.createRange();
     const walker = document.createTreeWalker(
@@ -1717,7 +1730,6 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
       range.collapse(true);
       selection.removeAllRanges();
       selection.addRange(range);
-      console.log(`[setCursorPosition] 成功设置光标位置到 ${validPosition}`);
     } else {
       // 如果找不到目标节点，将光标设置到末尾
       const textNodes: Node[] = [];
@@ -1739,18 +1751,16 @@ const setCursorPosition = (element: HTMLElement, position: number): void => {
           range.collapse(true);
           selection.removeAllRanges();
           selection.addRange(range);
-          console.log(`[setCursorPosition] 未找到目标节点，设置光标到文档末尾 (${lastLength})`);
         }
       } else {
         range.selectNodeContents(element);
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
-        console.log(`[setCursorPosition] 没有文本节点，设置光标到元素末尾`);
       }
     }
   } catch (error) {
-    console.error('[setCursorPosition] 设置光标位置时出错:', error);
+    console.error('[光标位置设置失败]', error);
   }
 };
 
@@ -1793,11 +1803,6 @@ const openMermaidEditor = () => {
   // 确保位置在有效范围内
   const validStart = Math.max(0, Math.min(start, mainContent.value.length));
   const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
-
-  console.log('[Mermaid编辑器] 打开编辑器');
-  console.log('[Mermaid编辑器] mainContent长度:', mainContent.value.length);
-  console.log('[Mermaid编辑器] 保存的光标位置 start:', currentSelectionStart.value, 'end:', currentSelectionEnd.value);
-  console.log('[Mermaid编辑器] 使用的光标位置 start:', validStart, 'end:', validEnd);
 
   // 尝试提取Mermaid代码块（使用 mainContent，确保索引匹配）
   const mermaidCode = extractMermaidCode(mainContent.value, validStart, validEnd);
@@ -1867,10 +1872,6 @@ const handleMermaidSave = async (mermaidCode: string) => {
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
 
-  console.log('[Mermaid保存] 开始保存');
-  console.log('[Mermaid保存] 插入位置 start:', start, 'end:', end);
-  console.log('[Mermaid保存] mainContent长度:', mainContent.value.length);
-
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
 
@@ -1899,9 +1900,6 @@ const handleMermaidSave = async (mermaidCode: string) => {
     // 光标位置设置为插入块之后（包括换行）
     newCursorPosition = insertPos + mermaidBlock.length + 1;
   }
-
-  console.log('[Mermaid保存] 新内容长度:', newMainContent.length);
-  console.log('[Mermaid保存] 新光标位置:', newCursorPosition);
 
   // 更新 mainContent 和完整 content
   mainContent.value = newMainContent;
@@ -1985,12 +1983,6 @@ const openFormulaEditor = () => {
   // 确保位置在有效范围内
   const validStart = Math.max(0, Math.min(start, mainContent.value.length));
   const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
-
-  console.log('[公式编辑器] 打开公式编辑器');
-  console.log('[公式编辑器] 编辑器文本长度:', currentEditorText.length);
-  console.log('[公式编辑器] mainContent长度:', mainContent.value.length);
-  console.log('[公式编辑器] 保存的光标位置 start:', currentSelectionStart.value, 'end:', currentSelectionEnd.value);
-  console.log('[公式编辑器] 使用的光标位置 start:', validStart, 'end:', validEnd);
 
   // 尝试提取公式代码（使用 mainContent，确保索引匹配）
   const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd);
@@ -2097,11 +2089,6 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   const start = currentSelectionStart.value;
   const end = currentSelectionEnd.value;
 
-  console.log('[公式保存] 保存公式');
-  console.log('[公式保存] 保存位置 start:', start, 'end:', end);
-  console.log('[公式保存] mainContent长度:', mainContent.value.length);
-  console.log('[公式保存] mainContent前100字符:', mainContent.value.substring(0, 100));
-
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
   let newMainContent = mainContent.value;
 
@@ -2114,17 +2101,12 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   const validStart = Math.max(0, Math.min(start, newMainContent.length));
   const validEnd = Math.max(validStart, Math.min(end, newMainContent.length));
 
-  console.log('[公式保存] 有效位置 start:', validStart, 'end:', validEnd);
-
   // 替换或插入公式
   if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
     newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validEnd);
   } else {
     newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validStart);
   }
-
-  console.log('[公式保存] 插入后mainContent前100字符:', newMainContent.substring(0, 100));
-  console.log('[公式保存] 公式插入位置:', newMainContent.indexOf(formattedFormula));
 
   // 更新 mainContent 和完整 content
   mainContent.value = newMainContent;
