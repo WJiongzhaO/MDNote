@@ -2108,7 +2108,7 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   let newMainContent = mainContent.value;
   
   // 根据公式类型格式化代码
-  const formattedFormula = formulaType === 'block' 
+  let formattedFormula = formulaType === 'block' 
     ? `$$${latexCode}$$`
     : `$${latexCode}$`;
 
@@ -2118,8 +2118,27 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   
   // 替换或插入公式
   if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
+    // 替换选中的内容
     newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validEnd);
   } else {
+    // 插入新公式
+    // 对于块级公式，需要确保前后有换行符（遵循 Markdown 规范）
+    if (formulaType === 'block') {
+      const textBefore = newMainContent.substring(0, validStart);
+      const textAfter = newMainContent.substring(validStart);
+      
+      // 检查前面是否需要添加换行
+      const needsLineBreakBefore = textBefore.length > 0 && !textBefore.endsWith('\n\n') && !textBefore.endsWith('\n');
+      // 检查后面是否需要添加换行
+      const needsLineBreakAfter = textAfter.length > 0 && !textAfter.startsWith('\n');
+      
+      // 构建带换行的公式
+      const prefix = needsLineBreakBefore ? '\n\n' : (textBefore.endsWith('\n') ? '\n' : '');
+      const suffix = needsLineBreakAfter ? '\n\n' : '';
+      
+      formattedFormula = prefix + formattedFormula + suffix;
+    }
+    
     newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validStart);
   }
 
