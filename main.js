@@ -994,6 +994,40 @@ ipcMain.handle('file:delete-node', async (event, nodePath) => {
   }
 });
 
+// 重命名文件或文件夹
+ipcMain.handle('file:rename-node', async (event, oldPath, newName) => {
+  try {
+    // 规范化路径（处理 Windows 路径）
+    const normalizedOldPath = path.normalize(oldPath);
+
+    // 检查路径是否存在
+    if (!fs.existsSync(normalizedOldPath)) {
+      throw new Error('要重命名的路径不存在: ' + normalizedOldPath);
+    }
+
+    // 获取父目录
+    const parentDir = path.dirname(normalizedOldPath);
+    
+    // 构建新路径
+    const newPath = path.join(parentDir, newName);
+
+    // 检查新路径是否已存在
+    if (fs.existsSync(newPath)) {
+      throw new Error('目标路径已存在: ' + newPath);
+    }
+
+    // 执行重命名
+    fs.renameSync(normalizedOldPath, newPath);
+    console.log('[Main Process] 已重命名:', normalizedOldPath, '->', newPath);
+    
+    // 返回新路径（保持原始格式，前端会处理）
+    return { success: true, newPath: newPath };
+  } catch (error) {
+    console.error('Error renaming node:', error);
+    throw error;
+  }
+});
+
 // 文件缓存操作（用于存储引用标志信息）
 const getCachePath = (filePath) => {
   // 将文件路径转换为缓存文件名（使用hash避免路径问题）

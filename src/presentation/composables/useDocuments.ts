@@ -44,6 +44,11 @@ export function useDocuments() {
         updatedAt: newDocument.updatedAt,
         folderId: newDocument.folderId
       });
+      
+      // 创建文档后，自动加载并选中新文档，确保编辑器显示新文档内容
+      // 这样文档列表和编辑器状态保持一致
+      currentDocument.value = newDocument;
+      
       return newDocument;
     } catch (err) {
       error.value = 'Failed to create document';
