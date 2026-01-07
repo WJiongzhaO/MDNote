@@ -204,10 +204,12 @@ export class MermaidRendererService implements MermaidRenderer {
         margin: 1rem 0;
         overflow: auto;
         text-align: center;
+        display: block;
       ">
         <div class="mermaid-diagram" style="
-          display: inline-block;
+          display: block;
           max-width: 100%;
+          margin: 0 auto;
         ">
           ${svg}
         </div>

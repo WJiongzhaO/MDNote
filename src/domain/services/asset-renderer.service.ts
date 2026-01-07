@@ -68,14 +68,13 @@ export class AssetRendererService implements AssetRenderer {
           background-color: #f8f9fa;
           position: relative;
           min-height: 200px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          display: block;
         "
       >
         <div class="mermaid-loading" style="
           text-align: center;
           color: #666;
+          padding: 3rem 0;
         ">
           <div style="margin-bottom: 0.5rem;">🔄 正在渲染Mermaid图表...</div>
           <div style="font-size: 0.8rem; opacity: 0.7;">请稍候</div>
@@ -147,13 +146,15 @@ export class AssetRendererService implements AssetRenderer {
       placeholder.innerHTML = `
         <div class="mermaid-container" style="
           background-color: transparent;
-          margin: 0;
+          margin: 1rem 0;
           overflow: auto;
           text-align: center;
+          display: block;
         ">
           <div class="mermaid-diagram" style="
-            display: inline-block;
+            display: block;
             max-width: 100%;
+            margin: 0 auto;
           ">
             ${svg}
           </div>

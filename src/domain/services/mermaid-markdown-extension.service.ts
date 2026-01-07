@@ -60,7 +60,7 @@ export class MermaidMarkdownExtension implements MarkdownExtension {
               padding: 0.5rem 1rem;
               margin: 0.5rem 0;
               background-color: #f8f9fa;
-              display: inline-block;
+              display: block;
               font-size: 0.85rem;
               color: #666;
             "

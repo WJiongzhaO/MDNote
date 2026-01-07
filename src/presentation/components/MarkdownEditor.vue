@@ -632,8 +632,15 @@ const handleEditorMouseDown = () => {
   }
 };
 
-// 处理编辑器失去焦点（精简版：只做状态标记，不再重建 DOM）
+// 处理编辑器失去焦点（保存光标位置）
 const handleEditorBlur = () => {
+  const editor = editorElement.value;
+  if (editor) {
+    // 保存光标位置
+    const { start, end } = getCursorPosition(editor);
+    currentSelectionStart.value = start;
+    currentSelectionEnd.value = end;
+  }
   isEditorFocused.value = false;
 };
 
@@ -2120,14 +2127,19 @@ const handleFormulaSave = (formulaData: { latexCode: string; formulaType: 'inlin
   mainContent.value = newMainContent;
   content.value = mergeContent(frontmatter.value, mainContent.value);
 
-  // 更新编辑器显示
-  if (!isEditorFocused.value) {
-    // 编辑器没有焦点时，应用标注
-    applyEditorAnnotations();
-  } else {
-    // 编辑器有焦点时，直接更新文本内容
-    editor.textContent = mainContent.value;
-  }
+  // 计算新的光标位置（插入公式后）
+  const newCursorPosition = validStart + formattedFormula.length;
+
+  // 更新编辑器显示并恢复光标
+  editor.textContent = mainContent.value;
+  
+  // 等待下一帧后设置光标位置
+  nextTick(() => {
+    if (editor) {
+      setCursorPosition(editor, newCursorPosition);
+      editor.focus(); // 确保编辑器获得焦点
+    }
+  });
 
   checkChanges();
   renderContent();
@@ -3915,6 +3927,14 @@ defineExpose({
 
 .markdown-preview :deep(a) {
   color: var(--preview-link);
+}
+
+/* Mermaid图表样式 - 确保上下排列 */
+.markdown-preview :deep(svg) {
+  display: block;
+  margin: 16px auto;
+  max-width: 100%;
+  height: auto;
 }
 
 /* 编辑器内容样式 */
