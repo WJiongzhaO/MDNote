@@ -187,15 +187,15 @@ const handleInsert = (insertType: string) => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
   flex-wrap: wrap;
 }
 
 .toolbar-divider {
   width: 1px;
   height: 24px;
-  background: #dee2e6;
+  background: var(--border-primary);
   margin: 0 4px;
 }
 </style>

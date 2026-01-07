@@ -8,6 +8,10 @@ import { Application } from './core/application';
 import { InversifyContainer } from './core/container/inversify.container';
 import { TYPES } from './core/container/container.types';
 import type { MermaidRenderer } from './domain/services/markdown-processor.interface';
+import { useTheme } from './presentation/composables/useTheme';
+
+// 主题系统初始化
+const { initialize: initializeTheme } = useTheme();
 
 // 创建响应式变量来存储服务实例
 const mermaidRenderer = ref<MermaidRenderer | null>(null);
@@ -21,6 +25,9 @@ provide('diContainer', container);
 provide(TYPES.MermaidRenderer, mermaidRenderer);
 
 onMounted(async () => {
+  // 初始化主题系统
+  initializeTheme();
+
   try {
     await app.start();
 
@@ -37,6 +44,8 @@ onMounted(async () => {
 </script>
 
 <style>
+@import './assets/styles/theme-variables.css';
+
 * {
   margin: 0;
   padding: 0;
@@ -47,12 +56,15 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: white;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 #app {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 </style>

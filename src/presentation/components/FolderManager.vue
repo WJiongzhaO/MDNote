@@ -468,22 +468,22 @@ onMounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
 }
 
 .manager-header {
-  background: white;
+  background: var(--bg-primary);
   padding: 20px 30px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .manager-header h1 {
   margin: 0;
-  color: #333;
+  color: var(--text-primary);
   font-size: 1.8rem;
 }
 
@@ -505,30 +505,30 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background: #667eea;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
-  background: #5a67d8;
+  background: var(--accent-secondary);
 }
 
 .btn-secondary {
-  background: #e9ecef;
-  color: #333;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-  background: #dee2e6;
+  background: var(--border-primary);
 }
 
 .btn-danger {
-  background: #e53e3e;
-  color: white;
+  background: var(--accent-danger);
+  color: var(--text-inverse);
 }
 
 .btn-danger:hover {
-  background: #c53030;
+  background: #e05555;
 }
 
 .btn-small {
@@ -548,15 +548,15 @@ onMounted(() => {
 
 .folder-tree-section {
   width: 350px;
-  background: white;
-  border-right: 1px solid #e9ecef;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-secondary);
   display: flex;
   flex-direction: column;
 }
 
 .section-header {
   padding: 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -565,7 +565,7 @@ onMounted(() => {
 .section-header h2 {
   margin: 0;
   font-size: 1.2rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .tree-actions {
@@ -589,17 +589,17 @@ onMounted(() => {
 }
 
 .folder-item:hover {
-  background: #f8f9fa;
+  background: var(--bg-hover);
 }
 
 .folder-item.active {
-  background: #e8f4ff;
-  border-left: 3px solid #667eea;
+  background: var(--bg-active);
+  border-left: 3px solid var(--accent-primary);
 }
 
 .root-folder {
   font-weight: 600;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   margin-bottom: 10px;
 }
 
@@ -616,24 +616,24 @@ onMounted(() => {
 
 .folder-count {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .folder-details-section {
   flex: 1;
-  background: white;
+  background: var(--bg-primary);
   padding: 30px;
   overflow-y: auto;
 }
 
 .folder-details h3 {
   margin: 0 0 10px 0;
-  color: #333;
+  color: var(--text-primary);
   font-size: 1.5rem;
 }
 
 .folder-description {
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 20px;
 }
 
@@ -648,7 +648,7 @@ onMounted(() => {
   gap: 30px;
   margin-bottom: 25px;
   padding: 15px;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
   border-radius: 6px;
 }
 
@@ -659,19 +659,19 @@ onMounted(() => {
 
 .stat-label {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
 .stat-value {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .folder-documents h4 {
   margin: 0 0 15px 0;
-  color: #333;
+  color: var(--text-primary);
   font-size: 1.1rem;
 }
 
@@ -683,7 +683,7 @@ onMounted(() => {
 
 .document-item {
   padding: 12px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -693,7 +693,7 @@ onMounted(() => {
 }
 
 .document-item:hover {
-  background: #f8f9fa;
+  background: var(--bg-hover);
 }
 
 .doc-icon {
@@ -703,18 +703,18 @@ onMounted(() => {
 .doc-title {
   flex: 1;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .doc-date {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .empty-documents {
   text-align: center;
   padding: 40px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .empty-documents p {
@@ -727,7 +727,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .selection-icon {
@@ -738,7 +738,7 @@ onMounted(() => {
 .empty-state, .loading-state {
   padding: 40px 20px;
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .empty-icon {
@@ -753,14 +753,14 @@ onMounted(() => {
 
 .empty-subtext {
   font-size: 0.9rem;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .loading-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid #e9ecef;
-  border-top: 2px solid #667eea;
+  border: 2px solid var(--border-secondary);
+  border-top: 2px solid var(--accent-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 12px;
@@ -777,7 +777,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -785,17 +785,17 @@ onMounted(() => {
 }
 
 .modal {
-  background: white;
+  background: var(--bg-primary);
   padding: 30px;
   border-radius: 8px;
   width: 500px;
   max-width: 90%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .modal h3 {
   margin: 0 0 20px 0;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .form-group {
@@ -806,22 +806,24 @@ onMounted(() => {
   display: block;
   margin-bottom: 8px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 1rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--accent-primary);
 }
 
 .modal-actions {
@@ -831,7 +833,7 @@ onMounted(() => {
 }
 
 .warning-text {
-  color: #e53e3e;
+  color: var(--accent-danger);
   font-size: 0.9rem;
   margin-top: 10px;
 }
@@ -841,11 +843,11 @@ onMounted(() => {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: #dc3545;
-  color: white;
+  background: var(--accent-danger);
+  color: var(--text-inverse);
   padding: 12px 20px;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -857,7 +859,7 @@ onMounted(() => {
 .error-close {
   background: none;
   border: none;
-  color: white;
+  color: var(--text-inverse);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 0;

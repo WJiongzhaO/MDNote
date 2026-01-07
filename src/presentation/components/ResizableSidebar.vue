@@ -81,8 +81,8 @@ const toggleCollapse = () => {
 .resizable-sidebar {
   position: relative;
   height: 100vh;
-  background: #f8f9fa;
-  border-right: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-secondary);
   display: flex;
   overflow: hidden;
 }
@@ -103,7 +103,7 @@ const toggleCollapse = () => {
 }
 
 .resize-handle:hover {
-  background: #007acc;
+  background: var(--accent-primary);
 }
 
 .resize-handle::before {
@@ -122,7 +122,7 @@ const toggleCollapse = () => {
   transform: translate(-50%, -50%);
   width: 2px;
   height: 20px;
-  background: #ccc;
+  background: var(--text-tertiary);
   border-radius: 1px;
   opacity: 0;
   transition: opacity 0.2s;

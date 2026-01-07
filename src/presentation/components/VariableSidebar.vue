@@ -514,8 +514,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--background-color);
-  color: var(--text-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .sidebar-header {
@@ -523,7 +523,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .sidebar-header h2 {
@@ -541,7 +541,7 @@ onMounted(() => {
   display: flex;
   padding: 8px;
   gap: 4px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .tab {
@@ -549,7 +549,7 @@ onMounted(() => {
   padding: 8px 12px;
   border: none;
   background: transparent;
-  color: var(--text-color);
+  color: var(--text-primary);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s;
@@ -560,12 +560,12 @@ onMounted(() => {
 }
 
 .tab:hover {
-  background: var(--hover-color);
+  background: var(--bg-hover);
 }
 
 .tab.active {
-  background: var(--primary-color);
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .tab .count {
@@ -579,7 +579,7 @@ onMounted(() => {
 .empty-state {
   padding: 32px;
   text-align: center;
-  color: var(--text-secondary-color);
+  color: var(--text-secondary);
 }
 
 .variable-list {
@@ -591,20 +591,20 @@ onMounted(() => {
 .variable-item {
   padding: 12px;
   margin-bottom: 8px;
-  background: var(--card-background);
-  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .variable-item:hover {
-  border-color: var(--primary-color);
+  border-color: var(--accent-primary);
 }
 
 .variable-item.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px var(--primary-color-light);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 .variable-header {
@@ -616,7 +616,7 @@ onMounted(() => {
 
 .variable-name {
   font-weight: 600;
-  color: var(--primary-color);
+  color: var(--accent-primary);
   font-family: monospace;
 }
 
@@ -632,19 +632,19 @@ onMounted(() => {
 }
 
 .variable-value {
-  color: var(--text-secondary-color);
+  color: var(--text-secondary);
   font-size: 14px;
   word-break: break-all;
   font-family: monospace;
   padding: 4px 8px;
-  background: var(--background-color);
+  background: var(--bg-secondary);
   border-radius: 4px;
 }
 
 .variable-origin {
   margin-top: 8px;
   font-size: 12px;
-  color: var(--text-secondary-color);
+  color: var(--text-secondary);
 }
 
 /* 对话框样式 */
@@ -654,7 +654,7 @@ onMounted(() => {
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  background: rgba(0, 0, 0, 0.5) !important;
+  background: var(--bg-overlay) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -663,14 +663,14 @@ onMounted(() => {
 }
 
 .dialog {
-  background: #ffffff !important;
+  background: var(--bg-primary) !important;
   border-radius: 12px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: var(--shadow-lg) !important;
   max-width: 500px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
-  color: #333333;
+  color: var(--text-primary);
   animation: dialogFadeIn 0.2s ease-out;
 }
 
@@ -698,8 +698,8 @@ onMounted(() => {
   justify-content: space-between !important;
   align-items: center !important;
   padding: 16px 24px !important;
-  border-bottom: 1px solid #e0e0e0 !important;
-  background: #f8f9fa !important;
+  border-bottom: 1px solid var(--border-secondary) !important;
+  background: var(--bg-secondary) !important;
   border-radius: 12px 12px 0 0 !important;
 }
 
@@ -707,13 +707,13 @@ onMounted(() => {
   margin: 0 !important;
   font-size: 18px !important;
   font-weight: 600 !important;
-  color: #333333 !important;
+  color: var(--text-primary) !important;
 }
 
 .dialog-body {
   padding: 24px !important;
-  background: #ffffff !important;
-  color: #333333 !important;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
 }
 
 .dialog-footer {
@@ -721,8 +721,8 @@ onMounted(() => {
   justify-content: flex-end !important;
   gap: 12px !important;
   padding: 16px 24px !important;
-  border-top: 1px solid #e0e0e0 !important;
-  background: #f8f9fa !important;
+  border-top: 1px solid var(--border-secondary) !important;
+  background: var(--bg-secondary) !important;
   border-radius: 0 0 12px 12px !important;
 }
 
@@ -734,14 +734,14 @@ onMounted(() => {
   display: block;
   margin-bottom: 8px;
   font-weight: 500;
-  color: #333333 !important;
+  color: var(--text-primary) !important;
 }
 
 .help-text {
   display: block;
   margin-top: 4px;
   font-size: 12px;
-  color: #666666;
+  color: var(--text-secondary);
 }
 
 .value-type-selector {
@@ -753,9 +753,9 @@ onMounted(() => {
 .type-btn {
   flex: 1;
   padding: 8px;
-  border: 1px solid #d0d0d0 !important;
+  border: 1px solid var(--border-primary) !important;
   background: transparent !important;
-  color: #333333 !important;
+  color: var(--text-primary) !important;
   border-radius: 6px !important;
   cursor: pointer;
   transition: all 0.2s;
@@ -763,24 +763,24 @@ onMounted(() => {
 }
 
 .type-btn:hover {
-  border-color: #4a90e2 !important;
-  background: #f0f7ff !important;
+  border-color: var(--accent-info) !important;
+  background: var(--bg-active) !important;
 }
 
 .type-btn.active {
-  background: #4a90e2 !important;
-  color: white !important;
-  border-color: #4a90e2 !important;
+  background: var(--accent-info) !important;
+  color: var(--text-inverse) !important;
+  border-color: var(--accent-info) !important;
 }
 
 .input,
 .textarea {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
-  background: #ffffff;
-  color: #333333;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-size: 14px;
   box-sizing: border-box;
   transition: border-color 0.2s;
@@ -789,8 +789,8 @@ onMounted(() => {
 .input:focus,
 .textarea:focus {
   outline: none;
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+  border-color: var(--accent-info);
+  box-shadow: 0 0 0 2px rgba(51, 154, 240, 0.1);
 }
 
 .textarea {
@@ -825,7 +825,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--border-color);
+  background-color: var(--border-primary);
   transition: 0.3s;
   border-radius: 24px;
 }
@@ -837,13 +837,13 @@ onMounted(() => {
   width: 18px;
   left: 3px;
   bottom: 3px;
-  background-color: white;
+  background-color: var(--text-inverse);
   transition: 0.3s;
   border-radius: 50%;
 }
 
 input:checked + .slider {
-  background-color: var(--primary-color);
+  background-color: var(--accent-primary);
 }
 
 input:checked + .slider:before {
@@ -852,16 +852,16 @@ input:checked + .slider:before {
 
 .error-message {
   padding: 8px 12px;
-  background: #fee;
-  color: #c33;
+  background: rgba(255, 107, 107, 0.2);
+  color: var(--accent-danger);
   border-radius: 6px;
   font-size: 14px;
 }
 
 .preview-result {
   padding: 12px;
-  background: var(--background-color);
-  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
   border-radius: 6px;
   font-family: monospace;
   white-space: pre-wrap;
@@ -882,12 +882,12 @@ input:checked + .slider:before {
 .btn-icon {
   padding: 6px;
   background: transparent;
-  color: #333333;
+  color: var(--text-primary);
   font-size: 18px;
 }
 
 .btn-icon:hover {
-  background: rgba(74, 144, 226, 0.1);
+  background: rgba(51, 154, 240, 0.1);
 }
 
 .btn-icon-small {
@@ -896,36 +896,36 @@ input:checked + .slider:before {
 }
 
 .btn-primary {
-  background: #4a90e2 !important;
-  color: white !important;
+  background: var(--accent-info) !important;
+  color: var(--text-inverse) !important;
   border: none !important;
 }
 
 .btn-primary:hover {
-  background: #357abd !important;
+  background: #2b8adb !important;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+  box-shadow: 0 2px 8px rgba(51, 154, 240, 0.3);
 }
 
 .btn-secondary {
-  background: #e0e0e0 !important;
-  color: #333333 !important;
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
   border: none !important;
 }
 
 .btn-secondary:hover {
-  background: #d0d0d0 !important;
+  background: var(--border-primary) !important;
 }
 
 .btn-danger {
-  background: #e74c3c !important;
-  color: white !important;
+  background: var(--accent-danger) !important;
+  color: var(--text-inverse) !important;
   border: none !important;
 }
 
 .btn-danger:hover {
-  background: #c0392b !important;
+  background: #e05555 !important;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
 }
 </style>

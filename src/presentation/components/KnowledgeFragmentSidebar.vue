@@ -1145,15 +1145,15 @@ defineExpose({
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
-  border-right: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-secondary);
   overflow: hidden;
   position: relative;
 }
 
 .knowledge-fragment-sidebar.drag-over {
-  background: #f0f7ff;
-  border: 2px dashed #667eea;
+  background: var(--bg-active);
+  border: 2px dashed var(--accent-primary);
 }
 
 .drag-overlay {
@@ -1172,17 +1172,17 @@ defineExpose({
 
 .drag-message {
   font-size: 1.2rem;
-  color: #667eea;
+  color: var(--accent-primary);
   font-weight: 600;
-  background: white;
+  background: var(--bg-primary);
   padding: 16px 24px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .sidebar-header {
   padding: 16px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1191,7 +1191,7 @@ defineExpose({
 .sidebar-header h2 {
   margin: 0;
   font-size: 1.2rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .header-actions {
@@ -1215,7 +1215,7 @@ defineExpose({
 }
 
 .btn-icon:hover {
-  background: #e9ecef;
+  background: var(--bg-tertiary);
 }
 
 .btn-icon-small {
@@ -1225,8 +1225,8 @@ defineExpose({
 }
 
 .btn-primary {
-  background: #007bff;
-  color: white;
+  background: var(--accent-info);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
@@ -1235,7 +1235,7 @@ defineExpose({
 
 .btn-secondary {
   background: #6c757d;
-  color: white;
+  color: var(--text-inverse);
 }
 
 .btn-secondary:hover {
@@ -1244,20 +1244,22 @@ defineExpose({
 
 .search-box {
   padding: 12px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .search-input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .tag-filter {
   padding: 12px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   max-height: 150px;
   overflow-y: auto;
 }
@@ -1270,20 +1272,21 @@ defineExpose({
 
 .tag {
   padding: 4px 8px;
-  background: #e9ecef;
+  background: var(--bg-tertiary);
   border-radius: 12px;
   font-size: 0.85rem;
   cursor: pointer;
   transition: background-color 0.2s;
+  color: var(--text-primary);
 }
 
 .tag:hover {
-  background: #dee2e6;
+  background: var(--border-primary);
 }
 
 .tag.active {
-  background: #007bff;
-  color: white;
+  background: var(--accent-info);
+  color: var(--text-inverse);
 }
 
 .fragment-list {
@@ -1295,9 +1298,9 @@ defineExpose({
 .fragment-item {
   padding: 12px;
   margin-bottom: 8px;
-  background: white;
+  background: var(--bg-primary);
   border-radius: 6px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-secondary);
   cursor: pointer;
   transition: all 0.2s;
   user-select: none;
@@ -1313,13 +1316,13 @@ defineExpose({
 }
 
 .fragment-item:hover {
-  border-color: #007bff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-color: var(--accent-info);
+  box-shadow: var(--shadow-sm);
 }
 
 .fragment-item.active {
-  border-color: #007bff;
-  background: #f0f7ff;
+  border-color: var(--accent-info);
+  background: var(--bg-active);
 }
 
 .fragment-header {
@@ -1333,7 +1336,7 @@ defineExpose({
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   flex: 1;
 }
 
@@ -1351,17 +1354,17 @@ defineExpose({
 
 .tag-small {
   padding: 2px 6px;
-  background: #e9ecef;
+  background: var(--bg-tertiary);
   border-radius: 10px;
   font-size: 0.75rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .fragment-preview-image {
   margin-bottom: 8px;
   border-radius: 4px;
   overflow: hidden;
-  background: #f0f0f0;
+  background: var(--bg-hover);
   height: 150px;
   width: 100%;
   display: flex;
@@ -1385,8 +1388,8 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
-  border: 1px solid #e0e0e0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   padding: 8px;
   overflow: hidden; /* 移除滚动，只在外层显示 */
@@ -1400,7 +1403,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   overflow: hidden; /* 移除滚动 */
-  background: white;
+  background: var(--bg-primary);
 }
 
 .mermaid-svg-container :deep(svg) {
@@ -1410,12 +1413,12 @@ defineExpose({
   height: auto !important;
   display: block !important;
   margin: 0 auto;
-  background: white !important;
+  background: var(--bg-primary) !important;
 }
 
 .mermaid-svg-container :deep(text) {
   /* 确保文字可见 */
-  fill: #333 !important;
+  fill: var(--text-primary) !important;
   stroke: none !important;
 }
 
@@ -1424,15 +1427,15 @@ defineExpose({
 .mermaid-svg-container :deep(.node ellipse),
 .mermaid-svg-container :deep(.node polygon) {
   /* 节点背景：白色填充，深色边框 */
-  fill: white !important;
-  stroke: #333 !important;
+  fill: var(--bg-primary) !important;
+  stroke: var(--text-primary) !important;
   stroke-width: 2px !important;
 }
 
 .mermaid-svg-container :deep(.edgePath path),
 .mermaid-svg-container :deep(.edgePath .path) {
   /* 连接线：深色，无填充 */
-  stroke: #333 !important;
+  stroke: var(--text-primary) !important;
   fill: none !important;
   stroke-width: 2px !important;
 }
@@ -1440,8 +1443,8 @@ defineExpose({
 .mermaid-svg-container :deep(.cluster rect),
 .mermaid-svg-container :deep(.cluster polygon) {
   /* 集群/分组：浅色背景 */
-  fill: #f0f0f0 !important;
-  stroke: #666 !important;
+  fill: var(--bg-hover) !important;
+  stroke: var(--text-secondary) !important;
   stroke-width: 2px !important;
 }
 
@@ -1449,19 +1452,19 @@ defineExpose({
   text-align: center;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .mermaid-error {
   text-align: center;
   font-size: 0.85rem;
-  color: #dc3545;
+  color: var(--accent-danger);
   padding: 8px;
 }
 
 .fragment-preview {
   font-size: 0.85rem;
-  color: #666;
+  color: var(--text-secondary);
   line-height: 1.4;
   max-height: 80px;
   overflow: hidden;
@@ -1483,7 +1486,7 @@ defineExpose({
 }
 
 .fragment-preview :deep(code) {
-  background: #f4f4f4;
+  background: var(--bg-secondary);
   padding: 2px 4px;
   border-radius: 3px;
   font-size: 0.9em;
@@ -1499,7 +1502,7 @@ defineExpose({
 .empty-state {
   padding: 40px 20px;
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .dialog-overlay {
@@ -1508,7 +1511,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1516,7 +1519,7 @@ defineExpose({
 }
 
 .dialog {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   width: 90%;
   max-width: 600px;
@@ -1527,7 +1530,7 @@ defineExpose({
 
 .dialog-header {
   padding: 16px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1546,10 +1549,12 @@ defineExpose({
 .textarea {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 0.9rem;
   font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .textarea {
@@ -1559,7 +1564,7 @@ defineExpose({
 
 .dialog-footer {
   padding: 16px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid var(--border-secondary);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1573,7 +1578,7 @@ defineExpose({
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .path-display {
@@ -1588,7 +1593,7 @@ defineExpose({
 
 .settings-hint {
   font-size: 0.85rem;
-  color: #666;
+  color: var(--text-secondary);
   margin: 8px 0;
 }
 </style>

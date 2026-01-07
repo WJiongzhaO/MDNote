@@ -780,7 +780,7 @@ defineExpose({
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--bg-primary);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -791,8 +791,8 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .chart-type-selector {
@@ -803,9 +803,9 @@ defineExpose({
 
 .chart-type-selector select {
   padding: 5px 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
-  background: white;
+  background: var(--bg-primary);
 }
 
 .editor-actions {
@@ -822,10 +822,10 @@ defineExpose({
   transition: background-color 0.2s;
 }
 
-.btn-secondary { background: #6c757d; color: white; }
-.btn-info { background: #17a2b8; color: white; }
-.btn-success { background: #28a745; color: white; }
-.btn-danger { background: #dc3545; color: white; }
+.btn-secondary { background: #6c757d; color: var(--text-inverse); }
+.btn-info { background: #17a2b8; color: var(--text-inverse); }
+.btn-success { background: var(--accent-success); color: var(--text-inverse); }
+.btn-danger { background: var(--accent-danger); color: var(--text-inverse); }
 .btn-sm { padding: 5px 10px; font-size: 0.8em; }
 
 .btn:hover {
@@ -842,7 +842,7 @@ defineExpose({
   flex: 1;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e9ecef;
+  border-right: 1px solid var(--border-secondary);
 }
 
 .preview-panel {
@@ -854,14 +854,14 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .panel-header h3 {
   margin: 0;
   font-size: 1.1em;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .symbol-toolbar {
@@ -871,15 +871,15 @@ defineExpose({
 
 .symbol-btn {
   padding: 5px 10px;
-  border: 1px solid #ddd;
-  background: white;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary);
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.9em;
 }
 
 .symbol-btn:hover {
-  background: #f8f9fa;
+  background: var(--bg-secondary);
 }
 
 .code-editor {
@@ -891,14 +891,14 @@ defineExpose({
   line-height: 1.5;
   resize: none;
   outline: none;
-  background: #fafafa;
+  background: var(--bg-secondary);
 }
 
 .preview-container {
   flex: 1;
   padding: 20px;
   overflow: auto;
-  background: white;
+  background: var(--bg-primary);
 }
 
 .rendering-indicator {
@@ -907,7 +907,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .spinner {
@@ -931,7 +931,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #6c757d;
+  color: var(--text-secondary);
   text-align: center;
 }
 
@@ -942,9 +942,9 @@ defineExpose({
 
 .error-message {
   padding: 10px 20px;
-  background: #ffeaea;
+  background: rgba(255, 107, 107, 0.2);
   border: 1px solid #ff6b6b;
-  color: #d63031;
+  color: var(--accent-danger);
   margin: 0 20px 20px;
   border-radius: 4px;
   font-size: 0.9em;
@@ -961,7 +961,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -969,7 +969,7 @@ defineExpose({
 }
 
 .modal-content {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   width: 80%;
   max-width: 800px;
@@ -982,7 +982,7 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .close-btn {
@@ -990,7 +990,7 @@ defineExpose({
   border: none;
   font-size: 1.5em;
   cursor: pointer;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .template-grid {
@@ -1001,7 +1001,7 @@ defineExpose({
 }
 
 .template-card {
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border-secondary);
   border-radius: 8px;
   padding: 15px;
   cursor: pointer;
@@ -1009,7 +1009,7 @@ defineExpose({
 }
 
 .template-card:hover {
-  border-color: #007bff;
+  border-color: var(--accent-info);
   box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2);
 }
 
@@ -1025,12 +1025,12 @@ defineExpose({
 
 .template-info h4 {
   margin: 0 0 5px 0;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .template-info p {
   margin: 0;
-  color: #6c757d;
+  color: var(--text-secondary);
   font-size: 0.9em;
   line-height: 1.4;
 }
@@ -1043,7 +1043,7 @@ defineExpose({
   
   .code-panel, .preview-panel {
     border-right: none;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid var(--border-secondary);
   }
   
   .editor-header {

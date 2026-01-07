@@ -249,7 +249,7 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
 
 .list-header {
   padding: 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -258,7 +258,7 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
 .list-header h2 {
   margin: 0;
   font-size: 1.2rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .btn {
@@ -272,12 +272,12 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
 
 .btn-icon {
   padding: 8px;
-  background: #667eea;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .btn-icon:hover {
-  background: #5a67d8;
+  background: var(--accent-secondary);
 }
 
 .plus-icon {
@@ -299,17 +299,17 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
 }
 
 .folder-item:hover {
-  background: #f0f2f5;
+  background: var(--bg-hover);
 }
 
 .folder-item.active {
-  background: #e8f4ff;
-  border-left: 3px solid #667eea;
+  background: var(--bg-active);
+  border-left: 3px solid var(--accent-primary);
 }
 
 .folder-item.drag-over {
-  background: #e3f2fd;
-  border-left: 3px solid #2196f3;
+  background: var(--bg-active);
+  border-left: 3px solid var(--accent-info);
 }
 
 .root-folder {
@@ -321,7 +321,7 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
   text-align: center;
   font-size: 0.8rem;
   cursor: pointer;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .folder-toggle-placeholder {
@@ -353,23 +353,23 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
   padding: 2px 6px;
   font-size: 0.8rem;
   background: transparent;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .btn-small:hover {
-  background: #e9ecef;
-  color: #333;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .folder-children {
   padding-left: 20px;
-  border-left: 1px solid #e9ecef;
+  border-left: 1px solid var(--border-secondary);
 }
 
 .empty-state {
   padding: 40px 20px;
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .empty-icon {
@@ -384,20 +384,20 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
 
 .empty-subtext {
   font-size: 0.9rem;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .loading-state {
   padding: 40px 20px;
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .loading-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid #e9ecef;
-  border-top: 2px solid #667eea;
+  border: 2px solid var(--border-secondary);
+  border-top: 2px solid var(--accent-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 12px;
@@ -414,7 +414,7 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -422,31 +422,33 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
 }
 
 .modal {
-  background: white;
+  background: var(--bg-primary);
   padding: 24px;
   border-radius: 8px;
   width: 400px;
   max-width: 90%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .modal h3 {
   margin: 0 0 16px 0;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .modal input {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 1rem;
   margin-bottom: 16px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .modal input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--accent-primary);
 }
 
 .modal-actions {
@@ -456,29 +458,29 @@ const handleDrop = (event: DragEvent, targetFolderId: string | null) => {
 }
 
 .btn-primary {
-  background: #667eea;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
-  background: #5a67d8;
+  background: var(--accent-secondary);
 }
 
 .btn-secondary {
-  background: #e9ecef;
-  color: #333;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-  background: #dee2e6;
+  background: var(--border-primary);
 }
 
 .btn-danger {
-  background: #e53e3e;
-  color: white;
+  background: var(--accent-danger);
+  color: var(--text-inverse);
 }
 
 .btn-danger:hover {
-  background: #c53030;
+  background: #e05555;
 }
 </style>

@@ -30,7 +30,7 @@ defineProps<Props>();
 
 .toolbar-group-title {
   font-size: 11px;
-  color: #868e96;
+  color: var(--text-tertiary);
   margin-right: 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;

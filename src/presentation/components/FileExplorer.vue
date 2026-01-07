@@ -388,7 +388,7 @@ onMounted(async () => {
 
   // 监听菜单事件（只注册一次）
   if (electronAPI && electronAPI.menu) {
-    const newFileHandler = () => {
+    const newFileHandler = (_event: any) => {
       if (currentPath.value) {
         handleNewFile();
       } else {
@@ -403,7 +403,7 @@ onMounted(async () => {
       }
     };
 
-    const newFolderHandler = () => {
+    const newFolderHandler = (_event: any) => {
       if (currentPath.value) {
         handleNewFolder();
       } else {
@@ -417,8 +417,8 @@ onMounted(async () => {
       }
     };
 
-    const openFolderHandler = async (folderPath?: string) => {
-      // folderPath 是从主进程发送过来的
+    const openFolderHandler = async (_event: any, folderPath?: string) => {
+      // _event 是 IPC 事件对象，folderPath 是从主进程发送过来的实际数据
       if (folderPath) {
         await loadFolder(folderPath);
         emit('open-folder', folderPath);
@@ -453,13 +453,13 @@ defineExpose({
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
 }
 
 .path-bar {
   padding: 8px 12px;
-  background: #e9ecef;
-  border-bottom: 1px solid #dee2e6;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -467,13 +467,13 @@ defineExpose({
 }
 
 .path-label {
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .path-value {
   flex: 1;
-  color: #333;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -484,13 +484,13 @@ defineExpose({
   border: none;
   cursor: pointer;
   padding: 2px 6px;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 1rem;
 }
 
 .btn-close:hover {
-  color: #333;
-  background: #dee2e6;
+  color: var(--text-primary);
+  background: var(--bg-hover);
   border-radius: 3px;
 }
 
@@ -505,15 +505,15 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .context-menu {
   position: fixed;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   z-index: 1000;
   min-width: 150px;
   padding: 4px 0;
@@ -526,16 +526,16 @@ defineExpose({
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .context-menu-item:hover {
-  background: #f0f0f0;
+  background: var(--bg-hover);
 }
 
 .context-menu-divider {
   height: 1px;
-  background: #e0e0e0;
+  background: var(--border-secondary);
   margin: 4px 0;
 }
 
@@ -549,7 +549,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -557,10 +557,11 @@ defineExpose({
 }
 
 .modal {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   padding: 20px;
   min-width: 300px;
+  color: var(--text-primary);
 }
 
 .modal h3 {
@@ -571,10 +572,12 @@ defineExpose({
 .modal input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 0.9rem;
   margin-bottom: 16px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .modal-actions {
@@ -592,12 +595,12 @@ defineExpose({
 }
 
 .btn-primary {
-  background: #007bff;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #0056b3;
+  opacity: 0.9;
 }
 
 .btn-primary:disabled {
@@ -606,12 +609,12 @@ defineExpose({
 }
 
 .btn-secondary {
-  background: #6c757d;
-  color: white;
+  background: var(--text-tertiary);
+  color: var(--text-inverse);
 }
 
 .btn-secondary:hover {
-  background: #5a6268;
+  opacity: 0.9;
 }
 </style>
 

@@ -61,16 +61,16 @@ const handleClick = () => {
   justify-content: center;
   position: relative;
   transition: all 0.2s;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .toolbar-btn:hover:not(:disabled) {
-  background: #e9ecef;
+  background: var(--bg-hover);
 }
 
 .toolbar-btn.active {
-  background: #667eea;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .toolbar-btn:active:not(:disabled) {

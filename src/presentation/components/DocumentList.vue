@@ -130,15 +130,15 @@ const handleDragEnd = () => {
 .document-list {
   width: 300px;
   height: 100vh;
-  background: #f8f9fa;
-  border-right: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-secondary);
   display: flex;
   flex-direction: column;
 }
 
 .list-header {
   padding: 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -147,7 +147,7 @@ const handleDragEnd = () => {
 .list-header h2 {
   margin: 0;
   font-size: 1.2rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .btn {
@@ -160,12 +160,12 @@ const handleDragEnd = () => {
 }
 
 .btn-primary {
-  background: #667eea;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .btn-primary:hover {
-  background: #5a67d8;
+  background: var(--accent-secondary);
 }
 
 .plus-icon {
@@ -174,20 +174,22 @@ const handleDragEnd = () => {
 
 .search-box {
   padding: 15px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .search-box input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .search-box input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--accent-primary);
 }
 
 .documents {
@@ -197,23 +199,23 @@ const handleDragEnd = () => {
 
 .document-item {
   padding: 12px 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .document-item:hover {
-  background: #f0f2f5;
+  background: var(--bg-hover);
 }
 
 .document-item.active {
-  background: #e8f4ff;
-  border-left: 3px solid #667eea;
+  background: var(--bg-active);
+  border-left: 3px solid var(--accent-primary);
 }
 
 .document-title {
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -222,13 +224,13 @@ const handleDragEnd = () => {
 
 .document-date {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .empty-state {
   padding: 40px 20px;
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .empty-icon {
@@ -243,20 +245,20 @@ const handleDragEnd = () => {
 
 .empty-subtext {
   font-size: 0.9rem;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .loading-state {
   padding: 40px 20px;
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .loading-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid #e9ecef;
-  border-top: 2px solid #667eea;
+  border: 2px solid var(--border-secondary);
+  border-top: 2px solid var(--accent-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 12px;

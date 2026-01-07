@@ -53,7 +53,7 @@ defineEmits<{
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,14 +61,14 @@ defineEmits<{
 }
 
 .diff-dialog {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   width: 90%;
   max-width: 800px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .dialog-header {
@@ -76,13 +76,14 @@ defineEmits<{
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .dialog-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 500;
+  color: var(--text-primary);
 }
 
 .close-btn {
@@ -90,13 +91,13 @@ defineEmits<{
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #999;
+  color: var(--text-tertiary);
   padding: 0;
   line-height: 1;
 }
 
 .close-btn:hover {
-  color: #333;
+  color: var(--text-primary);
 }
 
 .dialog-content {
@@ -107,7 +108,7 @@ defineEmits<{
 
 .no-diff {
   text-align: center;
-  color: #999;
+  color: var(--text-tertiary);
   padding: 40px 20px;
 }
 
@@ -118,21 +119,21 @@ defineEmits<{
 
 .diff-hunk {
   margin-bottom: 16px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .hunk-header {
-  background: #f5f5f5;
+  background: var(--bg-secondary);
   padding: 8px 12px;
   font-size: 12px;
-  color: #666;
-  border-bottom: 1px solid #e0e0e0;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .diff-lines {
-  background: #fafafa;
+  background: var(--bg-tertiary);
 }
 
 .diff-line {
@@ -151,25 +152,26 @@ defineEmits<{
   flex: 1;
   white-space: pre-wrap;
   word-break: break-all;
+  color: var(--text-primary);
 }
 
 .line- {
-  background: #fafafa;
+  background: var(--bg-tertiary);
 }
 
 .line-+ {
-  background: #e6ffed;
+  background: rgba(81, 207, 102, 0.15);
 }
 
 .line-+ .line-prefix {
-  color: #22863a;
+  color: var(--accent-success);
 }
 
 .line- {
-  background: #ffeef0;
+  background: rgba(255, 107, 107, 0.15);
 }
 
 .line-- .line-prefix {
-  color: #f85149;
+  color: var(--accent-danger);
 }
 </style>

@@ -3585,33 +3585,34 @@ defineExpose({
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: var(--bg-primary);
   position: relative;
   overflow: hidden;
 }
 
 .editor-header {
   padding: 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .title-input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 1.5rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
+  background: var(--bg-primary);
 }
 
 .title-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--accent-primary);
 }
 
 .title-placeholder {
-  color: #999;
+  color: var(--text-tertiary);
   font-size: 1.2rem;
   font-weight: 600;
 }
@@ -3632,7 +3633,7 @@ defineExpose({
 }
 
 .editor-pane {
-  border-right: 1px solid #e9ecef;
+  border-right: 1px solid var(--border-secondary);
 }
 
 .editor-wrapper {
@@ -3645,8 +3646,8 @@ defineExpose({
 }
 
 .editor-wrapper.drag-over {
-  background: #f0f7ff;
-  border: 2px dashed #667eea;
+  background: var(--bg-active);
+  border: 2px dashed var(--accent-primary);
 }
 
 .drag-overlay {
@@ -3665,16 +3666,16 @@ defineExpose({
 
 .drag-message {
   font-size: 1.2rem;
-  color: #667eea;
+  color: var(--accent-primary);
   font-weight: 600;
 }
 
 .editor-label {
   padding: 12px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-secondary);
   font-weight: 500;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .markdown-preview-container {
@@ -3682,7 +3683,7 @@ defineExpose({
   position: relative;
   min-height: 0; /* 重要：允许flex子元素缩小 */
   overflow: hidden;
-  background: white;
+  background: var(--bg-primary);
 }
 
 .markdown-preview {
@@ -3694,7 +3695,8 @@ defineExpose({
   padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
-  background: white;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   will-change: opacity;
   opacity: 0;
   transition: opacity 0.2s ease-in-out;
@@ -3719,7 +3721,7 @@ defineExpose({
   display: block;
   margin: 16px 0;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .markdown-editor-content :deep(.quick-search-highlight) {
@@ -3739,7 +3741,7 @@ defineExpose({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .no-document-icon {
@@ -3755,7 +3757,7 @@ defineExpose({
 
 .no-document-subtext {
   font-size: 0.9rem;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .save-indicator {
@@ -3763,8 +3765,8 @@ defineExpose({
   bottom: 20px;
   right: 20px;
   padding: 8px 16px;
-  background: #28a745;
-  color: white;
+  background: var(--accent-success);
+  color: var(--text-inverse);
   border-radius: 4px;
   font-size: 0.8rem;
   opacity: 0;
@@ -3784,8 +3786,8 @@ defineExpose({
 
 .toolbar-btn {
   padding: 8px 16px;
-  background: #667eea;
-  color: white;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -3794,7 +3796,7 @@ defineExpose({
 }
 
 .toolbar-btn:hover {
-  background: #5a6fd8;
+  opacity: 0.9;
 }
 
 /* 导出菜单样式 */
@@ -3807,10 +3809,10 @@ defineExpose({
   top: 100%;
   left: 0;
   margin-top: 4px;
-  background: white;
-  border: 1px solid #e9ecef;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   z-index: 1000;
   min-width: 180px;
   overflow: hidden;
@@ -3820,16 +3822,16 @@ defineExpose({
   padding: 10px 16px;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #333;
+  color: var(--text-primary);
   transition: background-color 0.2s;
 }
 
 .export-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--bg-hover);
 }
 
 .export-item:not(:last-child) {
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .modal-overlay {
@@ -3838,7 +3840,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3846,14 +3848,15 @@ defineExpose({
 }
 
 .modal-content {
-  background: white;
+  background: var(--bg-primary);
   border-radius: 8px;
   width: 90%;
   max-width: 1200px;
   height: 80%;
   max-height: 800px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
 }
 
 .markdown-preview :deep(h1),
@@ -3866,6 +3869,7 @@ defineExpose({
   margin-bottom: 16px;
   font-weight: 600;
   line-height: 1.25;
+  color: var(--text-primary);
 }
 
 .markdown-preview :deep(h1) { font-size: 2em; }
@@ -3877,14 +3881,14 @@ defineExpose({
 }
 
 .markdown-preview :deep(code) {
-  background: #f6f8fa;
+  background: var(--preview-code-bg);
   padding: 2px 4px;
   border-radius: 3px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
 .markdown-preview :deep(pre) {
-  background: #f6f8fa;
+  background: var(--preview-code-bg);
   padding: 16px;
   border-radius: 6px;
   overflow-x: auto;
@@ -3904,9 +3908,13 @@ defineExpose({
 
 .markdown-preview :deep(blockquote) {
   padding: 0 1em;
-  color: #6a737d;
-  border-left: 0.25em solid #dfe2e5;
+  color: var(--text-secondary);
+  border-left: 0.25em solid var(--preview-quote-border);
   margin-bottom: 16px;
+}
+
+.markdown-preview :deep(a) {
+  color: var(--preview-link);
 }
 
 /* 编辑器内容样式 */
@@ -3920,8 +3928,8 @@ defineExpose({
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 14px;
   line-height: 1.6;
-  background: white;
-  color: #333;
+  background: var(--editor-bg);
+  color: var(--editor-text);
   box-sizing: border-box;
   overflow-y: auto;
   overflow-x: hidden;
@@ -3931,7 +3939,7 @@ defineExpose({
 
 .markdown-editor-content:empty:before {
   content: attr(data-placeholder);
-  color: #999;
+  color: var(--text-tertiary);
   pointer-events: none;
 }
 
@@ -3950,9 +3958,9 @@ defineExpose({
 .markdown-editor-content :deep(.editor-reference.linked),
 .markdown-editor-content .editor-reference.linked {
   background-color: rgba(102, 126, 234, 0.4) !important;
-  border: 1px solid #667eea !important;
-  border-color: #667eea !important;
-  color: #4c51bf !important;
+  border: 1px solid var(--accent-primary) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
   display: inline-block !important;
   padding: 2px 4px !important;
   border-radius: 3px !important;
@@ -3991,7 +3999,7 @@ defineExpose({
 
 .markdown-editor-content .editor-mermaid {
   background-color: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  color: var(--accent-primary);
   padding: 2px 4px;
   border-radius: 3px;
   font-weight: 500;
@@ -3999,7 +4007,7 @@ defineExpose({
 
 .markdown-editor-content .editor-code {
   background-color: rgba(108, 117, 125, 0.1);
-  color: #6c757d;
+  color: var(--text-tertiary);
   padding: 2px 4px;
   border-radius: 3px;
   font-weight: 500;
@@ -4016,10 +4024,10 @@ defineExpose({
 /* 右键菜单样式 */
 .context-menu {
   position: fixed;
-  background: white;
-  border: 1px solid #e9ecef;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   z-index: 10000;
   min-width: 200px;
   padding: 4px 0;
@@ -4032,11 +4040,11 @@ defineExpose({
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .context-menu-item:hover {
-  background-color: #f8f9fa;
+  background-color: var(--bg-hover);
 }
 
 .context-menu-item .menu-icon {
@@ -4047,7 +4055,7 @@ defineExpose({
 
 .context-menu-divider {
   height: 1px;
-  background-color: #e9ecef;
+  background-color: var(--border-secondary);
   margin: 4px 0;
 }
 </style>

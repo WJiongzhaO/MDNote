@@ -1,18 +1,31 @@
 <template>
   <div class="sidebar-icon-bar">
+    <div class="icon-buttons">
+      <button
+        v-for="item in sidebarItems"
+        :key="item.id"
+        :class="['icon-btn', { active: activeSidebar === item.id }]"
+        @click="handleIconClick(item.id)"
+        :title="item.title"
+      >
+        <span class="icon">{{ item.icon }}</span>
+      </button>
+    </div>
+
+    <!-- 主题切换按钮 -->
     <button
-      v-for="item in sidebarItems"
-      :key="item.id"
-      :class="['icon-btn', { active: activeSidebar === item.id }]"
-      @click="handleIconClick(item.id)"
-      :title="item.title"
+      class="icon-btn theme-toggle-btn"
+      @click="toggleTheme"
+      :title="isDark ? '切换到浅色主题' : '切换到暗色主题'"
     >
-      <span class="icon">{{ item.icon }}</span>
+      <span class="icon">{{ isDark ? '🌙' : '☀️' }}</span>
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useTheme } from '@/presentation/composables/useTheme';
+
 export type SidebarType = 'folders' | 'fragments' | 'templates' | 'git-history' | 'variables' | null;
 
 interface SidebarItem {
@@ -28,6 +41,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'switch-sidebar', type: SidebarType): void;
 }>();
+
+// 主题相关
+const { isDark, toggleTheme } = useTheme();
 
 const sidebarItems: SidebarItem[] = [
   { id: 'folders', icon: '📁', title: '文件夹' },
@@ -48,13 +64,19 @@ const handleIconClick = (id: SidebarType) => {
 .sidebar-icon-bar {
   width: 48px;
   height: 100vh;
-  background: #2d2d2d;
+  background: var(--bg-tertiary);
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: space-between;
   padding: 12px 0;
+  border-right: 1px solid var(--border-primary);
+}
+
+.icon-buttons {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  border-right: 1px solid #1e1e1e;
 }
 
 .icon-btn {
@@ -68,17 +90,17 @@ const handleIconClick = (id: SidebarType) => {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  color: #ccc;
+  color: var(--text-secondary);
 }
 
 .icon-btn:hover {
-  background: #3d3d3d;
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .icon-btn.active {
-  background: #007acc;
-  color: #fff;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
 }
 
 .icon {
