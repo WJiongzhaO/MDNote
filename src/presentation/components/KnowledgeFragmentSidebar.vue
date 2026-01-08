@@ -187,7 +187,7 @@
           <input
             v-model="newFragmentTags"
             type="text"
-            placeholder="标签（用逗号分隔）"
+            placeholder="标签（用英文逗号,分隔）"
             class="input"
           />
         </div>
@@ -226,7 +226,7 @@
           <input
             v-model="editingFragmentTags"
             type="text"
-            placeholder="标签（用逗号分隔）"
+            placeholder="标签（用英文逗号,分隔）"
             class="input"
           />
           <div v-if="editingFragmentId" class="edit-warning">

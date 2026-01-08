@@ -56,7 +56,7 @@
         <span class="menu-icon">🗑️</span>
         <span>删除</span>
       </div>
-      <div v-if="contextMenu.node && contextMenu.node.type === 'file'" class="context-menu-item" @click="handleRename">
+      <div v-if="contextMenu.node" class="context-menu-item" @click="handleRename">
         <span class="menu-icon">✎</span>
         <span>重命名</span>
       </div>
@@ -97,6 +97,37 @@
         </div>
       </div>
     </div>
+
+    <!-- 重命名对话框 -->
+    <div v-if="showRenameDialog" class="modal-overlay" @click="showRenameDialog = false">
+      <div class="modal" @click.stop>
+        <h3>重命名</h3>
+        <input
+          type="text"
+          v-model="renameName"
+          placeholder="新名称"
+          @keyup.enter="confirmRename"
+          @keyup.esc="cancelRename"
+          ref="renameInput"
+        />
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="cancelRename">取消</button>
+          <button class="btn btn-primary" @click="confirmRename" :disabled="!renameName.trim()">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除确认对话框 -->
+    <div v-if="showDeleteConfirmDialog" class="modal-overlay" @click="cancelDelete">
+      <div class="modal" @click.stop>
+        <h3>确认删除</h3>
+        <p v-if="nodeToDelete">确定要删除 {{ nodeToDelete.name }} 吗？</p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="cancelDelete">取消</button>
+          <button class="btn btn-primary" @click="confirmDelete">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -129,10 +160,16 @@ const contextMenu = ref({
 });
 const showNewFileDialog = ref(false);
 const showNewFolderDialog = ref(false);
+const showRenameDialog = ref(false);
+const showDeleteConfirmDialog = ref(false);
+const nodeToDelete = ref<FileNode | null>(null);
 const newFileName = ref('');
 const newFolderName = ref('');
+const renameName = ref('');
+const renameNode = ref<FileNode | null>(null);
 const newFileInput = ref<HTMLInputElement>();
 const newFolderInput = ref<HTMLInputElement>();
+const renameInput = ref<HTMLInputElement>();
 const contextMenuParentPath = ref<string>('');
 
 const handleSelect = (path: string) => {
@@ -212,15 +249,138 @@ const handleNewFromTemplate = () => {
 const handleDelete = () => {
   if (!contextMenu.value.node) return;
   const node = contextMenu.value.node;
-  if (confirm(`确定要删除 ${node.name} 吗？`)) {
-    deleteNode(node.path);
-  }
+  // 使用自定义对话框而不是原生 confirm，避免焦点丢失
+  nodeToDelete.value = node;
+  showDeleteConfirmDialog.value = true;
   contextMenu.value.visible = false;
 };
 
+const confirmDelete = () => {
+  if (nodeToDelete.value) {
+    deleteNode(nodeToDelete.value.path);
+    nodeToDelete.value = null;
+  }
+  showDeleteConfirmDialog.value = false;
+};
+
+const cancelDelete = () => {
+  nodeToDelete.value = null;
+  showDeleteConfirmDialog.value = false;
+};
+
 const handleRename = () => {
-  // TODO: 实现重命名功能
+  if (!contextMenu.value.node) return;
+  
   contextMenu.value.visible = false;
+  renameNode.value = contextMenu.value.node;
+  renameName.value = contextMenu.value.node.name;
+  showRenameDialog.value = true;
+  
+  nextTick(() => {
+    renameInput.value?.focus();
+    // 选中文件名（不包括扩展名）以便用户直接输入新名称
+    if (renameInput.value) {
+      const input = renameInput.value;
+      const nameWithoutExt = renameNode.value?.name.split('.').slice(0, -1).join('.') || renameNode.value?.name || '';
+      if (nameWithoutExt && renameNode.value?.type === 'file') {
+        input.setSelectionRange(0, nameWithoutExt.length);
+      } else {
+        input.select();
+      }
+    }
+  });
+};
+
+const confirmRename = async () => {
+  console.log('[FileExplorer] confirmRename 被调用');
+  
+  if (!renameNode.value || !renameName.value.trim()) {
+    console.log('[FileExplorer] 验证失败: renameNode 或 renameName 为空');
+    return;
+  }
+
+  // 检查新名称是否与原名称相同
+  if (renameName.value.trim() === renameNode.value.name) {
+    console.log('[FileExplorer] 新名称与原名称相同，直接关闭对话框');
+    showRenameDialog.value = false;
+    return;
+  }
+
+  const oldPath = renameNode.value.path;
+  const newName = renameName.value.trim();
+
+  try {
+    const electronAPI = (window as any).electronAPI;
+    
+    // 检查 electronAPI 是否可用（与其他函数保持一致）
+    if (!electronAPI || !electronAPI.file || !electronAPI.file.renameNode) {
+      console.error('[FileExplorer] electronAPI 检查失败:', {
+        electronAPI: !!electronAPI,
+        file: !!(electronAPI && electronAPI.file),
+        renameNode: !!(electronAPI && electronAPI.file && electronAPI.file.renameNode),
+        availableMethods: electronAPI && electronAPI.file ? Object.keys(electronAPI.file) : []
+      });
+      alert('文件系统 API 不可用，无法重命名。\n\n请重启应用以加载最新的 API。\n\n如果问题仍然存在，请检查控制台日志。');
+      return;
+    }
+
+    console.log('[FileExplorer] 开始重命名:', oldPath, '->', newName);
+    
+    // 调用重命名 API
+    const result = await electronAPI.file.renameNode(oldPath, newName);
+    console.log('[FileExplorer] 重命名 API 返回结果:', result);
+    
+    // 如果执行到这里没有抛出错误，说明重命名成功
+    // 更新选中路径（如果当前选中的是被重命名的文件/文件夹）
+    if (result && result.newPath) {
+      // 规范化路径比较（处理 Windows 路径分隔符）
+      const normalizePath = (p: string) => p.replace(/\\/g, '/');
+      if (normalizePath(selectedPath.value) === normalizePath(oldPath)) {
+        selectedPath.value = result.newPath;
+        console.log('[FileExplorer] 更新选中路径:', result.newPath);
+      }
+    }
+    
+    // 重新加载文件夹以刷新文件树
+    console.log('[FileExplorer] 重新加载文件夹:', currentPath.value);
+    await loadFolder(currentPath.value);
+    
+    // 关闭对话框
+    console.log('[FileExplorer] 关闭重命名对话框');
+    showRenameDialog.value = false;
+    renameName.value = '';
+    renameNode.value = null;
+    
+    console.log('[FileExplorer] 重命名完成');
+  } catch (error) {
+    console.error('[FileExplorer] 重命名失败:', error);
+    alert('重命名失败：' + (error instanceof Error ? error.message : '未知错误'));
+    // 即使失败也关闭对话框，让用户可以重试
+    showRenameDialog.value = false;
+  }
+};
+
+const cancelRename = () => {
+  showRenameDialog.value = false;
+  renameName.value = '';
+  renameNode.value = null;
+};
+
+// 在文件树中查找文件节点（递归查找）
+const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null => {
+  const normalizePath = (p: string) => p.replace(/\\/g, '/');
+  const normalizedTarget = normalizePath(targetPath);
+  
+  for (const node of nodes) {
+    if (normalizePath(node.path) === normalizedTarget) {
+      return node;
+    }
+    if (node.children) {
+      const found = findNodeByPath(node.children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
 };
 
 const createNewFile = async () => {
@@ -234,6 +394,22 @@ const createNewFile = async () => {
     if (electronAPI && electronAPI.file && electronAPI.file.writeFileContent) {
       await electronAPI.file.writeFileContent(filePath, '');
       await loadFolder(currentPath.value);
+      
+      // 等待文件树更新后，从文件树中找到新创建的文件并使用其实际路径
+      await nextTick();
+      
+      // 在文件树中查找新创建的文件节点
+      const newNode = findNodeByPath(fileTree.value, filePath);
+      if (newNode) {
+        // 使用文件树中的实际路径（确保路径格式一致）
+        selectedPath.value = newNode.path;
+        emit('select-file', newNode.path);
+      } else {
+        // 如果找不到，使用原始路径（向后兼容）
+        selectedPath.value = filePath;
+        emit('select-file', filePath);
+      }
+      
       showNewFileDialog.value = false;
       newFileName.value = '';
     }
@@ -267,7 +443,20 @@ const deleteNode = async (nodePath: string) => {
   try {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.file && electronAPI.file.deleteNode) {
+      // 检查删除的是否是当前选中的文件
+      const isSelectedFile = selectedPath.value === nodePath;
+      
       await electronAPI.file.deleteNode(nodePath);
+      
+      // 如果删除的是当前选中的文件，清空选中状态
+      // 这样编辑器也会清空内容，保持状态一致
+      if (isSelectedFile) {
+        selectedPath.value = '';
+        // 发出事件通知父组件清空当前文档
+        // 注意：这里不能直接访问 currentDocument，需要通过事件通知
+        emit('select-file', ''); // 传递空字符串表示清空选中
+      }
+      
       await loadFolder(currentPath.value);
     }
   } catch (error) {
@@ -439,12 +628,18 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
 });
 
+// 设置选中路径的方法，供外部调用
+const setSelectedPath = (path: string) => {
+  selectedPath.value = path;
+};
+
 // 暴露方法供外部调用
 defineExpose({
   loadFolder,
   closeFolder,
   handleNewFile,
-  handleNewFolder
+  handleNewFolder,
+  setSelectedPath
 });
 </script>
 

@@ -14,19 +14,6 @@
 
     <div class="toolbar-divider"></div>
 
-    <!-- 插入按钮组 -->
-    <ToolbarGroup title="插入">
-      <ToolbarButton
-        v-for="btn in insertButtons"
-        :key="btn.id"
-        :icon="btn.icon"
-        :tooltip="btn.tooltip"
-        @click="() => handleInsert(btn.action)"
-      />
-    </ToolbarGroup>
-
-    <div class="toolbar-divider"></div>
-
     <!-- 列表按钮组 -->
     <ToolbarGroup title="列表">
       <ToolbarButton
@@ -59,11 +46,6 @@
         tooltip="数学公式"
         @click="$emit('open-formula')"
       />
-      <ToolbarButton
-        text="💡"
-        tooltip="知识片段"
-        @click="$emit('insert-fragment')"
-      />
     </ToolbarGroup>
   </div>
 </template>
@@ -80,12 +62,12 @@ import { useEditorToolbar } from '@/presentation/composables/useEditorToolbar';
 import ToolbarGroup from './ToolbarGroup.vue';
 import ToolbarButton from './ToolbarButton.vue';
 
-// Icons (SVG)
+// Icons (SVG) - Material Icons
 const icons = {
-  bold: '<path d="M15.6 10.79c.97-.67 1.65-1.61 1.65-2.66-.02-1.31-.67-2.33-1.61-3.03L11 4H4v14h11.28c2.4 0 3.64-1.57 3.64-3.3 0-1.31-.46-2.14-1.3-2.66zm-4.6 2.82c-.52 0-1.05-.15-1.45-.5-.4-.34-.68-.91-.68-1.61V7h1.33v2.07c.02.84.3 1.5.8 1.5 1.54zm4.4 2.75c-.52 0-1.05-.15-1.45-.5-.4-.34-.68-.91-.68-1.61V7h1.33v2.07c.02.84.3 1.5.8 1.5 1.54z"/>',
-  italic: '<path d="M10 4v3h2.5v-.25c0-.69.56-1.25 1.25-1.25H10V4zm0 5v3h2.5c.97 0 1.75.78 1.75 1.75v.25c0 .97-.78 1.75-1.75 1.75H10V9z"/>',
-  strikethrough: '<path d="M3 12h18M3 12c0-3 2-4 4-4s4 1 4 4-2 4-4 4-4-1-4-4 4z"/>',
-  code: '<path d="M9.4 16.6 4.6-4.6M4.6 16.6 4.6-4.6"/>',
+  bold: '<path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/>',
+  italic: '<path d="M10 4v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V4h-8z"/>',
+  strikethrough: '<path d="M5 4h14v2h-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5H19v2h-4.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5H19v2H5V4zm2 5v2h10V9H7z"/>',
+  code: '<path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>',
   link: '<path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h2.1a5 5 0 0 0 0-10H7a5 5 0 0 0 0 10h4v1.9H7c-1.71 0-3.1 1.39-3.1 3.1 0 1.39.81 2.6 1.98 3.1L8.4 13H7v2h5.9c1.71 0 3.1-1.39 3.1-3.1 0-1.39-.81-2.6-1.98-3.1L15.6 11H17V9h-5.9c-1.71 0-3.1 1.39-3.1 3.1z"/>',
   image: '<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l-3.5-4.5-1.5 1.5-2 2.5z M5 19h14V5H5v14z"/>',
   list: '<path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>',
@@ -104,7 +86,6 @@ const emit = defineEmits<{
   (e: 'update:content', content: string): void;
   (e: 'open-mermaid'): void;
   (e: 'open-formula'): void;
-  (e: 'insert-fragment'): void;
 }>();
 
 // 使用工具栏 Composable
@@ -157,11 +138,6 @@ const formatButtons = [
   { id: 'code', action: 'code', icon: icons.code, tooltip: '代码 (Ctrl+`)' },
 ];
 
-const insertButtons = [
-  { id: 'link', action: 'link', icon: icons.link, tooltip: '链接 (Ctrl+K)' },
-  { id: 'image', action: 'image', icon: icons.image, tooltip: '图片 (Ctrl+Shift+I)' },
-];
-
 const listButtons = [
   { id: 'ul', action: 'ul', icon: icons.list, tooltip: '无序列表' },
   { id: 'ol', action: 'ol', icon: icons.list, tooltip: '有序列表' },
@@ -175,10 +151,6 @@ const handleFormat = (formatType: string) => {
   applyFormat(formatType);
 };
 
-const handleInsert = (insertType: string) => {
-  console.log('[EditorToolbar-handleInsert] 按钮被点击', { insertType });
-  insertContent(insertType);
-};
 </script>
 
 <style scoped>

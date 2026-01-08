@@ -26,6 +26,7 @@
       @select-document="handleSelectDocument"
       @create-new="handleCreateNew"
       @search="handleSearch"
+      @delete-document="handleDeleteDocument"
     />
 
     <MarkdownEditor
@@ -61,6 +62,7 @@ const {
   error,
   createDocument,
   updateDocument,
+  deleteDocument,
   loadDocument,
   loadDocuments,
   loadDocumentsByFolder,
@@ -115,6 +117,10 @@ const handleUpdateDocument = async (id: string, title: string, content: string) 
     title,
     content
   });
+};
+
+const handleDeleteDocument = async (id: string) => {
+  await deleteDocument(id);
 };
 
 const handleSearch = async (query: string) => {

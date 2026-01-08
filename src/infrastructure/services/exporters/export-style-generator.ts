@@ -121,9 +121,12 @@ export function generateStylesFromConfig(config: ExportConfig | undefined | null
         border: 1px solid rgba(0, 0, 0, 0.1);
         overflow-x: auto;
         margin: 1em 0;
-        page-break-inside: avoid;
         line-height: 1.5;
         ${code.showLineNumbers ? 'counter-reset: line-number;' : ''}
+        /* 代码块智能分页：小块避免切分，大块允许切分 */
+        max-height: 80vh;
+        page-break-before: auto;
+        page-break-inside: auto;
       }
 
       pre code {
@@ -158,6 +161,7 @@ export function generateStylesFromConfig(config: ExportConfig | undefined | null
         color: #666;
         font-style: italic;
         background-color: rgba(0, 0, 0, 0.02);
+        page-break-inside: auto; /* 允许长引用跨页 */
       }
       
       blockquote p {
@@ -169,6 +173,12 @@ export function generateStylesFromConfig(config: ExportConfig | undefined | null
         border-collapse: collapse;
         width: 100%;
         margin: 1em 0;
+        page-break-before: auto;
+        page-break-inside: auto; /* 允许大表格跨页 */
+      }
+      
+      /* 表格行尽量不被切分 */
+      table tr {
         page-break-inside: avoid;
       }
 
@@ -189,14 +199,18 @@ export function generateStylesFromConfig(config: ExportConfig | undefined | null
       }
       ` : ''}
 
-      /* 图片样式 */
+      /* 图片样式 - 智能分页 */
       img {
         max-width: 100%;
+        max-height: 85vh; /* 限制最大高度为视口的85%，避免超大图片 */
         height: auto;
-        page-break-inside: avoid;
         display: block;
         margin: 1.5em auto;
         border-radius: 4px;
+        page-break-before: auto; /* 自动判断是否需要分页 */
+        page-break-after: auto;
+        page-break-inside: avoid;
+        object-fit: contain; /* 保持图片比例 */
       }
       
       /* 图片标题 */
@@ -207,6 +221,7 @@ export function generateStylesFromConfig(config: ExportConfig | undefined | null
         color: #666;
         margin-top: -0.5em;
         margin-bottom: 1em;
+        page-break-before: avoid; /* 标题与图片保持在一起 */
       }
 
       /* 分隔线 */
@@ -296,6 +311,23 @@ export function generateStylesFromConfig(config: ExportConfig | undefined | null
         border-radius: 2px;
       }
       
+      /* Mermaid 图表容器样式 */
+      .mermaid-container {
+        page-break-before: auto;
+        page-break-inside: auto; /* 允许大图表跨页 */
+        max-height: 85vh; /* 限制最大高度 */
+        overflow: visible;
+        margin: 1.5em 0;
+      }
+      
+      .mermaid-container svg {
+        max-width: 100%;
+        max-height: 85vh;
+        height: auto !important;
+        display: block;
+        margin: 0 auto;
+      }
+      
       /* 打印优化 */
       @media print {
         body {
@@ -303,18 +335,62 @@ export function generateStylesFromConfig(config: ExportConfig | undefined | null
           padding: 0;
         }
         
+        /* 标题后避免立即分页 */
         h1, h2, h3, h4, h5, h6 {
           page-break-after: avoid;
+          page-break-inside: avoid;
         }
         
-        img, table, pre, blockquote {
-          page-break-inside: avoid;
+        /* 标题前智能分页 */
+        h1 {
+          page-break-before: auto;
+        }
+        
+        h2, h3 {
+          page-break-before: auto;
         }
         
         /* 避免孤行和寡行 */
         p {
           orphans: 3;
           widows: 3;
+          page-break-inside: auto;
+        }
+        
+        /* 图片智能分页 */
+        img {
+          max-height: 75vh; /* 打印时进一步限制高度 */
+          page-break-before: auto;
+          page-break-after: auto;
+          page-break-inside: avoid;
+        }
+        
+        /* 小代码块避免切分，大代码块允许切分 */
+        pre {
+          page-break-before: auto;
+        }
+        
+        /* 表格行避免切分 */
+        table {
+          page-break-before: auto;
+        }
+        
+        table thead {
+          display: table-header-group; /* 每页重复表头 */
+        }
+        
+        table tr {
+          page-break-inside: avoid;
+        }
+        
+        /* Mermaid 图表打印优化 */
+        .mermaid-container {
+          max-height: 75vh;
+          page-break-before: auto;
+        }
+        
+        .mermaid-container svg {
+          max-height: 75vh !important;
         }
       }
     </style>

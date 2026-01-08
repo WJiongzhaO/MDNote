@@ -237,6 +237,15 @@ provide('currentDocumentContent', currentDocumentContent);
 
 // 处理选择文件（从文件资源管理器）
 const handleSelectFile = async (filePath: string) => {
+  // 如果 filePath 为空，说明是清空选中状态（例如文件被删除）
+  if (!filePath) {
+    currentFilePath.value = '';
+    currentDocumentPath.value = '';
+    currentDocument.value = null;
+    currentDocumentContent.value = '';
+    return;
+  }
+
   currentFilePath.value = filePath;
   currentDocumentPath.value = filePath;
 
@@ -409,7 +418,13 @@ const confirmCreateFromTemplate = async () => {
     // 刷新文件树视图，确保新文件立刻可见
     if (fileExplorerRef.value && templateTargetFolder.value) {
       try {
-        (fileExplorerRef.value as any).loadFolder(templateTargetFolder.value);
+        await (fileExplorerRef.value as any).loadFolder(templateTargetFolder.value);
+        // 等待文件树更新后，更新选中状态
+        await nextTick();
+        // 使用 setSelectedPath 设置选中状态（FileTreeNode 会使用路径标准化比较）
+        if ((fileExplorerRef.value as any).setSelectedPath) {
+          (fileExplorerRef.value as any).setSelectedPath(newFilePath);
+        }
       } catch (e) {
         console.warn('刷新文件树失败，但文件已经创建:', e);
       }
