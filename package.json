@@ -64,7 +64,9 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico"
+      "icon": "public/icon.ico",
+      "signingHashAlgorithms": [],
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,

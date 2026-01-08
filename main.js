@@ -304,7 +304,14 @@ function createWindow() {
     win.loadURL('http://localhost:5173');
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'));
+    // 生产环境：打包后 dist 目录在 app.asar 内部
+    // __dirname 在打包后指向 app.asar
+    // 所以直接使用 __dirname + dist/index.html
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    console.log('[Main Process] Loading index.html from:', indexPath);
+    win.loadFile(indexPath);
+    // 临时：打开开发者工具用于调试（正常版本应注释掉）
+    //win.webContents.openDevTools();
   }
 
   mainWindow = win;
