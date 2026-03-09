@@ -80,7 +80,7 @@
             </button>
             <button
               class="btn btn-icon-small"
-              @click.stop="deleteFragment(fragment.id)"
+              @click.stop="openDeleteFragmentDialog(fragment)"
               title="删除"
             >
               🗑️
@@ -239,6 +239,31 @@
         </div>
       </div>
     </div>
+
+    <!-- 删除片段确认对话框 -->
+    <div 
+      v-if="showDeleteFragmentDialog" 
+      class="dialog-overlay" 
+      @click.self="handleCancelDeleteFragment"
+    >
+      <div class="dialog dialog-small" @click.stop>
+        <div class="dialog-header">
+          <h3>确认删除</h3>
+          <button class="btn btn-icon" @click="handleCancelDeleteFragment">✕</button>
+        </div>
+        <div class="dialog-body">
+          <p>
+            确定要删除知识片段
+            <strong v-if="fragmentToDelete">{{ fragmentToDelete.title || '未命名片段' }}</strong>
+            吗？
+          </p>
+        </div>
+        <div class="dialog-footer">
+          <button class="btn btn-secondary" @click="handleCancelDeleteFragment">取消</button>
+          <button class="btn btn-danger" @click="handleConfirmDeleteFragment">删除</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -252,6 +277,12 @@ import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-
 import { useDocuments } from '../composables/useDocuments';
 import { TYPES } from '../../core/container/container.types';
 import type { MermaidRenderer } from '../../domain/services/markdown-processor.interface';
+
+interface Props {
+  markdownEditorRef?: any; // MarkdownEditor 组件的引用
+}
+
+const props = defineProps<Props>();
 
 const emit = defineEmits<{  
   'fragment-updated': [fragmentId: string];
@@ -320,6 +351,8 @@ const draggedFragment = ref<KnowledgeFragmentResponse | null>(null);
 const previewImageUrls = ref<Record<string, string>>({});
 const previewImageUrl = ref<Record<string, string>>({});
 const mermaidPreviewSvgs = ref<Record<string, string>>({});
+const showDeleteFragmentDialog = ref(false);
+const fragmentToDelete = ref<KnowledgeFragmentResponse | null>(null);
 
 // 依赖注入Mermaid渲染器
 const mermaidRenderer = inject<Ref<MermaidRenderer | null>>(TYPES.MermaidRenderer);
@@ -534,13 +567,39 @@ const insertFragment = async (fragment: KnowledgeFragmentResponse) => {
   emit('insert', fragment);
 };
 
-// 删除片段
-const deleteFragment = async (id: string) => {
-  if (confirm('确定要删除这个知识片段吗？')) {
+// 打开删除片段确认对话框
+const openDeleteFragmentDialog = (fragment: KnowledgeFragmentResponse) => {
+  fragmentToDelete.value = fragment;
+  showDeleteFragmentDialog.value = true;
+};
+
+// 取消删除片段
+const handleCancelDeleteFragment = () => {
+  showDeleteFragmentDialog.value = false;
+  fragmentToDelete.value = null;
+  nextTick(() => {
+    restoreEditorFocus();
+  });
+};
+
+// 确认删除片段
+const handleConfirmDeleteFragment = async () => {
+  if (!fragmentToDelete.value) return;
+
+  const id = fragmentToDelete.value.id;
+
+  try {
     await deleteFragmentAction(id);
     if (selectedFragmentId.value === id) {
       selectedFragmentId.value = null;
     }
+    showDeleteFragmentDialog.value = false;
+    fragmentToDelete.value = null;
+    await nextTick();
+    restoreEditorFocus();
+  } catch (error) {
+    console.error('Error deleting fragment:', error);
+    alert('删除失败：' + (error instanceof Error ? error.message : '未知错误'));
   }
 };
 
@@ -556,8 +615,15 @@ const renderFragmentPreview = async (fragment: KnowledgeFragmentResponse) => {
   }
   
   try {
+    // 先展开知识片段中的引用（递归展开，但限制深度避免循环引用）
+    let previewMarkdown = fragment.markdown;
+    
+    // 展开引用（限制递归深度为3，避免无限循环）
+    previewMarkdown = await expandFragmentReferencesInPreview(previewMarkdown, 0, 3, new Set([fragment.id]));
+    
     // 截取前500个字符作为预览
-    const previewMarkdown = fragment.markdown.substring(0, 500);
+    previewMarkdown = previewMarkdown.substring(0, 500);
+    
     // 使用真正的Markdown渲染器，传递片段ID以处理图片路径
     // 使用 fragment: 前缀标识这是知识片段
     const fragmentDocId = `fragment:${fragment.id}`;
@@ -568,6 +634,88 @@ const renderFragmentPreview = async (fragment: KnowledgeFragmentResponse) => {
     console.error('Error rendering fragment preview:', error);
     fragmentPreviewHtml.value[fragment.id] = '<p>预览加载失败</p>';
   }
+};
+
+// 展开知识片段中的引用（用于预览）
+const expandFragmentReferencesInPreview = async (
+  content: string, 
+  currentDepth: number, 
+  maxDepth: number,
+  visitedIds: Set<string>
+): Promise<string> => {
+  // 如果达到最大深度，停止递归
+  if (currentDepth >= maxDepth) {
+    return content;
+  }
+
+  // 解析引用
+  const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
+  const parser = new FragmentReferenceParser();
+  const references = parser.parseReferences(content);
+
+  if (references.length === 0) {
+    return content;
+  }
+
+  let expandedContent = content;
+
+  // 从后往前替换，避免索引偏移
+  for (let i = references.length - 1; i >= 0; i--) {
+    const ref = references[i];
+    
+    // 防止循环引用
+    if (visitedIds.has(ref.fragmentId)) {
+      console.warn(`[知识片段预览] 检测到循环引用，跳过片段 ${ref.fragmentId}`);
+      // 移除循环引用标记
+      const before = expandedContent.substring(0, ref.startIndex);
+      const after = expandedContent.substring(ref.endIndex);
+      expandedContent = before + after;
+      continue;
+    }
+
+    try {
+      // 获取引用的片段
+      const application = Application.getInstance();
+      await application.getApplicationService().initialize();
+      const fragmentUseCases = application.getKnowledgeFragmentUseCases();
+      const fragment = await fragmentUseCases.getFragment(ref.fragmentId);
+      
+      if (!fragment) {
+        console.warn(`[知识片段预览] 片段 ${ref.fragmentId} 不存在，移除引用标记`);
+        // 移除不存在的引用标记
+        const before = expandedContent.substring(0, ref.startIndex);
+        const after = expandedContent.substring(ref.endIndex);
+        expandedContent = before + after;
+        continue;
+      }
+
+      // 递归展开片段内容中的引用
+      const newVisitedIds = new Set(visitedIds);
+      newVisitedIds.add(ref.fragmentId);
+      let fragmentContent = fragment.markdown;
+      
+      // 递归展开嵌套引用
+      fragmentContent = await expandFragmentReferencesInPreview(
+        fragmentContent, 
+        currentDepth + 1, 
+        maxDepth, 
+        newVisitedIds
+      );
+
+      // 替换引用为展开后的内容
+      const before = expandedContent.substring(0, ref.startIndex);
+      const after = expandedContent.substring(ref.endIndex);
+      expandedContent = before + fragmentContent + after;
+    } catch (error) {
+      console.error(`[知识片段预览] 展开片段 ${ref.fragmentId} 失败:`, error);
+      // 出错时移除引用标记
+      const before = expandedContent.substring(0, ref.startIndex);
+      const after = expandedContent.substring(ref.endIndex);
+      expandedContent = before + after;
+    }
+  }
+
+  return expandedContent;
 };
 
 // 渲染Mermaid图表预览
@@ -803,7 +951,8 @@ const handleCreateFragment = async () => {
     console.log('内容长度:', newFragmentContent.value.length);
     console.log('内容预览:', newFragmentContent.value.substring(0, 200));
     
-    // 简单的Markdown解析为AST节点
+    // 直接使用源代码内容（已经是从编辑器获取的源代码，包含引用标记等原始内容）
+    // 将Markdown解析为AST节点
     const nodes = parseMarkdownToNodes(newFragmentContent.value);
     console.log('解析后的节点数量:', nodes.length);
     console.log('节点类型:', nodes.map(n => n.type));
@@ -952,18 +1101,49 @@ const setDocumentContext = (context: { documentId?: string; filePath?: string })
 
 const handleDrop = async (event: DragEvent) => {
   event.preventDefault();
+  event.stopPropagation(); // 阻止事件冒泡，避免影响编辑器
   isDragging.value = false;
 
-  // 获取拖拽的文本内容
-  const text = event.dataTransfer?.getData('text/plain') || '';
-  
-  if (!text.trim()) {
-    return;
+  let sourceCode = '';
+
+  // 优先从 dataTransfer 获取源代码（在 dragstart 时保存的）
+  if (event.dataTransfer) {
+    const savedSourceCode = event.dataTransfer.getData('text/x-markdown-source');
+    if (savedSourceCode && savedSourceCode.trim()) {
+      sourceCode = savedSourceCode;
+      console.log('[知识片段库] 从拖拽数据获取源代码:', sourceCode.substring(0, 100));
+      console.log('[知识片段库] 源代码长度:', sourceCode.length);
+    }
+  }
+
+  // 如果没有从拖拽数据获取到，尝试从编辑器获取选中内容的源代码
+  if (!sourceCode.trim() && props.markdownEditorRef) {
+    try {
+      const selectedSourceCode = (props.markdownEditorRef as any).getSelectedSourceCode?.();
+      if (selectedSourceCode && selectedSourceCode.trim()) {
+        sourceCode = selectedSourceCode;
+        console.log('[知识片段库] 从编辑器获取选中内容的源代码:', sourceCode.substring(0, 100));
+        console.log('[知识片段库] 源代码长度:', sourceCode.length);
+      }
+    } catch (error) {
+      console.warn('[知识片段库] 获取编辑器选中内容失败:', error);
+    }
+  }
+
+  // 如果还是没有，使用拖拽的文本（降级方案，但这是渲染后的内容）
+  if (!sourceCode.trim()) {
+    const text = event.dataTransfer?.getData('text/plain') || '';
+    if (!text.trim()) {
+      return;
+    }
+    sourceCode = text;
+    console.log('[知识片段库] 使用拖拽的文本内容（渲染后的）:', sourceCode.substring(0, 100));
+    console.warn('[知识片段库] 警告：使用的是渲染后的文本，可能包含 [知识片段：xxx] 格式');
   }
 
   // 自动填充内容并打开创建对话框
-  newFragmentContent.value = text;
-  newFragmentTitle.value = text.substring(0, 50).replace(/\n/g, ' ').trim() || '新知识片段';
+  newFragmentContent.value = sourceCode;
+  newFragmentTitle.value = sourceCode.substring(0, 50).replace(/\n/g, ' ').trim() || '新知识片段';
   showCreateDialog.value = true;
 };
 

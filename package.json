@@ -31,7 +31,8 @@
     "reflect-metadata": "^0.2.2",
     "simple-git": "^3.30.0",
     "vue-router": "^4.6.4",
-    "yaml": "^2.8.2"
+    "yaml": "^2.8.2",
+    "cytoscape": "^3.30.4"
   },
   "devDependencies": {
     "@electron/remote": "^2.1.2",
