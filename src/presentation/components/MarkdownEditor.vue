@@ -17,6 +17,14 @@
         >
           📐 公式编辑器
         </button>
+        <!-- 生成知识图谱 -->
+        <button
+          class="toolbar-btn"
+          @click="openKnowledgeGraph"
+          title="根据当前文章生成知识图谱"
+        >
+          🕸️ 知识图谱
+        </button>
         <!-- 导出按钮 -->
         <div class="export-menu">
           <button
@@ -69,6 +77,7 @@
             @focus="handleEditorFocus"
             @blur="handleEditorBlur"
             @mousedown="handleEditorMouseDown"
+            @dragstart="handleEditorDragStart"
             @dragover.prevent="handleDragOver"
             @drop="handleEditorDrop"
             @dragenter.prevent="handleEditorDragEnter"
@@ -215,6 +224,53 @@
       :status-message="exportStatusMessage"
       @close="showExportProgress = false"
     />
+
+    <!-- 知识图谱模态框 -->
+    <div v-if="showKnowledgeGraphModal" class="modal-overlay" @click="closeKnowledgeGraph" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    ">
+      <div class="knowledge-graph-modal" @click.stop style="
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        width: 90vw;
+        max-width: 1200px;
+        height: 90vh;
+        overflow: hidden;
+        position: relative;
+        min-width: 640px;
+      ">
+        <div class="knowledge-graph-header">
+          <h3>🕸️ 知识图谱</h3>
+          <div class="knowledge-graph-actions">
+            <button
+              type="button"
+              class="toolbar-btn sample-btn"
+              @click="saveKnowledgeGraph"
+              title="将当前知识图谱保存为独立文件"
+              v-if="knowledgeGraphData"
+            >
+              保存为知识图谱
+            </button>
+            <button type="button" class="toolbar-btn sample-btn" @click="showSampleGraph" title="查看样例效果">查看样例</button>
+            <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">✕</button>
+          </div>
+        </div>
+        <div v-if="isSampleMode" class="knowledge-graph-sample-hint">（样例展示，实际数据将由 RAG 等方式提取）</div>
+        <div v-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">正在生成图谱…</div>
+        <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">{{ knowledgeGraphError }}</div>
+        <KnowledgeGraphView v-else-if="knowledgeGraphData" :graph="knowledgeGraphData" class="knowledge-graph-body" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -225,6 +281,7 @@ import FormulaEditor from './FormulaEditor.vue';
 import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
 import ExportConfigModal from './ExportConfigModal.vue';
 import ExportProgressModal from './ExportProgressModal.vue';
+import KnowledgeGraphView from './KnowledgeGraphView.vue';
 import type { DocumentResponse } from '../../application';
 import type { ExportConfig } from '../../domain/types/export-config.types';
 import { useAssetRenderer } from '../composables/useAssetRenderer';
@@ -232,6 +289,8 @@ import { useImageUpload } from '../composables/useImageUpload';
 import { useEditorShortcuts } from '../composables/useShortcutManager';
 import { Application } from '../../core/application';
 import { TYPES } from '../../core/container/container.types';
+import { extractKnowledgeGraph, sampleKnowledgeGraph, type KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
+import { FileSystemKnowledgeGraphService } from '../../infrastructure/services/knowledge-graph-file.service';
 
 interface Props {
   document: DocumentResponse | null;
@@ -309,6 +368,14 @@ const currentSelectionEnd = ref(0);
 const showFormulaEditor = ref(false);
 const currentFormulaCode = ref('');
 const currentFormulaType = ref<'inline' | 'block'>('inline');
+
+// 知识图谱相关状态
+const showKnowledgeGraphModal = ref(false);
+const knowledgeGraphData = ref<KnowledgeGraph | null>(null);
+const knowledgeGraphError = ref('');
+const isKnowledgeGraphRendering = ref(false);
+const isSampleMode = ref(false);
+const knowledgeGraphService = new FileSystemKnowledgeGraphService();
 
 // 导出相关状态
 const showExportMenu = ref(false);
@@ -2346,6 +2413,81 @@ const closeFormulaEditor = () => {
   currentFormulaCode.value = '';
 };
 
+// 知识图谱相关方法
+const openKnowledgeGraph = () => {
+  showKnowledgeGraphModal.value = true;
+  const fullContent = getContent();
+  if (!fullContent || !fullContent.trim()) {
+    knowledgeGraphData.value = sampleKnowledgeGraph;
+    knowledgeGraphError.value = '';
+    isSampleMode.value = true;
+    isKnowledgeGraphRendering.value = false;
+    return;
+  }
+  isSampleMode.value = false;
+  knowledgeGraphError.value = '';
+  isKnowledgeGraphRendering.value = true;
+  knowledgeGraphData.value = null;
+  try {
+    const graph = extractKnowledgeGraph(fullContent);
+    knowledgeGraphData.value = graph;
+  } catch (e) {
+    knowledgeGraphError.value = e instanceof Error ? e.message : '生成知识图谱失败';
+    knowledgeGraphData.value = null;
+  } finally {
+    isKnowledgeGraphRendering.value = false;
+  }
+};
+
+const showSampleGraph = () => {
+  knowledgeGraphData.value = sampleKnowledgeGraph;
+  knowledgeGraphError.value = '';
+  isSampleMode.value = true;
+};
+
+const closeKnowledgeGraph = () => {
+  showKnowledgeGraphModal.value = false;
+  knowledgeGraphData.value = null;
+  knowledgeGraphError.value = '';
+  isSampleMode.value = false;
+};
+
+const saveKnowledgeGraph = async () => {
+  try {
+    if (isSampleMode.value && knowledgeGraphData.value) {
+      await knowledgeGraphService.saveGraph({
+        title: '样例：数据结构知识图谱',
+        documentId: null,
+        documentTitle: null,
+        graph: knowledgeGraphData.value
+      });
+      knowledgeGraphError.value = '';
+      return;
+    }
+    const fullContent = getContent();
+    if (!fullContent || !fullContent.trim()) {
+      knowledgeGraphError.value = '当前文档为空，无法保存知识图谱';
+      return;
+    }
+    const titleToUse = title.value || '未命名图谱';
+    const documentId = props.document?.id ?? null;
+    const documentTitle = title.value || (props.document?.title ?? null);
+    const graphWithOccurrences = extractKnowledgeGraph(fullContent, {
+      documentId: documentId ?? undefined,
+      documentTitle: documentTitle ?? undefined
+    });
+    await knowledgeGraphService.saveGraph({
+      title: titleToUse,
+      documentId,
+      documentTitle,
+      graph: graphWithOccurrences
+    });
+    knowledgeGraphError.value = '';
+  } catch (e) {
+    knowledgeGraphError.value = e instanceof Error ? e.message : '保存知识图谱失败';
+  }
+};
+
 // 点击外部关闭导出菜单
 const handleClickOutsideExport = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
@@ -2757,6 +2899,23 @@ const handleDragLeave = (event: DragEvent) => {
   const editor = editorElement.value;
   if (editor && !editor.contains(event.relatedTarget as Node)) {
     isDragging.value = false;
+  }
+};
+
+// 编辑器拖拽开始（保存选中内容的源代码）
+const handleEditorDragStart = (event: DragEvent) => {
+  const editor = editorElement.value;
+  if (!editor || !event.dataTransfer) {
+    return;
+  }
+
+  // 获取选中内容的源代码
+  const sourceCode = getSelectedSourceCode();
+  
+  if (sourceCode && sourceCode.trim()) {
+    // 将源代码保存到 dataTransfer 的自定义数据中
+    event.dataTransfer.setData('text/x-markdown-source', sourceCode);
+    console.log('[MarkdownEditor] 拖拽开始，保存源代码:', sourceCode.substring(0, 100));
   }
 };
 
@@ -3280,6 +3439,69 @@ const getSelectedText = () => {
   return '';
 };
 
+// 获取选中内容的源代码（从编辑器中提取，包含引用标记等原始内容）
+// 注意：这个方法会保存和恢复选中范围，避免干扰编辑器焦点
+const getSelectedSourceCode = (): string => {
+  const editor = editorElement.value;
+  if (!editor) {
+    return '';
+  }
+
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return '';
+  }
+
+  // 保存当前选中范围
+  const range = selection.getRangeAt(0);
+  
+  // 检查选中范围是否在编辑器内
+  if (!editor.contains(range.commonAncestorContainer)) {
+    return '';
+  }
+
+  // 如果没有选中内容（范围折叠），返回空字符串
+  if (range.collapsed) {
+    return '';
+  }
+
+  try {
+    // 关键步骤1：先同步编辑器内容到mainContent（使用getTextContent还原引用格式）
+    // getTextContent会将[知识片段: b]还原为{{ref:xxx}}，所以mainContent就是源代码
+    const currentEditorText = getTextContent(editor);
+    if (currentEditorText !== mainContent.value) {
+      mainContent.value = currentEditorText;
+    }
+
+    // 关键步骤2：获取选中位置（getCursorPosition使用calculateTextLength，
+    // 它基于getTextContent的逻辑，所以返回的位置已经是基于源代码的位置）
+    const position = getCursorPosition(editor);
+    const start = position.start;
+    const end = position.end;
+
+    // 确保位置在有效范围内
+    const validStart = Math.max(0, Math.min(start, mainContent.value.length));
+    const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+
+    // 关键步骤3：直接从mainContent（源代码）中提取选中部分
+    const sourceCode = mainContent.value.substring(validStart, validEnd);
+    
+    // 恢复选中范围（确保编辑器焦点不丢失）
+    try {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (e) {
+      // 如果恢复失败，尝试重新设置光标位置
+      console.warn('恢复选中范围失败，尝试恢复光标位置:', e);
+    }
+    
+    return sourceCode;
+  } catch (error) {
+    console.error('获取选中源代码失败:', error);
+    return '';
+  }
+};
+
 // 根据偏移量选中一段文本（用于快速搜索跳转）
 const setSelectionRange = (start: number, end: number) => {
   const editor = editorElement.value;
@@ -3778,6 +4000,7 @@ defineExpose({
   getContent,
   refreshContent,
   getSelectedText,
+  getSelectedSourceCode,
   setSelectionRange,
   setSearchHighlights,
   setCurrentSearchMatch,
@@ -4051,6 +4274,58 @@ defineExpose({
 
 .export-item:not(:last-child) {
   border-bottom: 1px solid var(--border-secondary);
+}
+
+/* 知识图谱模态框 */
+.knowledge-graph-modal {
+  box-shadow: var(--shadow-md);
+}
+.knowledge-graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.knowledge-graph-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.knowledge-graph-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.knowledge-graph-actions .sample-btn {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+.knowledge-graph-sample-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.knowledge-graph-modal .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  color: var(--text-secondary);
+}
+.knowledge-graph-modal .close-btn:hover {
+  color: var(--text-primary);
+}
+.knowledge-graph-loading,
+.knowledge-graph-error {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.knowledge-graph-error {
+  color: var(--error-color, #c62828);
+}
+.knowledge-graph-body {
+  min-height: 320px;
 }
 
 .modal-overlay {

@@ -26,7 +26,14 @@
 <script setup lang="ts">
 import { useTheme } from '@/presentation/composables/useTheme';
 
-export type SidebarType = 'folders' | 'fragments' | 'templates' | 'git-history' | 'variables' | null;
+export type SidebarType =
+  | 'folders'
+  | 'fragments'
+  | 'templates'
+  | 'git-history'
+  | 'variables'
+  | 'knowledge-graphs'
+  | null;
 
 interface SidebarItem {
   id: SidebarType;
@@ -50,7 +57,8 @@ const sidebarItems: SidebarItem[] = [
   { id: 'fragments', icon: '📚', title: '知识片段库' },
   { id: 'templates', icon: '📑', title: '文档模板' },
   { id: 'variables', icon: '📝', title: '变量管理' },
-  { id: 'git-history', icon: '🕒', title: 'Git历史' }
+  { id: 'git-history', icon: '🕒', title: 'Git历史' },
+  { id: 'knowledge-graphs', icon: '🕸️', title: '知识图谱' }
 ];
 
 const handleIconClick = (id: SidebarType) => {

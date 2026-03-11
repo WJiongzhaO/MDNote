@@ -52,7 +52,7 @@
         <button
           class="btn btn-icon-small delete-btn"
           title="删除模板"
-          @click.stop="handleDeleteTemplate(tpl)"
+          @click.stop="openDeleteTemplateDialog(tpl)"
         >
           🗑️
         </button>
@@ -96,6 +96,22 @@
         </div>
       </div>
     </div>
+
+    <!-- 删除模板确认弹窗（样式对齐删除文档/文件夹） -->
+    <div
+      v-if="showDeleteConfirmDialog && deletingTemplate"
+      class="modal-overlay"
+      @click="handleCancelDeleteTemplate"
+    >
+      <div class="modal" @click.stop>
+        <h3>确认删除</h3>
+        <p>确定要删除模板「{{ deletingTemplate.name }}」吗？</p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="handleCancelDeleteTemplate">取消</button>
+          <button class="btn btn-danger" @click="handleConfirmDeleteTemplate">删除</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -115,6 +131,8 @@ const searchQuery = ref('');
 const activeTemplatePath = ref<string | null>(null);
 const showCreateDialog = ref(false);
 const newTemplateName = ref('');
+const showDeleteConfirmDialog = ref(false);
+const deletingTemplate = ref<DocumentTemplateInfo | null>(null);
 
 const filteredTemplates = computed(() => {
   if (!searchQuery.value.trim()) {
@@ -171,14 +189,27 @@ const confirmCreateTemplate = async () => {
   }
 };
 
-const handleDeleteTemplate = async (tpl: DocumentTemplateInfo) => {
-  if (!confirm(`确定要删除模板「${tpl.name}」吗？`)) return;
+const openDeleteTemplateDialog = (tpl: DocumentTemplateInfo) => {
+  deletingTemplate.value = tpl;
+  showDeleteConfirmDialog.value = true;
+};
+
+const handleCancelDeleteTemplate = () => {
+  showDeleteConfirmDialog.value = false;
+  deletingTemplate.value = null;
+};
+
+const handleConfirmDeleteTemplate = async () => {
+  if (!deletingTemplate.value) return;
   try {
-    await templateService.deleteTemplate(tpl.fullPath);
+    await templateService.deleteTemplate(deletingTemplate.value.fullPath);
     await loadTemplates();
   } catch (error) {
     console.error('删除模板失败:', error);
     alert('删除模板失败：' + (error instanceof Error ? error.message : '未知错误'));
+  } finally {
+    showDeleteConfirmDialog.value = false;
+    deletingTemplate.value = null;
   }
 };
 
@@ -425,6 +456,54 @@ onMounted(async () => {
 
 .placeholder {
   color: var(--text-tertiary);
+}
+
+/* 删除模板模态框样式，对齐删除文档/文件夹 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-overlay);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.modal {
+  background: var(--bg-primary);
+  padding: 24px;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: var(--shadow-md);
+}
+
+.modal h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+}
+
+.modal p {
+  margin: 0 0 16px 0;
+  color: var(--text-secondary);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-danger {
+  background: var(--accent-danger);
+  color: var(--text-inverse);
+}
+
+.btn-danger:hover {
+  background: #e05555;
 }
 </style>
 

@@ -27,6 +27,7 @@
         <KnowledgeFragmentSidebar
           v-if="activeSidebar === 'fragments'"
           ref="knowledgeFragmentSidebarRef"
+          :markdown-editor-ref="markdownEditorRef"
           @insert="(fragment) => handleInsertFragment(fragment.id)"
           @fragment-updated="handleFragmentUpdated"
         />
@@ -50,21 +51,38 @@
           @variable-updated="handleVariableUpdated"
           @variable-insert="handleInsertVariable"
         />
+
+        <!-- 知识图谱侧边栏 -->
+        <KnowledgeGraphSidebar
+          v-if="activeSidebar === 'knowledge-graphs'"
+          @select-graph="handleSelectKnowledgeGraph"
+          @deleted="handleKnowledgeGraphDeleted"
+        />
       </ResizableSidebar>
 
       <!-- 主编辑区域 -->
-      <!-- 图片预览区域 -->
-      <div v-if="currentDocument && (currentDocument as any).fileType === 'image'" class="image-preview-container">
-        <div class="image-preview-content" v-html="currentDocument?.content"></div>
+      <!-- 知识图谱主视图 -->
+      <div v-if="activeSidebar === 'knowledge-graphs'" class="knowledge-graph-main">
+        <KnowledgeGraphView
+          :graph="activeKnowledgeGraph"
+          @jump-to="handleKnowledgeGraphJumpTo"
+        />
       </div>
-      <!-- Markdown 编辑器 -->
-      <MarkdownEditor
-        v-else
-        :document="currentDocument"
-        :render-markdown="renderMarkdown"
-        @update-document="handleUpdateDocument"
-        ref="markdownEditorRef"
-      />
+      <!-- 其他：图片预览 + Markdown 编辑器 -->
+      <template v-else>
+        <!-- 图片预览区域 -->
+        <div v-if="currentDocument && (currentDocument as any).fileType === 'image'" class="image-preview-container">
+          <div class="image-preview-content" v-html="currentDocument?.content"></div>
+        </div>
+        <!-- Markdown 编辑器 -->
+        <MarkdownEditor
+          v-else
+          :document="currentDocument"
+          :render-markdown="renderMarkdown"
+          @update-document="handleUpdateDocument"
+          ref="markdownEditorRef"
+        />
+      </template>
     </div>
 
     <!-- 通过模板创建文档对话框（沿用“新建文件”窗口样式） -->
@@ -163,6 +181,8 @@ import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue';
 import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue';
 import VariableSidebar from './VariableSidebar.vue';
 import GitPanel from './git/GitPanel.vue';
+import KnowledgeGraphSidebar from './KnowledgeGraphSidebar.vue';
+import KnowledgeGraphView from './KnowledgeGraphView.vue';
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue';
 import ResizableSidebar from './ResizableSidebar.vue';
 import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-fragment.dto';
@@ -199,6 +219,7 @@ const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null
 const currentFilePath = ref<string>('');
 const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
 const dataPath = ref<string>(''); // Git 仓库路径 - 从 Electron API 获取
+const activeKnowledgeGraph = ref<any | null>(null);
 
 // 模板创建对话框状态
 const showTemplateCreateDialog = ref(false);
@@ -342,6 +363,42 @@ const handleSwitchSidebar = async (type: SidebarType) => {
   if (type === 'fragments') {
     await nextTick();
     updateFragmentSidebarContext();
+  }
+};
+
+const handleSelectKnowledgeGraph = async (info: any) => {
+  try {
+    const { FileSystemKnowledgeGraphService } = await import('../../infrastructure/services/knowledge-graph-file.service');
+    const service = new FileSystemKnowledgeGraphService();
+    const file = await service.readGraph(info.fullPath);
+    activeKnowledgeGraph.value = file.graph;
+  } catch (e) {
+    console.error('加载知识图谱失败:', e);
+  }
+};
+
+const handleKnowledgeGraphDeleted = () => {
+  activeKnowledgeGraph.value = null;
+};
+
+const handleKnowledgeGraphJumpTo = async (payload: {
+  documentId: string;
+  documentTitle?: string;
+  start: number;
+  end: number;
+}) => {
+  if (payload.documentId === 'sample-doc') {
+    return;
+  }
+  activeSidebar.value = null;
+  if (currentDocument.value?.id !== payload.documentId) {
+    await loadDocument(payload.documentId);
+  }
+  await nextTick();
+  await nextTick();
+  const editor = markdownEditorRef.value as any;
+  if (editor?.setSelectionRange) {
+    editor.setSelectionRange(payload.start, payload.end);
   }
 };
 
@@ -1022,6 +1079,14 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   display: flex;
   overflow: hidden;
   min-height: 0;
+}
+
+.knowledge-graph-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .image-preview-container {
