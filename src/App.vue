@@ -10,22 +10,17 @@ import { TYPES } from './core/container/container.types';
 import type { MermaidRenderer } from './domain/services/markdown-processor.interface';
 import { useTheme } from './presentation/composables/useTheme';
 
-// 主题系统初始化
 const { initialize: initializeTheme } = useTheme();
 
-// 创建响应式变量来存储服务实例
 const mermaidRenderer = ref<MermaidRenderer | null>(null);
 
-// 在setup阶段立即初始化应用并配置 DI 容器（必须在子组件挂载之前）
 const app = Application.getInstance();
 const container = InversifyContainer.getInstance();
 provide('diContainer', container);
 
-// 在setup阶段提供响应式引用
 provide(TYPES.MermaidRenderer, mermaidRenderer);
 
 onMounted(async () => {
-  // 初始化主题系统
   initializeTheme();
 
   try {

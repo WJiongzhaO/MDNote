@@ -45,7 +45,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getLastOpenedFolder: () => ipcRenderer.invoke('file:get-last-opened-folder'),
     saveFileCache: (filePath, cacheData) => ipcRenderer.invoke('file:save-file-cache', filePath, cacheData),
     getFileCache: (filePath) => ipcRenderer.invoke('file:get-file-cache', filePath),
-    deleteFileCache: (filePath) => ipcRenderer.invoke('file:delete-file-cache', filePath)
+    deleteFileCache: (filePath) => ipcRenderer.invoke('file:delete-file-cache', filePath),
+    createDirectory: (dirPath) => ipcRenderer.invoke('vault:create-directory', dirPath),
+    deleteDirectory: (dirPath) => ipcRenderer.invoke('vault:delete-directory', dirPath),
+    directoryExists: (dirPath) => ipcRenderer.invoke('vault:directory-exists', dirPath)
   },
   // 知识片段库 API（使用全局路径，不随项目切换）
   fragment: {
@@ -59,6 +62,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     copy: (sourcePath, destPath) => ipcRenderer.invoke('fragment:copy', sourcePath, destPath),
     deleteDir: (dirPath) => ipcRenderer.invoke('fragment:delete-dir', dirPath),
     getFullPath: (relativePath) => ipcRenderer.invoke('fragment:get-full-path', relativePath)
+  },
+  // 知识库 API
+  vault: {
+    createDirectory: (dirPath) => ipcRenderer.invoke('vault:create-directory', dirPath),
+    write: (filePath, data) => ipcRenderer.invoke('vault:write', filePath, data),
+    read: (filePath) => ipcRenderer.invoke('vault:read', filePath),
+    deleteDirectory: (dirPath) => ipcRenderer.invoke('vault:delete-directory', dirPath),
+    exists: (filePath) => ipcRenderer.invoke('vault:exists', filePath),
+    directoryExists: (dirPath) => ipcRenderer.invoke('vault:directory-exists', dirPath),
+    getVaultsPath: () => ipcRenderer.invoke('vault:get-vaults-path')
+  },
+  // 知识库注册表 API
+  vaultRegistry: {
+    getRegistry: () => ipcRenderer.invoke('vault-registry:get'),
+    saveRegistry: (registry) => ipcRenderer.invoke('vault-registry:save', registry),
+    addVault: (item) => ipcRenderer.invoke('vault-registry:add-vault', item),
+    removeVault: (id) => ipcRenderer.invoke('vault-registry:remove-vault', id),
+    setLastOpened: (id) => ipcRenderer.invoke('vault-registry:set-last-opened', id),
+    checkPathExists: (vaultPath) => ipcRenderer.invoke('vault-registry:check-path-exists', vaultPath)
   },
   // Git 操作 API
   git: {

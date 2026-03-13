@@ -3,6 +3,7 @@ import type { ServiceContainer } from '../container/service-container.interface'
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
 import type { FolderRepository } from '../../domain/repositories/folder.repository.interface';
 import type { IGitRepository } from '../../domain/repositories/IGitRepository';
+import type { VaultRepository } from '../../domain/repositories/vault.repository.interface';
 import { MarkdownProcessor } from '../../domain/services/markdown-processor.domain.service';
 import { ExtensibleMarkdownProcessor } from '../../domain/services/extensible-markdown-processor.domain.service';
 import { HandlebarsTemplateProcessor } from '../../domain/services/template-processor.service';
@@ -17,6 +18,7 @@ import { DocumentUseCases } from '../../application/usecases/document.usecases';
 import { FolderUseCases } from '../../application/usecases/folder.usecases';
 import { KnowledgeFragmentUseCases } from '../../application/usecases/knowledge-fragment.usecases';
 import { GitUseCases } from '../../application/usecases/GitUseCases';
+import { VaultUseCases } from '../../application/usecases/vault.usecases';
 import { StorageAdapter } from '../../infrastructure/storage.adapter';
 import { FileSystemAssetManager } from '../../infrastructure/services/file-system-asset-manager.service';
 import { FragmentReferenceParser } from '../../domain/services/fragment-reference-parser.service';
@@ -25,6 +27,9 @@ import { FragmentReferenceRegistrationService } from '../../domain/services/frag
 import { FragmentReferenceSyncService } from '../../domain/services/fragment-reference-sync.service';
 import { FileSystemImageStorageService } from '../../infrastructure/services/image-storage.service';
 import { ElectronGitRepository } from '../../infrastructure/repositories/git/ElectronGitRepository';
+import { FileSystemVaultRepository } from '../../infrastructure/repositories/file-system.vault.repository.impl';
+import { FileSystemVaultRegistryRepository } from '../../infrastructure/repositories/vault-registry.repository.impl';
+import type { VaultRegistryRepository } from '../../domain/repositories/vault-registry.repository.interface';
 
 // 变量系统服务
 import { SimpleTemplateProcessor } from '../../domain/services/simple-template-processor.service';
@@ -142,6 +147,16 @@ export class ApplicationModule {
 
     container.bind<GitUseCases>(TYPES.GitUseCases)
       .to(GitUseCases);
+
+    // 配置知识库仓储和用例
+    container.bind<VaultRepository>(TYPES.VaultRepository)
+      .toSingleton(FileSystemVaultRepository);
+
+    container.bind<VaultRegistryRepository>(TYPES.VaultRegistryRepository)
+      .toSingleton(FileSystemVaultRegistryRepository);
+
+    container.bind<VaultUseCases>(TYPES.VaultUseCases)
+      .toSingleton(VaultUseCases);
 
     // 配置引用相关服务
     container.bind<FragmentReferenceParser>(TYPES.FragmentReferenceParser)

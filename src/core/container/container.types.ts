@@ -7,6 +7,8 @@ export const TYPES = {
   FolderRepository: Symbol.for('FolderRepository'),
   KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
   GitRepository: Symbol.for('GitRepository'),
+  VaultRepository: Symbol.for('VaultRepository'),
+  VaultRegistryRepository: Symbol.for('VaultRegistryRepository'),
 
   // 领域服务
   MarkdownProcessor: Symbol.for('MarkdownProcessor'),
@@ -36,6 +38,7 @@ export const TYPES = {
   GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
+  VaultUseCases: Symbol.for('VaultUseCases'),
 
   // 编辑器工具栏相关
   FormatEditorService: Symbol.for('FormatEditorService'),

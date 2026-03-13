@@ -1014,7 +1014,7 @@ ipcMain.handle('file:rename-node', async (event, oldPath, newName) => {
 
     // 获取父目录
     const parentDir = path.dirname(normalizedOldPath);
-    
+
     // 构建新路径
     const newPath = path.join(parentDir, newName);
 
@@ -1026,7 +1026,7 @@ ipcMain.handle('file:rename-node', async (event, oldPath, newName) => {
     // 执行重命名
     fs.renameSync(normalizedOldPath, newPath);
     console.log('[Main Process] 已重命名:', normalizedOldPath, '->', newPath);
-    
+
     // 返回新路径（保持原始格式，前端会处理）
     return { success: true, newPath: newPath };
   } catch (error) {
@@ -1113,15 +1113,15 @@ ipcMain.handle('export:pdf', async (event, options) => {
       });
 
       const page = await browser.newPage();
-      
+
       // 设置页面默认超时（30秒）
       page.setDefaultTimeout(30000);
       page.setDefaultNavigationTimeout(30000);
 
       // 设置内容，等待网络资源（包括 KaTeX CSS）加载完成
-      await page.setContent(options.html || options.content || '', { 
+      await page.setContent(options.html || options.content || '', {
         waitUntil: 'networkidle0',  // 等待网络空闲，确保外部资源（CSS、字体）加载完成
-        timeout: 30000 
+        timeout: 30000
       });
 
       // 额外等待，确保 KaTeX 字体加载完成
@@ -1150,7 +1150,7 @@ ipcMain.handle('export:pdf', async (event, options) => {
                 // 检查 Mermaid 占位符
                 const checkAndWaitMermaid = () => {
                   const placeholders = document.querySelectorAll('.mermaid-asset-placeholder');
-                  
+
                   if (placeholders.length === 0) {
                     console.log('[PDF Export] 所有资源已就绪');
                     resolve();
@@ -1158,14 +1158,14 @@ ipcMain.handle('export:pdf', async (event, options) => {
                   }
 
                   console.log(`[PDF Export] 等待 ${placeholders.length} 个 Mermaid 图表渲染`);
-                  
+
                   // 使用 setInterval 定期检查，最多等待 8 秒
                   let attempts = 0;
                   const maxAttempts = 16;
                   const interval = setInterval(() => {
                     attempts++;
                     const remaining = document.querySelectorAll('.mermaid-asset-placeholder');
-                    
+
                     if (remaining.length === 0) {
                       clearInterval(interval);
                       console.log('[PDF Export] Mermaid 图表渲染完成');
@@ -1233,10 +1233,10 @@ ipcMain.handle('export:pdf', async (event, options) => {
               // 忽略单个页面关闭错误
             }
           }));
-          
+
           // 然后关闭浏览器
           await browser.close();
-          
+
           // 添加延迟确保资源释放
           await new Promise(resolve => setTimeout(resolve, 300));
         } catch (closeError) {
@@ -1257,7 +1257,7 @@ ipcMain.handle('export:pdf', async (event, options) => {
       return result;
     } catch (error) {
       console.error('[Main Process] PDF export error:', error);
-      
+
       // 确保浏览器被关闭（增强的错误处理）
       if (browser) {
         try {
@@ -1271,7 +1271,7 @@ ipcMain.handle('export:pdf', async (event, options) => {
               // 忽略
             }
           }));
-          
+
           await browser.close();
           await new Promise(resolve => setTimeout(resolve, 300));
         } catch (closeError) {
@@ -1296,6 +1296,208 @@ ipcMain.handle('export:pdf', async (event, options) => {
       error: error.message || 'PDF导出失败'
     };
   }
+});
+
+// ==================== 知识库 IPC 处理器 ====================
+// 创建目录
+ipcMain.handle('vault:create-directory', async (event, dirPath) => {
+  try {
+    console.log('[Main Process] vault:create-directory called, dirPath:', dirPath);
+    const normalizedPath = path.normalize(dirPath);
+    if (!fs.existsSync(normalizedPath)) {
+      fs.mkdirSync(normalizedPath, { recursive: true });
+      console.log('[Main Process] Directory created:', normalizedPath);
+    }
+    return true;
+  } catch (error) {
+    console.error('[Main Process] Error creating vault directory:', error);
+    throw error;
+  }
+});
+
+// 写入文件
+ipcMain.handle('vault:write', async (event, filePath, data) => {
+  try {
+    console.log('[Main Process] vault:write called, filePath:', filePath);
+    const normalizedPath = path.normalize(filePath);
+    const dir = path.dirname(normalizedPath);
+
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    const maxRetries = 5;
+    const baseDelay = 50;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        fs.writeFileSync(normalizedPath, JSON.stringify(data, null, 2), 'utf8');
+        console.log('[Main Process] File written:', normalizedPath);
+        return true;
+      } catch (err) {
+        console.log(`[Main Process] Write attempt ${i + 1}/${maxRetries} failed:`, err.message);
+        if (err.code === 'EPERM' || err.code === 'EBUSY') {
+          if (i < maxRetries - 1) {
+            const delay = baseDelay * Math.pow(2, i);
+            console.log(`[Main Process] Retrying after ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('[Main Process] Error writing vault file:', error);
+    throw error;
+  }
+});
+
+// 读取文件
+ipcMain.handle('vault:read', async (event, filePath) => {
+  try {
+    console.log('[Main Process] vault:read called, filePath:', filePath);
+    const normalizedPath = path.normalize(filePath);
+    if (fs.existsSync(normalizedPath)) {
+      const data = fs.readFileSync(normalizedPath, 'utf8');
+      return JSON.parse(data);
+    }
+    return null;
+  } catch (error) {
+    console.error('[Main Process] Error reading vault file:', error);
+    throw error;
+  }
+});
+
+// 删除目录
+ipcMain.handle('vault:delete-directory', async (event, dirPath) => {
+  try {
+    console.log('[Main Process] vault:delete-directory called, dirPath:', dirPath);
+    const normalizedPath = path.normalize(dirPath);
+    if (fs.existsSync(normalizedPath)) {
+      fs.rmSync(normalizedPath, { recursive: true, force: true });
+      console.log('[Main Process] Directory deleted:', normalizedPath);
+    }
+    return true;
+  } catch (error) {
+    console.error('[Main Process] Error deleting vault directory:', error);
+    throw error;
+  }
+});
+
+// 检查文件是否存在
+ipcMain.handle('vault:exists', async (event, filePath) => {
+  try {
+    const normalizedPath = path.normalize(filePath);
+    return fs.existsSync(normalizedPath);
+  } catch (error) {
+    console.error('[Main Process] Error checking vault file existence:', error);
+    throw error;
+  }
+});
+
+// 检查目录是否存在
+ipcMain.handle('vault:directory-exists', async (event, dirPath) => {
+  try {
+    const normalizedPath = path.normalize(dirPath);
+    if (fs.existsSync(normalizedPath)) {
+      const stats = fs.statSync(normalizedPath);
+      return stats.isDirectory();
+    }
+    return false;
+  } catch (error) {
+    console.error('[Main Process] Error checking vault directory existence:', error);
+    throw error;
+  }
+});
+
+// ==================== 知识库注册表 IPC 处理器 ====================
+const VAULT_REGISTRY_FILE = 'vault-registry.json';
+
+function getVaultRegistryPath() {
+  return path.join(userDataPath, VAULT_REGISTRY_FILE);
+}
+
+function loadVaultRegistry() {
+  const registryPath = getVaultRegistryPath();
+  try {
+    if (fs.existsSync(registryPath)) {
+      const data = fs.readFileSync(registryPath, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('[Main Process] Error loading vault registry:', error);
+  }
+  return {
+    version: '1.0.0',
+    vaults: [],
+    lastOpenedVaultId: null
+  };
+}
+
+function saveVaultRegistry(registry) {
+  const registryPath = getVaultRegistryPath();
+  try {
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error('[Main Process] Error saving vault registry:', error);
+    return false;
+  }
+}
+
+ipcMain.handle('vault-registry:get', async () => {
+  return loadVaultRegistry();
+});
+
+ipcMain.handle('vault-registry:save', async (event, registry) => {
+  return saveVaultRegistry(registry);
+});
+
+ipcMain.handle('vault-registry:add-vault', async (event, item) => {
+  const registry = loadVaultRegistry();
+  const existingIndex = registry.vaults.findIndex(v => v.id === item.id);
+  if (existingIndex >= 0) {
+    registry.vaults[existingIndex] = item;
+  } else {
+    registry.vaults.push(item);
+  }
+  return saveVaultRegistry(registry);
+});
+
+ipcMain.handle('vault-registry:remove-vault', async (event, id) => {
+  const registry = loadVaultRegistry();
+  registry.vaults = registry.vaults.filter(v => v.id !== id);
+  if (registry.lastOpenedVaultId === id) {
+    registry.lastOpenedVaultId = null;
+  }
+  return saveVaultRegistry(registry);
+});
+
+ipcMain.handle('vault-registry:set-last-opened', async (event, id) => {
+  const registry = loadVaultRegistry();
+  registry.lastOpenedVaultId = id;
+  return saveVaultRegistry(registry);
+});
+
+ipcMain.handle('vault-registry:check-path-exists', async (event, vaultPath) => {
+  try {
+    return fs.existsSync(vaultPath);
+  } catch (error) {
+    return false;
+  }
+});
+
+ipcMain.handle('vault:get-vaults-path', async () => {
+  const vaultsPath = path.join(userDataPath, 'vaults');
+  if (!fs.existsSync(vaultsPath)) {
+    fs.mkdirSync(vaultsPath, { recursive: true });
+  }
+  return vaultsPath;
 });
 
 // ==================== Git IPC 处理器 ====================

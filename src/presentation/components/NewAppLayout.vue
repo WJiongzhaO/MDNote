@@ -172,6 +172,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, nextTick, watch, provide } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { Application } from '../../core/application';
 import { useDocuments } from '../composables/useDocuments';
 import { useFolders } from '../composables/useFolders';
@@ -189,6 +190,9 @@ import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-
 import { FileSystemTemplateService, type DocumentTemplateInfo } from '../../infrastructure/services/template.service';
 import { INITIAL_DOCUMENT_TEMPLATES } from '../../infrastructure/services/default-templates';
 import QuickSearchDialog from './QuickSearchDialog.vue';
+
+const route = useRoute();
+const router = useRouter();
 
 const {
   documents,
@@ -632,41 +636,56 @@ const handleFragmentUpdated = async (fragmentId: string) => {
 onMounted(async () => {
   console.log('[NewAppLayout] onMounted - Initializing...');
 
-  // 获取真实的 dataPath（可能是用户上次打开的文件夹）
-  try {
-    const electronAPI = (window as any).electronAPI;
+  const electronAPI = (window as any).electronAPI;
 
-    // 优先尝试获取自定义路径（用户上次打开的文件夹）
-    if (electronAPI && electronAPI.file && electronAPI.file.getCustomDataPath) {
-      const customPath = await electronAPI.file.getCustomDataPath();
-      if (customPath) {
-        console.log('[NewAppLayout] Found custom data path:', customPath);
-        dataPath.value = customPath;
-      } else {
-        console.log('[NewAppLayout] No custom data path, using default');
-        // 如果没有自定义路径，获取默认路径
-        if (electronAPI.file.getDataPath) {
-          const path = await electronAPI.file.getDataPath();
-          dataPath.value = path;
-          console.log('[NewAppLayout] Using default data path:', path);
-        }
+  const vaultPath = route.query.vaultPath as string | undefined;
+  const vaultId = route.query.vaultId as string | undefined;
+  
+  if (vaultPath) {
+    console.log('[NewAppLayout] Loading vault from route params:', vaultPath);
+    dataPath.value = vaultPath;
+    lastOpenedFolderPath.value = vaultPath;
+    
+    try {
+      if (electronAPI && electronAPI.file && electronAPI.file.setCustomDataPath) {
+        await electronAPI.file.setCustomDataPath(vaultPath);
       }
-    } else if (electronAPI && electronAPI.file && electronAPI.file.getDataPath) {
-      const path = await electronAPI.file.getDataPath();
-      dataPath.value = path;
-      console.log('[NewAppLayout] Using data path from getDataPath:', path);
+      if (electronAPI && electronAPI.file && electronAPI.file.saveLastOpenedFolder) {
+        await electronAPI.file.saveLastOpenedFolder(vaultPath);
+      }
+    } catch (error) {
+      console.error('[NewAppLayout] Error setting vault path:', error);
     }
+  } else {
+    try {
+      if (electronAPI && electronAPI.file && electronAPI.file.getCustomDataPath) {
+        const customPath = await electronAPI.file.getCustomDataPath();
+        if (customPath) {
+          console.log('[NewAppLayout] Found custom data path:', customPath);
+          dataPath.value = customPath;
+        } else {
+          console.log('[NewAppLayout] No custom data path, using default');
+          if (electronAPI.file.getDataPath) {
+            const path = await electronAPI.file.getDataPath();
+            dataPath.value = path;
+            console.log('[NewAppLayout] Using default data path:', path);
+          }
+        }
+      } else if (electronAPI && electronAPI.file && electronAPI.file.getDataPath) {
+        const path = await electronAPI.file.getDataPath();
+        dataPath.value = path;
+        console.log('[NewAppLayout] Using data path from getDataPath:', path);
+      }
 
-    console.log('[NewAppLayout] Final initialized dataPath:', dataPath.value);
-  } catch (error) {
-    console.error('[NewAppLayout] Error getting dataPath:', error);
+      console.log('[NewAppLayout] Final initialized dataPath:', dataPath.value);
+    } catch (error) {
+      console.error('[NewAppLayout] Error getting dataPath:', error);
+    }
   }
 
   await loadFolders();
   await loadDocumentsByFolder(null);
 
-  // 监听原生菜单事件（Save事件）
-  const electronAPI = (window as any).electronAPI;
   if (electronAPI && electronAPI.menu) {
     electronAPI.menu.onSave(async () => {
       if (markdownEditorRef.value && currentFilePath.value) {
@@ -679,7 +698,6 @@ onMounted(async () => {
     });
   }
 
-  // 监听主进程发送的恢复文件夹事件
   if (electronAPI && electronAPI.on) {
     electronAPI.on('app:restore-last-folder', async (folderPath: string) => {
       if (folderPath) {
@@ -692,42 +710,36 @@ onMounted(async () => {
     });
   }
 
-  // 获取数据路径（用于Git仓库）
-  try {
-    if (electronAPI && electronAPI.file && electronAPI.file.getDataPath) {
-      const path = await electronAPI.file.getDataPath();
-      if (path) {
-        dataPath.value = path;
-      }
+  if (vaultPath) {
+    if (activeSidebar.value !== 'folders') {
+      activeSidebar.value = 'folders';
     }
-  } catch (error) {
-    console.error('Error getting data path:', error);
-    // 使用默认路径
-  }
-
-  // 尝试加载上次打开的文件夹
-  try {
-    if (electronAPI && electronAPI.file && electronAPI.file.getLastOpenedFolder) {
-      const lastFolder = await electronAPI.file.getLastOpenedFolder();
-      if (lastFolder) {
-        lastOpenedFolderPath.value = lastFolder;
-        // 确保切换到文件夹侧边栏
-        if (activeSidebar.value !== 'folders') {
-          activeSidebar.value = 'folders';
-        }
-        // 等待组件渲染完成后再加载文件夹
-        await nextTick();
-        await nextTick(); // 再次等待确保FileExplorer已完全挂载
-        if (fileExplorerRef.value) {
-          (fileExplorerRef.value as any).loadFolder(lastFolder);
+    await nextTick();
+    await nextTick();
+    if (fileExplorerRef.value) {
+      (fileExplorerRef.value as any).loadFolder(vaultPath);
+    }
+  } else {
+    try {
+      if (electronAPI && electronAPI.file && electronAPI.file.getLastOpenedFolder) {
+        const lastFolder = await electronAPI.file.getLastOpenedFolder();
+        if (lastFolder) {
+          lastOpenedFolderPath.value = lastFolder;
+          if (activeSidebar.value !== 'folders') {
+            activeSidebar.value = 'folders';
+          }
+          await nextTick();
+          await nextTick();
+          if (fileExplorerRef.value) {
+            (fileExplorerRef.value as any).loadFolder(lastFolder);
+          }
         }
       }
+    } catch (error) {
+      console.error('Error loading last opened folder:', error);
     }
-  } catch (error) {
-    console.error('Error loading last opened folder:', error);
   }
 
-  // 检查是否是首次运行
   const application = Application.getInstance();
   const documentUseCases = application.getDocumentUseCases();
   const existingDocs = await documentUseCases.getAllDocuments();
@@ -761,14 +773,12 @@ onMounted(async () => {
     });
   }
 
-  // 确保默认模板已经写入到全局模板库（如果已存在则不会覆盖）
   try {
     await templateService.ensureInitialTemplates(INITIAL_DOCUMENT_TEMPLATES);
   } catch (e) {
     console.error('初始化默认模板失败:', e);
   }
 
-  // 监听快捷键命令触发的快速搜索事件
   if (typeof window !== 'undefined') {
     window.addEventListener('mdnote:open-quick-search', handleOpenQuickSearch);
   }
