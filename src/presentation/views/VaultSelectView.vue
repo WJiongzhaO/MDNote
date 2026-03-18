@@ -18,22 +18,24 @@
 
     <div class="vault-list-section">
       <h2 class="section-title">已有知识库</h2>
-      
+
       <div v-if="loading" class="loading-state">
         加载中...
       </div>
-      
+
       <div v-else-if="vaults.length === 0" class="empty-state">
         <p>暂无知识库</p>
         <p class="hint">点击上方按钮创建或打开知识库</p>
       </div>
-      
+
       <div v-else class="vault-grid">
         <VaultCard
           v-for="vault in vaults"
           :key="vault.id"
           :vault="vault"
           @select="handleSelectVault"
+          @remove-from-list="handleRemoveFromList"
+          @delete="handleDeleteVault"
         />
       </div>
     </div>
@@ -88,7 +90,7 @@ const handleSelectVault = async (vaultId: string) => {
   try {
     const useCases = getVaultUseCases();
     const result = await useCases.openVault(vaultId);
-    
+
     if (result.success) {
       router.push({
         path: '/app',
@@ -103,15 +105,37 @@ const handleSelectVault = async (vaultId: string) => {
   }
 };
 
+const handleRemoveFromList = async (vaultId: string) => {
+  try {
+    const useCases = getVaultUseCases();
+    await useCases.removeFromRegistry(vaultId);
+    await loadVaults();
+  } catch (error) {
+    console.error('从列表移除失败:', error);
+    alert('从列表移除失败: ' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
+
+const handleDeleteVault = async (vaultId: string) => {
+  try {
+    const useCases = getVaultUseCases();
+    await useCases.deleteVaultFromRegistryAndDisk(vaultId);
+    await loadVaults();
+  } catch (error) {
+    console.error('删除知识库失败:', error);
+    alert('删除知识库失败: ' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
+
 const handleCreateVault = async (data: { name: string }) => {
   try {
     const useCases = getVaultUseCases();
     const result = await useCases.createAndRegisterVault({
       name: data.name
     });
-    
+
     showNewVaultDialog.value = false;
-    
+
     router.push({
       path: '/app',
       query: { vaultId: result.id, vaultPath: result.path }
@@ -131,11 +155,11 @@ const openFolderAsVault = async () => {
     }
 
     const folderPath = await electronAPI.dialog.openFolder({ skipSaveLastFolder: true });
-    
+
     if (folderPath) {
       const useCases = getVaultUseCases();
       const result = await useCases.importFolderAsVault(folderPath);
-      
+
       router.push({
         path: '/app',
         query: { vaultId: result.id, vaultPath: result.path }
@@ -150,7 +174,7 @@ const openFolderAsVault = async () => {
 onMounted(async () => {
   const app = Application.getInstance();
   await app.start();
-  
+
   await loadVaults();
 });
 </script>

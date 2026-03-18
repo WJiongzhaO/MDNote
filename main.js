@@ -237,7 +237,7 @@ function createMenu() {
   ];
 
   const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+  Menu.setApplicationMenu(null);
 }
 
 let mainWindow = null;
@@ -922,8 +922,19 @@ ipcMain.handle('file:read-directory', async (event, dirPath) => {
     const items = fs.readdirSync(dirPath, { withFileTypes: true });
     const result = [];
 
+    const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+    const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
+
     for (const item of items) {
       const fullPath = path.join(dirPath, item.name);
+
+      if (item.isDirectory() && systemDirs.includes(item.name)) {
+        continue;
+      }
+      if (!item.isDirectory() && (systemFiles.includes(item.name) || item.name.startsWith('.'))) {
+        continue;
+      }
+
       result.push({
         name: item.name,
         type: item.isDirectory() ? 'folder' : 'file',

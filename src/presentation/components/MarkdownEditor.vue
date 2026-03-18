@@ -2,50 +2,6 @@
   <div class="editor-container">
     <div class="editor-header">
       <div v-if="document || currentFilePath" class="editor-toolbar">
-        <button
-          class="toolbar-btn"
-          @click="openMermaidEditor"
-          title="编辑Mermaid图表"
-        >
-          📊 Mermaid编辑器
-        </button>
-        <!-- 添加公式编辑器按钮 -->
-        <button
-          class="toolbar-btn"
-          @click="openFormulaEditor"
-          title="编辑数学公式"
-        >
-          📐 公式编辑器
-        </button>
-        <!-- 生成知识图谱 -->
-        <button
-          class="toolbar-btn"
-          @click="openKnowledgeGraph"
-          title="根据当前文章生成知识图谱"
-        >
-          🕸️ 知识图谱
-        </button>
-        <!-- 导出按钮 -->
-        <div class="export-menu">
-          <button
-            class="toolbar-btn"
-            @click="showExportMenu = !showExportMenu"
-            title="导出文档"
-          >
-            📤 导出
-          </button>
-          <div v-if="showExportMenu" class="export-dropdown" @click.stop>
-            <div class="export-item" @click="handleExport('pdf')">
-              📕 PDF (.pdf)
-            </div>
-            <div class="export-item" @click="handleExport('html')">
-              🌐 HTML (.html)
-            </div>
-            <div class="export-item" @click="handleExport('markdown')">
-              📝 Markdown (.md)
-            </div>
-          </div>
-      </div>
     </div>
 
       <!-- 新增：格式化工具栏 -->
@@ -56,6 +12,8 @@
         @update:content="handleToolbarUpdate"
         @open-mermaid="openMermaidEditor"
         @open-formula="openFormulaEditor"
+        @open-knowledge-graph="openKnowledgeGraph"
+        @export="handleExport"
         @insert-fragment="handleInsertFragment"
       />
     </div>
@@ -378,7 +336,6 @@ const isSampleMode = ref(false);
 const knowledgeGraphService = new FileSystemKnowledgeGraphService();
 
 // 导出相关状态
-const showExportMenu = ref(false);
 const isExporting = ref(false);
 const showExportConfigModal = ref(false);
 const pendingExportFormat = ref<'pdf' | 'html' | 'markdown'>('pdf');
@@ -1834,9 +1791,6 @@ onMounted(() => {
     useAutoRender(previewElement1);
   }
 
-  // 添加点击外部关闭导出菜单的监听
-  document.addEventListener('click', handleClickOutsideExport);
-
   if (content.value) {
     renderContent();
     // 确保编辑器内容正确显示
@@ -1852,9 +1806,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  // 移除点击外部关闭导出菜单的监听
-  document.removeEventListener('click', handleClickOutsideExport);
-
   // 组件卸载前，如果有未保存的更改，强制保存
   if (hasChanges.value) {
     // 清除防抖定时器，立即保存
@@ -2488,22 +2439,12 @@ const saveKnowledgeGraph = async () => {
   }
 };
 
-// 点击外部关闭导出菜单
-const handleClickOutsideExport = (event: MouseEvent) => {
-  const target = event.target as HTMLElement;
-  if (!target.closest('.export-menu')) {
-    showExportMenu.value = false;
-  }
-};
-
 // 导出相关方法
 const handleExport = async (format: 'pdf' | 'html' | 'markdown') => {
   // 检查是否有文档或外部文件
   if ((!props.document && !currentFilePath.value) || isExporting.value) {
     return;
   }
-
-  showExportMenu.value = false;
 
   // Markdown 导出不需要配置，直接导出
   if (format === 'markdown') {

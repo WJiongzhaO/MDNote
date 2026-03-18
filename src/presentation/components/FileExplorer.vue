@@ -491,8 +491,16 @@ const loadFolder = async (folderPath: string) => {
 const buildFileTree = (items: Array<{ name: string; type: 'file' | 'folder'; path: string }>, rootPath: string): FileNode[] => {
   const tree: FileNode[] = [];
 
-  // 直接构建树结构（只处理一级）
+  const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+  const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
+
   for (const item of items) {
+    if (item.type === 'folder' && systemDirs.includes(item.name)) {
+      continue;
+    }
+    if (item.type === 'file' && (systemFiles.includes(item.name) || item.name.startsWith('.'))) {
+      continue;
+    }
     const node: FileNode = {
       name: item.name,
       path: item.path,
@@ -514,7 +522,21 @@ const loadFolderChildren = async (folderNode: FileNode) => {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.file && electronAPI.file.readDirectory) {
       const items = await electronAPI.file.readDirectory(folderNode.path);
-      folderNode.children = items.map((item: { name: string; path: string; type: 'file' | 'folder' }) => ({
+
+      const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+      const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
+
+      const filteredItems = items.filter((item: { name: string; path: string; type: 'file' | 'folder' }) => {
+        if (item.type === 'folder' && systemDirs.includes(item.name)) {
+          return false;
+        }
+        if (item.type === 'file' && (systemFiles.includes(item.name) || item.name.startsWith('.'))) {
+          return false;
+        }
+        return true;
+      });
+
+      folderNode.children = filteredItems.map((item: { name: string; path: string; type: 'file' | 'folder' }) => ({
         name: item.name,
         path: item.path,
         type: item.type,

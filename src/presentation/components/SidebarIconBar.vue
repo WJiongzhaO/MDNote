@@ -6,11 +6,34 @@
         :key="item.id"
         :class="['icon-btn', { active: activeSidebar === item.id }]"
         @click="handleIconClick(item.id)"
+        @contextmenu="handleContextMenu($event, item.id)"
         :title="item.title"
       >
         <span class="icon">{{ item.icon }}</span>
       </button>
     </div>
+
+    <!-- 右键菜单 -->
+    <div
+      v-if="contextMenu.visible"
+      class="context-menu"
+      :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
+      @click.stop
+    >
+      <div class="context-menu-item" @click="handleManageFragments">
+        <span class="menu-icon">📚</span>
+        <span>管理知识片段</span>
+      </div>
+    </div>
+
+    <!-- 返回知识库选择按钮 -->
+    <button
+      class="icon-btn back-btn"
+      @click="handleBackToVaultSelect"
+      title="返回知识库选择"
+    >
+      <span class="icon">🏠</span>
+    </button>
 
     <!-- 主题切换按钮 -->
     <button
@@ -24,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useTheme } from '@/presentation/composables/useTheme';
 
 export type SidebarType =
@@ -47,10 +71,20 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'switch-sidebar', type: SidebarType): void;
+  (e: 'back-to-vault-select'): void;
+  (e: 'manage-fragments'): void;
 }>();
 
 // 主题相关
 const { isDark, toggleTheme } = useTheme();
+
+// 右键菜单状态
+const contextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  targetId: null as SidebarType | null
+});
 
 const sidebarItems: SidebarItem[] = [
   { id: 'folders', icon: '📁', title: '文件夹' },
@@ -66,6 +100,46 @@ const handleIconClick = (id: SidebarType) => {
   const newActive = props.activeSidebar === id ? null : id;
   emit('switch-sidebar', newActive);
 };
+
+const handleBackToVaultSelect = () => {
+  emit('back-to-vault-select');
+};
+
+// 右键菜单处理
+const handleContextMenu = (event: MouseEvent, id: SidebarType) => {
+  // 只在知识片段库按钮上显示右键菜单
+  if (id !== 'fragments') {
+    return;
+  }
+  
+  event.preventDefault();
+  contextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    targetId: id
+  };
+};
+
+const handleManageFragments = () => {
+  contextMenu.value.visible = false;
+  emit('manage-fragments');
+};
+
+// 点击外部关闭右键菜单
+const handleClickOutside = (event: MouseEvent) => {
+  if (!(event.target as HTMLElement).closest('.context-menu')) {
+    contextMenu.value.visible = false;
+  }
+};
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+});
 </script>
 
 <style scoped>
@@ -114,6 +188,35 @@ const handleIconClick = (id: SidebarType) => {
 .icon {
   font-size: 1.5rem;
   line-height: 1;
+}
+
+.context-menu {
+  position: fixed;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  min-width: 150px;
+  padding: 4px 0;
+}
+
+.context-menu-item {
+  padding: 6px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.context-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.menu-icon {
+  font-size: 1rem;
 }
 </style>
 

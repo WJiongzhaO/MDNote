@@ -46,6 +46,29 @@
         tooltip="数学公式"
         @click="$emit('open-formula')"
       />
+      <ToolbarButton
+        text="🕸️"
+        tooltip="知识图谱"
+        @click="$emit('open-knowledge-graph')"
+      />
+      <div class="export-menu">
+        <ToolbarButton
+          text="📤"
+          tooltip="导出"
+          @click="toggleExportMenu"
+        />
+        <div v-if="showExportMenu" class="export-dropdown" @click.stop>
+          <div class="export-item" @click="handleExport('pdf')">
+            📕 PDF (.pdf)
+          </div>
+          <div class="export-item" @click="handleExport('html')">
+            🌐 HTML (.html)
+          </div>
+          <div class="export-item" @click="handleExport('markdown')">
+            📝 Markdown (.md)
+          </div>
+        </div>
+      </div>
     </ToolbarGroup>
   </div>
 </template>
@@ -57,7 +80,7 @@
  * @module presentation/components/editor/toolbar
  */
 
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useEditorToolbar } from '@/presentation/composables/useEditorToolbar';
 import ToolbarGroup from './ToolbarGroup.vue';
 import ToolbarButton from './ToolbarButton.vue';
@@ -86,7 +109,23 @@ const emit = defineEmits<{
   (e: 'update:content', content: string): void;
   (e: 'open-mermaid'): void;
   (e: 'open-formula'): void;
+  (e: 'open-knowledge-graph'): void;
+  (e: 'export', format: 'pdf' | 'html' | 'markdown'): void;
 }>();
+
+// 导出菜单状态
+const showExportMenu = ref(false);
+
+// 切换导出菜单
+const toggleExportMenu = () => {
+  showExportMenu.value = !showExportMenu.value;
+};
+
+// 处理导出
+const handleExport = (format: 'pdf' | 'html' | 'markdown') => {
+  showExportMenu.value = false;
+  emit('export', format);
+};
 
 // 使用工具栏 Composable
 const contentRef = computed({
@@ -151,6 +190,22 @@ const handleFormat = (formatType: string) => {
   applyFormat(formatType);
 };
 
+// 点击外部关闭导出菜单
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement;
+  if (!target.closest('.export-menu')) {
+    showExportMenu.value = false;
+  }
+};
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+});
+
 </script>
 
 <style scoped>
@@ -169,5 +224,38 @@ const handleFormat = (formatType: string) => {
   height: 24px;
   background: var(--border-primary);
   margin: 0 4px;
+}
+
+.export-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.export-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  min-width: 150px;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+
+.export-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.export-item:hover {
+  background: var(--bg-hover);
 }
 </style>
