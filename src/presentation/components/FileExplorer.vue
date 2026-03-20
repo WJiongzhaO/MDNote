@@ -2,8 +2,8 @@
   <div class="file-explorer">
     <!-- 路径显示栏 -->
     <div class="path-bar">
-      <span class="path-label">当前路径：</span>
-      <span class="path-value">{{ currentPath || '未打开文件夹' }}</span>
+      <span class="path-label">当前知识库：</span>
+      <span class="path-value">{{ vaultName }}</span>
       <button v-if="currentPath" class="btn-close" @click="closeFolder" title="关闭文件夹">✕</button>
     </div>
 
@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import FileTreeNode from './FileTreeNode.vue';
 
 interface FileNode {
@@ -152,6 +152,13 @@ const emit = defineEmits<{
 const currentPath = ref<string>('');
 const fileTree = ref<FileNode[]>([]);
 const selectedPath = ref<string>('');
+
+const vaultName = computed(() => {
+  if (!currentPath.value) return '未打开文件夹';
+  const normalizedPath = currentPath.value.replace(/\\/g, '/');
+  const parts = normalizedPath.split('/').filter(p => p);
+  return parts[parts.length - 1] || '未打开文件夹';
+});
 const contextMenu = ref({
   visible: false,
   x: 0,
@@ -270,12 +277,12 @@ const cancelDelete = () => {
 
 const handleRename = () => {
   if (!contextMenu.value.node) return;
-  
+
   contextMenu.value.visible = false;
   renameNode.value = contextMenu.value.node;
   renameName.value = contextMenu.value.node.name;
   showRenameDialog.value = true;
-  
+
   nextTick(() => {
     renameInput.value?.focus();
     // 选中文件名（不包括扩展名）以便用户直接输入新名称
@@ -293,7 +300,7 @@ const handleRename = () => {
 
 const confirmRename = async () => {
   console.log('[FileExplorer] confirmRename 被调用');
-  
+
   if (!renameNode.value || !renameName.value.trim()) {
     console.log('[FileExplorer] 验证失败: renameNode 或 renameName 为空');
     return;
@@ -311,7 +318,7 @@ const confirmRename = async () => {
 
   try {
     const electronAPI = (window as any).electronAPI;
-    
+
     // 检查 electronAPI 是否可用（与其他函数保持一致）
     if (!electronAPI || !electronAPI.file || !electronAPI.file.renameNode) {
       console.error('[FileExplorer] electronAPI 检查失败:', {
@@ -325,11 +332,11 @@ const confirmRename = async () => {
     }
 
     console.log('[FileExplorer] 开始重命名:', oldPath, '->', newName);
-    
+
     // 调用重命名 API
     const result = await electronAPI.file.renameNode(oldPath, newName);
     console.log('[FileExplorer] 重命名 API 返回结果:', result);
-    
+
     // 如果执行到这里没有抛出错误，说明重命名成功
     // 更新选中路径（如果当前选中的是被重命名的文件/文件夹）
     if (result && result.newPath) {
@@ -340,17 +347,17 @@ const confirmRename = async () => {
         console.log('[FileExplorer] 更新选中路径:', result.newPath);
       }
     }
-    
+
     // 重新加载文件夹以刷新文件树
     console.log('[FileExplorer] 重新加载文件夹:', currentPath.value);
     await loadFolder(currentPath.value);
-    
+
     // 关闭对话框
     console.log('[FileExplorer] 关闭重命名对话框');
     showRenameDialog.value = false;
     renameName.value = '';
     renameNode.value = null;
-    
+
     console.log('[FileExplorer] 重命名完成');
   } catch (error) {
     console.error('[FileExplorer] 重命名失败:', error);
@@ -370,7 +377,7 @@ const cancelRename = () => {
 const findNodeByPath = (nodes: FileNode[], targetPath: string): FileNode | null => {
   const normalizePath = (p: string) => p.replace(/\\/g, '/');
   const normalizedTarget = normalizePath(targetPath);
-  
+
   for (const node of nodes) {
     if (normalizePath(node.path) === normalizedTarget) {
       return node;
@@ -394,10 +401,10 @@ const createNewFile = async () => {
     if (electronAPI && electronAPI.file && electronAPI.file.writeFileContent) {
       await electronAPI.file.writeFileContent(filePath, '');
       await loadFolder(currentPath.value);
-      
+
       // 等待文件树更新后，从文件树中找到新创建的文件并使用其实际路径
       await nextTick();
-      
+
       // 在文件树中查找新创建的文件节点
       const newNode = findNodeByPath(fileTree.value, filePath);
       if (newNode) {
@@ -409,7 +416,7 @@ const createNewFile = async () => {
         selectedPath.value = filePath;
         emit('select-file', filePath);
       }
-      
+
       showNewFileDialog.value = false;
       newFileName.value = '';
     }
@@ -445,9 +452,9 @@ const deleteNode = async (nodePath: string) => {
     if (electronAPI && electronAPI.file && electronAPI.file.deleteNode) {
       // 检查删除的是否是当前选中的文件
       const isSelectedFile = selectedPath.value === nodePath;
-      
+
       await electronAPI.file.deleteNode(nodePath);
-      
+
       // 如果删除的是当前选中的文件，清空选中状态
       // 这样编辑器也会清空内容，保持状态一致
       if (isSelectedFile) {
@@ -456,7 +463,7 @@ const deleteNode = async (nodePath: string) => {
         // 注意：这里不能直接访问 currentDocument，需要通过事件通知
         emit('select-file', ''); // 传递空字符串表示清空选中
       }
-      
+
       await loadFolder(currentPath.value);
     }
   } catch (error) {
@@ -667,6 +674,7 @@ defineExpose({
 
 <style scoped>
 .file-explorer {
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
