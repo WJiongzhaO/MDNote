@@ -46,7 +46,9 @@
       @click="toggleTheme"
       :title="isDark ? '切换到浅色主题' : '切换到暗色主题'"
     >
-      <span class="icon">{{ isDark ? '🌙' : '☀️' }}</span>
+      <span class="icon">
+        <img :src="isDark ? '/icon/dark.svg' : '/icon/light.svg'" :alt="isDark ? '暗色主题' : '浅色主题'" class="svg-icon" />
+      </span>
     </button>
   </div>
 </template>
