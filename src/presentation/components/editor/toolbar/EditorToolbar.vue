@@ -130,7 +130,6 @@ const emit = defineEmits<{
 
 const showExportMenu = ref(false);
 const showHeadingMenu = ref(false);
-const headingLevel = ref(0);
 
 const headingLabels = [
   '一级标题',
@@ -140,31 +139,6 @@ const headingLabels = [
   '五级标题',
   '六级标题',
 ];
-
-const toggleExportMenu = () => {
-  showExportMenu.value = !showExportMenu.value;
-  showHeadingMenu.value = false;
-};
-
-const toggleHeadingMenu = () => {
-  showHeadingMenu.value = !showHeadingMenu.value;
-  showExportMenu.value = false;
-};
-
-const handleExport = (format: 'pdf' | 'html' | 'markdown') => {
-  showExportMenu.value = false;
-  emit('export', format);
-};
-
-const applyHeadingLevel = (level: number) => {
-  headingLevel.value = level;
-  showHeadingMenu.value = false;
-  if (level > 0) {
-    applyFormat('heading', { level });
-  } else {
-    applyFormat('paragraph');
-  }
-};
 
 const contentRef = computed({
   get: () => {
@@ -190,12 +164,44 @@ watch(contentRef, (newVal, oldVal) => {
 
 const {
   isActive,
+  blockType,
   applyFormat,
   insertContent,
 } = useEditorToolbar(
   computed(() => props.editor),
   contentRef
 );
+
+const headingLevel = computed(() => {
+  if (blockType.value.startsWith('h')) {
+    return parseInt(blockType.value.substring(1));
+  }
+  return 0;
+});
+
+const toggleExportMenu = () => {
+  showExportMenu.value = !showExportMenu.value;
+  showHeadingMenu.value = false;
+};
+
+const toggleHeadingMenu = () => {
+  showHeadingMenu.value = !showHeadingMenu.value;
+  showExportMenu.value = false;
+};
+
+const handleExport = (format: 'pdf' | 'html' | 'markdown') => {
+  showExportMenu.value = false;
+  emit('export', format);
+};
+
+const applyHeadingLevel = (level: number) => {
+  showHeadingMenu.value = false;
+  if (level > 0) {
+    applyFormat('heading', { level });
+  } else {
+    applyFormat('paragraph');
+  }
+};
 
 const formatButtons = [
   { id: 'bold', action: 'bold', icon: icons.bold, tooltip: '加粗 (Ctrl+B)' },
