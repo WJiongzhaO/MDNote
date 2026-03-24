@@ -498,7 +498,7 @@ const loadFolder = async (folderPath: string) => {
 const buildFileTree = (items: Array<{ name: string; type: 'file' | 'folder'; path: string }>, rootPath: string): FileNode[] => {
   const tree: FileNode[] = [];
 
-  const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+  const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive', 'documents', 'file-cache'];
   const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
 
   for (const item of items) {
@@ -530,7 +530,7 @@ const loadFolderChildren = async (folderNode: FileNode) => {
     if (electronAPI && electronAPI.file && electronAPI.file.readDirectory) {
       const items = await electronAPI.file.readDirectory(folderNode.path);
 
-      const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+      const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive', 'documents', 'file-cache'];
       const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
 
       const filteredItems = items.filter((item: { name: string; path: string; type: 'file' | 'folder' }) => {
