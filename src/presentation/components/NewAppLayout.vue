@@ -5,6 +5,8 @@
       <SidebarIconBar
         :active-sidebar="activeSidebar"
         @switch-sidebar="handleSwitchSidebar"
+        @back-to-vault-select="handleBackToVaultSelect"
+        @manage-fragments="handleManageFragments"
       />
 
       <!-- 可调整大小的侧边栏 -->
@@ -18,7 +20,11 @@
         <FileExplorer
           v-if="activeSidebar === 'folders'"
           ref="fileExplorerRef"
+          :view-mode="documentViewMode"
           @select-file="handleSelectFile"
+          @select-document="handleSelectDocument"
+          @create-sub-document="handleCreateSubDocument"
+          @move-document="handleMoveDocumentToParent"
           @open-folder="handleOpenLocalFolder"
           @create-from-template="handleCreateFromTemplate"
         />
@@ -36,12 +42,6 @@
         <DocumentTemplateSidebar
           v-if="activeSidebar === 'templates'"
           @open-template="handleOpenTemplate"
-        />
-
-        <!-- Git 侧边栏 -->
-        <GitPanel
-          v-if="activeSidebar === 'git-history'"
-          :repo-path="dataPath"
         />
 
         <!-- 变量管理侧边栏 -->
@@ -163,6 +163,12 @@
       @replace-all="replaceAll"
     />
 
+    <!-- 知识片段管理器 -->
+    <FragmentManager
+      v-if="showFragmentManager"
+      @close="handleCloseFragmentManager"
+    />
+
     <div v-if="error" class="error-toast">
       {{ error }}
       <button @click="error = null" class="error-close">×</button>
@@ -181,11 +187,11 @@ import FileExplorer from './FileExplorer.vue';
 import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue';
 import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue';
 import VariableSidebar from './VariableSidebar.vue';
-import GitPanel from './git/GitPanel.vue';
 import KnowledgeGraphSidebar from './KnowledgeGraphSidebar.vue';
 import KnowledgeGraphView from './KnowledgeGraphView.vue';
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue';
 import ResizableSidebar from './ResizableSidebar.vue';
+import FragmentManager from './FragmentManager.vue';
 import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-fragment.dto';
 import { FileSystemTemplateService, type DocumentTemplateInfo } from '../../infrastructure/services/template.service';
 import { INITIAL_DOCUMENT_TEMPLATES } from '../../infrastructure/services/default-templates';
@@ -196,6 +202,7 @@ const router = useRouter();
 
 const {
   documents,
+  documentTree,
   currentDocument,
   isLoading,
   error,
@@ -203,6 +210,9 @@ const {
   updateDocument,
   loadDocument,
   loadDocumentsByFolder,
+  loadDocumentTree,
+  createSubDocument,
+  moveDocumentToParent,
   renderMarkdown
 } = useDocuments();
 
@@ -215,6 +225,7 @@ const {
 } = useFolders();
 
 const activeSidebar = ref<SidebarType>('folders'); // 默认显示文件夹
+const showFragmentManager = ref(false); // 显示知识片段管理器
 const selectedFolderId = ref<string | null>(null);
 const fileExplorerRef = ref<InstanceType<typeof FileExplorer> | null>(null);
 const markdownEditorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
@@ -222,8 +233,9 @@ const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSid
 const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null);
 const currentFilePath = ref<string>('');
 const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
-const dataPath = ref<string>(''); // Git 仓库路径 - 从 Electron API 获取
+const dataPath = ref<string>(''); // 当前数据路径 - 从 Electron API 获取
 const activeKnowledgeGraph = ref<any | null>(null);
+const documentViewMode = ref<'list' | 'tree'>('list'); // 文档视图模式：列表或树形
 
 // 模板创建对话框状态
 const showTemplateCreateDialog = ref(false);
@@ -318,11 +330,38 @@ const handleSelectFile = async (filePath: string) => {
   }
 };
 
+// 处理创建子文档
+const handleCreateSubDocument = async (parentId: string) => {
+  try {
+    await createSubDocument(parentId);
+    await loadDocumentTree();
+    if (fileExplorerRef.value) {
+      await fileExplorerRef.value.loadDocumentTree();
+    }
+  } catch (error) {
+    console.error('Error creating sub document:', error);
+    alert('创建子文档失败：' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
+
+// 处理移动文档到父文档
+const handleMoveDocumentToParent = async (documentId: string, newParentId: string | null) => {
+  try {
+    await moveDocumentToParent(documentId, newParentId);
+    await loadDocumentTree();
+    if (fileExplorerRef.value) {
+      await fileExplorerRef.value.loadDocumentTree();
+    }
+  } catch (error) {
+    console.error('Error moving document:', error);
+    alert('移动文档失败：' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
+
 // 处理打开本地文件夹
 const handleOpenLocalFolder = async (folderPath: string) => {
   lastOpenedFolderPath.value = folderPath;
 
-  // 更新 Git 仓库路径为当前打开的文件夹
   dataPath.value = folderPath;
   console.log('[NewAppLayout] handleOpenLocalFolder - dataPath updated to:', folderPath);
 
@@ -368,6 +407,21 @@ const handleSwitchSidebar = async (type: SidebarType) => {
     await nextTick();
     updateFragmentSidebarContext();
   }
+};
+
+// 返回知识库选择页面
+const handleBackToVaultSelect = () => {
+  router.push('/');
+};
+
+// 打开知识片段管理器
+const handleManageFragments = () => {
+  showFragmentManager.value = true;
+};
+
+// 关闭知识片段管理器
+const handleCloseFragmentManager = () => {
+  showFragmentManager.value = false;
 };
 
 const handleSelectKnowledgeGraph = async (info: any) => {
@@ -640,12 +694,12 @@ onMounted(async () => {
 
   const vaultPath = route.query.vaultPath as string | undefined;
   const vaultId = route.query.vaultId as string | undefined;
-  
+
   if (vaultPath) {
     console.log('[NewAppLayout] Loading vault from route params:', vaultPath);
     dataPath.value = vaultPath;
     lastOpenedFolderPath.value = vaultPath;
-    
+
     try {
       if (electronAPI && electronAPI.file && electronAPI.file.setCustomDataPath) {
         await electronAPI.file.setCustomDataPath(vaultPath);

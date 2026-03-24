@@ -2,7 +2,6 @@
 const { app, BrowserWindow, ipcMain, Menu, dialog, protocol } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { registerGitIpcHandlers } = require('./git-ipc-handlers');
 
 // 使用 electron-is-dev@2.0.0（CommonJS 版本）
 const isDev = require('electron-is-dev');
@@ -237,7 +236,7 @@ function createMenu() {
   ];
 
   const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+  Menu.setApplicationMenu(null);
 }
 
 let mainWindow = null;
@@ -922,8 +921,19 @@ ipcMain.handle('file:read-directory', async (event, dirPath) => {
     const items = fs.readdirSync(dirPath, { withFileTypes: true });
     const result = [];
 
+    const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+    const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
+
     for (const item of items) {
       const fullPath = path.join(dirPath, item.name);
+
+      if (item.isDirectory() && systemDirs.includes(item.name)) {
+        continue;
+      }
+      if (!item.isDirectory() && (systemFiles.includes(item.name) || item.name.startsWith('.'))) {
+        continue;
+      }
+
       result.push({
         name: item.name,
         type: item.isDirectory() ? 'folder' : 'file',
@@ -1499,8 +1509,3 @@ ipcMain.handle('vault:get-vaults-path', async () => {
   }
   return vaultsPath;
 });
-
-// ==================== Git IPC 处理器 ====================
-// 注册所有 Git 相关的 IPC 处理器
-// 传递一个函数，这样 Git handlers 可以动态获取最新的 dataPath
-registerGitIpcHandlers(ipcMain, () => dataPath);

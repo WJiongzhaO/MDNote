@@ -6,7 +6,6 @@ export const TYPES = {
   DocumentRepository: Symbol.for('DocumentRepository'),
   FolderRepository: Symbol.for('FolderRepository'),
   KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
-  GitRepository: Symbol.for('GitRepository'),
   VaultRepository: Symbol.for('VaultRepository'),
   VaultRegistryRepository: Symbol.for('VaultRegistryRepository'),
 
@@ -35,7 +34,6 @@ export const TYPES = {
   DocumentUseCases: Symbol.for('DocumentUseCases'),
   FolderUseCases: Symbol.for('FolderUseCases'),
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
-  GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
   VaultUseCases: Symbol.for('VaultUseCases'),
