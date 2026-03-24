@@ -2,7 +2,6 @@ import { TYPES } from '../container/container.types';
 import type { ServiceContainer } from '../container/service-container.interface';
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface';
 import type { FolderRepository } from '../../domain/repositories/folder.repository.interface';
-import type { IGitRepository } from '../../domain/repositories/IGitRepository';
 import type { VaultRepository } from '../../domain/repositories/vault.repository.interface';
 import { MarkdownProcessor } from '../../domain/services/markdown-processor.domain.service';
 import { ExtensibleMarkdownProcessor } from '../../domain/services/extensible-markdown-processor.domain.service';
@@ -17,7 +16,6 @@ import { ApplicationService } from '../../application/services/application.servi
 import { DocumentUseCases } from '../../application/usecases/document.usecases';
 import { FolderUseCases } from '../../application/usecases/folder.usecases';
 import { KnowledgeFragmentUseCases } from '../../application/usecases/knowledge-fragment.usecases';
-import { GitUseCases } from '../../application/usecases/GitUseCases';
 import { VaultUseCases } from '../../application/usecases/vault.usecases';
 import { StorageAdapter } from '../../infrastructure/storage.adapter';
 import { FileSystemAssetManager } from '../../infrastructure/services/file-system-asset-manager.service';
@@ -26,7 +24,6 @@ import { FragmentReferenceResolver } from '../../domain/services/fragment-refere
 import { FragmentReferenceRegistrationService } from '../../domain/services/fragment-reference-registration.service';
 import { FragmentReferenceSyncService } from '../../domain/services/fragment-reference-sync.service';
 import { FileSystemImageStorageService } from '../../infrastructure/services/image-storage.service';
-import { ElectronGitRepository } from '../../infrastructure/repositories/git/ElectronGitRepository';
 import { FileSystemVaultRepository } from '../../infrastructure/repositories/file-system.vault.repository.impl';
 import { FileSystemVaultRegistryRepository } from '../../infrastructure/repositories/vault-registry.repository.impl';
 import type { VaultRegistryRepository } from '../../domain/repositories/vault-registry.repository.interface';
@@ -139,14 +136,6 @@ export class ApplicationModule {
 
     container.bind<KnowledgeFragmentUseCases>(TYPES.KnowledgeFragmentUseCases)
       .to(KnowledgeFragmentUseCases);
-
-    // 配置 Git 仓储和用例
-    // 使用ElectronGitRepository，通过IPC与主进程通信
-    container.bind<IGitRepository>(TYPES.GitRepository)
-      .to(ElectronGitRepository);
-
-    container.bind<GitUseCases>(TYPES.GitUseCases)
-      .to(GitUseCases);
 
     // 配置知识库仓储和用例
     container.bind<VaultRepository>(TYPES.VaultRepository)

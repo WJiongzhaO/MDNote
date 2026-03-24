@@ -1,91 +1,108 @@
 <template>
   <div class="editor-toolbar">
-    <!-- 格式化按钮组 -->
-    <ToolbarGroup title="格式化">
-      <ToolbarButton
-        v-for="btn in formatButtons"
-        :key="btn.id"
-        :active="isActive[btn.id]"
-        :icon="btn.icon"
-        :tooltip="btn.tooltip"
-        @click="() => handleFormat(btn.action)"
-      />
-    </ToolbarGroup>
+    <button
+      v-for="btn in formatButtons"
+      :key="btn.id"
+      class="toolbar-btn"
+      :class="{ active: isActive[btn.id] }"
+      :title="btn.tooltip"
+      @click="() => handleFormat(btn.action)"
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" v-html="btn.icon"></svg>
+    </button>
 
     <div class="toolbar-divider"></div>
 
-    <!-- 列表按钮组 -->
-    <ToolbarGroup title="列表">
-      <ToolbarButton
-        v-for="btn in listButtons"
-        :key="btn.id"
-        :icon="btn.icon"
-        :tooltip="btn.tooltip"
-        @click="() => handleFormat(btn.action)"
-      />
+    <button
+      v-for="btn in listButtons"
+      :key="btn.id"
+      class="toolbar-btn"
+      :title="btn.tooltip"
+      @click="() => handleFormat(btn.action)"
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" v-html="btn.icon"></svg>
+    </button>
 
-      <!-- 标题下拉菜单 -->
-      <ToolbarButton
-        :text="headingLabel"
-        tooltip="标题"
-        @click="cycleHeadingLevel"
-      />
-    </ToolbarGroup>
-
-    <div class="toolbar-divider"></div>
-
-    <!-- 高级功能按钮组 -->
-    <ToolbarGroup title="高级">
-      <ToolbarButton
-        text="📊"
-        tooltip="Mermaid 图表"
-        @click="$emit('open-mermaid')"
-      />
-      <ToolbarButton
-        text="📐"
-        tooltip="数学公式"
-        @click="$emit('open-formula')"
-      />
-      <ToolbarButton
-        text="🕸️"
-        tooltip="知识图谱"
-        @click="$emit('open-knowledge-graph')"
-      />
-      <div class="export-menu">
-        <ToolbarButton
-          text="📤"
-          tooltip="导出"
-          @click="toggleExportMenu"
-        />
-        <div v-if="showExportMenu" class="export-dropdown" @click.stop>
-          <div class="export-item" @click="handleExport('pdf')">
-            📕 PDF (.pdf)
-          </div>
-          <div class="export-item" @click="handleExport('html')">
-            🌐 HTML (.html)
-          </div>
-          <div class="export-item" @click="handleExport('markdown')">
-            📝 Markdown (.md)
-          </div>
+    <div class="heading-dropdown">
+      <button
+        class="toolbar-btn heading-btn"
+        :class="{ active: headingLevel > 0 }"
+        title="选择标题级别"
+        @click="toggleHeadingMenu"
+      >
+        {{ headingLevel > 0 ? `H${headingLevel}` : 'H▼' }}
+      </button>
+      <div v-if="showHeadingMenu" class="heading-menu" @click.stop>
+        <div
+          v-for="level in 6"
+          :key="level"
+          class="heading-item"
+          :class="{ active: headingLevel === level }"
+          @click="applyHeadingLevel(level)"
+        >
+          H{{ level }} - {{ headingLabels[level - 1] }}
+        </div>
+        <div class="heading-divider"></div>
+        <div
+          class="heading-item"
+          :class="{ active: headingLevel === 0 }"
+          @click="applyHeadingLevel(0)"
+        >
+          普通文本
         </div>
       </div>
-    </ToolbarGroup>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <button
+      class="toolbar-btn"
+      title="Mermaid 图表"
+      @click="$emit('open-mermaid')"
+    >
+      📊
+    </button>
+    <button
+      class="toolbar-btn"
+      title="数学公式"
+      @click="$emit('open-formula')"
+    >
+      📐
+    </button>
+    <button
+      class="toolbar-btn"
+      title="知识图谱"
+      @click="$emit('open-knowledge-graph')"
+    >
+      🕸️
+    </button>
+    <div class="export-menu">
+      <button
+        class="toolbar-btn"
+        title="导出"
+        @click="toggleExportMenu"
+      >
+        📤
+      </button>
+      <div v-if="showExportMenu" class="export-dropdown" @click.stop>
+        <div class="export-item" @click="handleExport('pdf')">
+          📕 PDF (.pdf)
+        </div>
+        <div class="export-item" @click="handleExport('html')">
+          🌐 HTML (.html)
+        </div>
+        <div class="export-item" @click="handleExport('markdown')">
+          📝 Markdown (.md)
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * 编辑器工具栏主组件
- *
- * @module presentation/components/editor/toolbar
- */
-
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useEditorToolbar } from '@/presentation/composables/useEditorToolbar';
-import ToolbarGroup from './ToolbarGroup.vue';
-import ToolbarButton from './ToolbarButton.vue';
 
-// Icons (SVG) - Material Icons
 const icons = {
   bold: '<path d="M15.6 10.79c.97-.67 1.65-1.77 1.65-2.79 0-2.26-1.75-4-4-4H7v14h7.04c2.09 0 3.71-1.7 3.71-3.79 0-1.52-.86-2.82-2.15-3.42zM10 6.5h3c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-3v-3zm3.5 9H10v-3h3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z"/>',
   italic: '<path d="M10 4v3h2.21l-3.42 8H6v3h8v-3h-2.21l3.42-8H18V4h-8z"/>',
@@ -96,7 +113,6 @@ const icons = {
   list: '<path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/>',
 };
 
-// Props
 interface Props {
   editor: HTMLDivElement | null;
   content: string;
@@ -104,7 +120,6 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// Emits
 const emit = defineEmits<{
   (e: 'update:content', content: string): void;
   (e: 'open-mermaid'): void;
@@ -113,21 +128,44 @@ const emit = defineEmits<{
   (e: 'export', format: 'pdf' | 'html' | 'markdown'): void;
 }>();
 
-// 导出菜单状态
 const showExportMenu = ref(false);
+const showHeadingMenu = ref(false);
+const headingLevel = ref(0);
 
-// 切换导出菜单
+const headingLabels = [
+  '一级标题',
+  '二级标题',
+  '三级标题',
+  '四级标题',
+  '五级标题',
+  '六级标题',
+];
+
 const toggleExportMenu = () => {
   showExportMenu.value = !showExportMenu.value;
+  showHeadingMenu.value = false;
 };
 
-// 处理导出
+const toggleHeadingMenu = () => {
+  showHeadingMenu.value = !showHeadingMenu.value;
+  showExportMenu.value = false;
+};
+
 const handleExport = (format: 'pdf' | 'html' | 'markdown') => {
   showExportMenu.value = false;
   emit('export', format);
 };
 
-// 使用工具栏 Composable
+const applyHeadingLevel = (level: number) => {
+  headingLevel.value = level;
+  showHeadingMenu.value = false;
+  if (level > 0) {
+    applyFormat('heading', { level });
+  } else {
+    applyFormat('paragraph');
+  }
+};
+
 const contentRef = computed({
   get: () => {
     console.log('[EditorToolbar-contentRef-get] 获取内容:', props.content);
@@ -140,7 +178,6 @@ const contentRef = computed({
   }
 });
 
-// 监听 contentRef 的变化
 watch(contentRef, (newVal, oldVal) => {
   console.log('[EditorToolbar-watch-contentRef] 内容变化', {
     oldLength: oldVal?.length || 0,
@@ -160,16 +197,6 @@ const {
   contentRef
 );
 
-// 标题级别循环
-const headingLevel = ref(0);
-const headingLabel = computed(() => headingLevel.value > 0 ? `H${headingLevel.value}` : 'H▼');
-
-const cycleHeadingLevel = () => {
-  headingLevel.value = (headingLevel.value % 6) + 1;
-  applyFormat('heading', { level: headingLevel.value });
-};
-
-// 按钮配置
 const formatButtons = [
   { id: 'bold', action: 'bold', icon: icons.bold, tooltip: '加粗 (Ctrl+B)' },
   { id: 'italic', action: 'italic', icon: icons.italic, tooltip: '斜体 (Ctrl+I)' },
@@ -182,7 +209,6 @@ const listButtons = [
   { id: 'ol', action: 'ol', icon: icons.list, tooltip: '有序列表' },
 ];
 
-// 事件处理
 const handleFormat = (formatType: string) => {
   console.log('[EditorToolbar-handleFormat] 按钮被点击', { formatType });
   console.log('[EditorToolbar-handleFormat] 当前 content:', contentRef.value);
@@ -190,11 +216,13 @@ const handleFormat = (formatType: string) => {
   applyFormat(formatType);
 };
 
-// 点击外部关闭导出菜单
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
   if (!target.closest('.export-menu')) {
     showExportMenu.value = false;
+  }
+  if (!target.closest('.heading-dropdown')) {
+    showHeadingMenu.value = false;
   }
 };
 
@@ -212,11 +240,51 @@ onUnmounted(() => {
 .editor-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   padding: 8px 12px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-secondary);
   flex-wrap: wrap;
+}
+
+.toolbar-btn {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.toolbar-btn.active {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.toolbar-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .toolbar-divider {
@@ -224,6 +292,57 @@ onUnmounted(() => {
   height: 24px;
   background: var(--border-primary);
   margin: 0 4px;
+}
+
+.heading-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.heading-btn {
+  width: auto;
+  min-width: 40px;
+  padding: 4px 8px;
+  font-weight: 500;
+}
+
+.heading-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  min-width: 140px;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+
+.heading-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.heading-item:hover {
+  background: var(--bg-hover);
+}
+
+.heading-item.active {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.heading-divider {
+  height: 1px;
+  background: var(--border-primary);
+  margin: 4px 0;
 }
 
 .export-menu {

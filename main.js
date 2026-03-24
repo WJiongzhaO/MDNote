@@ -2,7 +2,6 @@
 const { app, BrowserWindow, ipcMain, Menu, dialog, protocol } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
-const { registerGitIpcHandlers } = require('./git-ipc-handlers');
 
 // 使用 electron-is-dev@2.0.0（CommonJS 版本）
 const isDev = require('electron-is-dev');
@@ -1510,8 +1509,3 @@ ipcMain.handle('vault:get-vaults-path', async () => {
   }
   return vaultsPath;
 });
-
-// ==================== Git IPC 处理器 ====================
-// 注册所有 Git 相关的 IPC 处理器
-// 传递一个函数，这样 Git handlers 可以动态获取最新的 dataPath
-registerGitIpcHandlers(ipcMain, () => dataPath);

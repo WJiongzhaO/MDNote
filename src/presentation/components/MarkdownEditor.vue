@@ -1,22 +1,17 @@
 <template>
   <div class="editor-container">
-    <div class="editor-header">
-      <div v-if="document || currentFilePath" class="editor-toolbar">
-    </div>
-
-      <!-- 新增：格式化工具栏 -->
-      <EditorToolbar
-        v-if="document || currentFilePath"
-        :editor="editorElement"
-        :content="mainContent"
-        @update:content="handleToolbarUpdate"
-        @open-mermaid="openMermaidEditor"
-        @open-formula="openFormulaEditor"
-        @open-knowledge-graph="openKnowledgeGraph"
-        @export="handleExport"
-        @insert-fragment="handleInsertFragment"
-      />
-    </div>
+    <!-- 格式化工具栏 -->
+    <EditorToolbar
+      v-if="document || currentFilePath"
+      :editor="editorElement"
+      :content="mainContent"
+      @update:content="handleToolbarUpdate"
+      @open-mermaid="openMermaidEditor"
+      @open-formula="openFormulaEditor"
+      @open-knowledge-graph="openKnowledgeGraph"
+      @export="handleExport"
+      @insert-fragment="handleInsertFragment"
+    />
 
     <div class="editor-content" v-if="document || currentFilePath">
       <div class="editor-pane">
@@ -3961,11 +3956,6 @@ defineExpose({
   overflow: hidden;
 }
 
-.editor-header {
-  padding: 20px;
-  border-bottom: 1px solid var(--border-secondary);
-}
-
 .title-input {
   width: 100%;
   padding: 8px 12px;
@@ -4161,11 +4151,6 @@ defineExpose({
 }
 
 /* Mermaid编辑器相关样式 */
-.editor-toolbar {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-}
 
 .toolbar-btn {
   padding: 8px 16px;

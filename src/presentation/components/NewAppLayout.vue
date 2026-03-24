@@ -44,12 +44,6 @@
           @open-template="handleOpenTemplate"
         />
 
-        <!-- Git 侧边栏 -->
-        <GitPanel
-          v-if="activeSidebar === 'git-history'"
-          :repo-path="dataPath"
-        />
-
         <!-- 变量管理侧边栏 -->
         <VariableSidebar
           v-if="activeSidebar === 'variables'"
@@ -193,7 +187,6 @@ import FileExplorer from './FileExplorer.vue';
 import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue';
 import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue';
 import VariableSidebar from './VariableSidebar.vue';
-import GitPanel from './git/GitPanel.vue';
 import KnowledgeGraphSidebar from './KnowledgeGraphSidebar.vue';
 import KnowledgeGraphView from './KnowledgeGraphView.vue';
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue';
@@ -240,7 +233,7 @@ const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSid
 const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null);
 const currentFilePath = ref<string>('');
 const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
-const dataPath = ref<string>(''); // Git 仓库路径 - 从 Electron API 获取
+const dataPath = ref<string>(''); // 当前数据路径 - 从 Electron API 获取
 const activeKnowledgeGraph = ref<any | null>(null);
 const documentViewMode = ref<'list' | 'tree'>('list'); // 文档视图模式：列表或树形
 

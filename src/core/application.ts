@@ -66,13 +66,6 @@ export class Application {
   }
 
   /**
-   * 获取Git用例实例
-   */
-  getGitUseCases() {
-    return this.container.get(Symbol.for('GitUseCases'));
-  }
-
-  /**
    * 获取导出用例实例
    */
   getExportUseCases() {
