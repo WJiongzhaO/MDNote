@@ -362,7 +362,6 @@ const handleMoveDocumentToParent = async (documentId: string, newParentId: strin
 const handleOpenLocalFolder = async (folderPath: string) => {
   lastOpenedFolderPath.value = folderPath;
 
-  // 更新 Git 仓库路径为当前打开的文件夹
   dataPath.value = folderPath;
   console.log('[NewAppLayout] handleOpenLocalFolder - dataPath updated to:', folderPath);
 
