@@ -66,6 +66,27 @@ export class Application {
   }
 
   /**
+   * 获取片段分类用例实例（工作2）
+   */
+  getFragmentCategoryUseCases() {
+    return this.applicationService.getFragmentCategoryUseCases();
+  }
+
+  /**
+   * 获取知识健康度服务（工作3）
+   */
+  getKnowledgeHealthService() {
+    return this.applicationService.getKnowledgeHealthService();
+  }
+
+  /**
+   * 获取推荐服务（工作3）
+   */
+  getRecommendationService() {
+    return this.applicationService.getRecommendationService();
+  }
+
+  /**
    * 获取Git用例实例
    */
   getGitUseCases() {
