@@ -55,6 +55,7 @@
         <!-- 知识图谱侧边栏 -->
         <KnowledgeGraphSidebar
           v-if="activeSidebar === 'knowledge-graphs'"
+          :selected-graph-id="activeKnowledgeGraphId"
           @select-graph="handleSelectKnowledgeGraph"
           @deleted="handleKnowledgeGraphDeleted"
         />
@@ -63,9 +64,46 @@
       <!-- 主编辑区域 -->
       <!-- 知识图谱主视图 -->
       <div v-if="activeSidebar === 'knowledge-graphs'" class="knowledge-graph-main">
+        <div
+          v-if="activeKnowledgeGraph && activeKnowledgeGraph.nodes && activeKnowledgeGraph.nodes.length > 0"
+          class="kg-main-toolbar"
+        >
+          <span class="kg-main-toolbar-title">知识图谱</span>
+          <div class="kg-main-toolbar-actions">
+            <button
+              type="button"
+              class="kg-main-toolbar-btn"
+              title="唯一写盘方式：将当前内存中的图谱写入 JSON（拖拽、随机布局等不会自动保存）"
+              @click="manualSaveKnowledgeGraph"
+            >
+              手动保存
+            </button>
+            <button
+              type="button"
+              class="kg-main-toolbar-btn"
+              title="从磁盘重新读取当前 JSON 覆盖内存（与上次「手动保存」后的文件一致）"
+              @click="manualLoadKnowledgeGraph"
+            >
+              手动加载
+            </button>
+            <button
+              type="button"
+              class="kg-main-toolbar-btn"
+              title="丢弃已保存坐标并重新随机排列节点"
+              @click="randomizeSidebarKnowledgeGraphLayout"
+            >
+              随机重新布局
+            </button>
+          </div>
+        </div>
         <KnowledgeGraphView
+          :key="knowledgeGraphViewKey"
+          class="kg-main-graph-view"
           :graph="activeKnowledgeGraph"
+          :graph-load-key="knowledgeGraphViewKey"
+          :layout-randomize-key="kgSidebarLayoutRandomizeKey"
           @jump-to="handleKnowledgeGraphJumpTo"
+          @graph-update="handleKnowledgeGraphLayoutUpdate"
         />
       </div>
       <!-- 其他：图片预览 + Markdown 编辑器 -->
@@ -177,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch, provide } from 'vue';
+import { ref, onMounted, computed, nextTick, watch, provide, toRaw } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Application } from '../../core/application';
 import { useDocuments } from '../composables/useDocuments';
@@ -196,6 +234,7 @@ import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-
 import { FileSystemTemplateService, type DocumentTemplateInfo } from '../../infrastructure/services/template.service';
 import { INITIAL_DOCUMENT_TEMPLATES } from '../../infrastructure/services/default-templates';
 import QuickSearchDialog from './QuickSearchDialog.vue';
+import type { KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
 
 const route = useRoute();
 const router = useRouter();
@@ -234,7 +273,20 @@ const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null
 const currentFilePath = ref<string>('');
 const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
 const dataPath = ref<string>(''); // 当前数据路径 - 从 Electron API 获取
-const activeKnowledgeGraph = ref<any | null>(null);
+const activeKnowledgeGraph = ref<KnowledgeGraph | null>(null);
+const activeKnowledgeGraphPath = ref<string | null>(null);
+/** 与列表选中同步（侧边栏 v-if 销毁重建时用于恢复高亮） */
+const activeKnowledgeGraphId = ref<string | null>(null);
+const kgSidebarLayoutRandomizeKey = ref(0);
+/** 切换图谱文件时递增，强制主视图重建，避免 Cytoscape 残留上一张图的状态 */
+const kgGraphSwitchEpoch = ref(0);
+/** 列表点击切换图谱时的请求序号，防止多次 await 完成后旧读盘覆盖新选中 */
+let kgSelectRequestSeq = 0;
+
+const knowledgeGraphViewKey = computed(
+  () =>
+    `${activeKnowledgeGraphPath.value ?? ''}#${activeKnowledgeGraphId.value ?? ''}#${kgGraphSwitchEpoch.value}`
+);
 const documentViewMode = ref<'list' | 'tree'>('list'); // 文档视图模式：列表或树形
 
 // 模板创建对话框状态
@@ -424,19 +476,95 @@ const handleCloseFragmentManager = () => {
   showFragmentManager.value = false;
 };
 
+/** 离开知识图谱模式时清空，避免「列表无选中但主区仍显示上次图谱」 */
+function clearKnowledgeGraphSession() {
+  activeKnowledgeGraph.value = null;
+  activeKnowledgeGraphPath.value = null;
+  activeKnowledgeGraphId.value = null;
+  kgSidebarLayoutRandomizeKey.value = 0;
+}
+
 const handleSelectKnowledgeGraph = async (info: any) => {
+  const seq = ++kgSelectRequestSeq;
   try {
     const { FileSystemKnowledgeGraphService } = await import('../../infrastructure/services/knowledge-graph-file.service');
     const service = new FileSystemKnowledgeGraphService();
-    const file = await service.readGraph(info.fullPath);
+    const resolvedPath = await service.resolveKnowledgeGraphPath(info.fullPath);
+    if (seq !== kgSelectRequestSeq) return;
+    const file = await service.readGraph(resolvedPath);
+    if (seq !== kgSelectRequestSeq) return;
+    activeKnowledgeGraphPath.value = resolvedPath;
     activeKnowledgeGraph.value = file.graph;
+    activeKnowledgeGraphId.value = file.id;
+    kgSidebarLayoutRandomizeKey.value = 0;
+    kgGraphSwitchEpoch.value += 1;
   } catch (e) {
     console.error('加载知识图谱失败:', e);
   }
 };
 
+const randomizeSidebarKnowledgeGraphLayout = () => {
+  if (!activeKnowledgeGraph.value) return;
+  const { nodePositions: _np, ...rest } = activeKnowledgeGraph.value;
+  activeKnowledgeGraph.value = { ...rest };
+  kgSidebarLayoutRandomizeKey.value += 1;
+};
+
+/** 侧栏知识图谱唯一写盘入口：将当前内存中的 graph 写入当前 JSON */
+const manualSaveKnowledgeGraph = async () => {
+  const path = activeKnowledgeGraphPath.value;
+  const graph = activeKnowledgeGraph.value;
+  if (!path || !graph?.nodes?.length) {
+    window.alert('请先通过左侧列表打开一个知识图谱。');
+    return;
+  }
+  try {
+    const { FileSystemKnowledgeGraphService } = await import('../../infrastructure/services/knowledge-graph-file.service');
+    const service = new FileSystemKnowledgeGraphService();
+    await service.writeGraphData(path, toRaw(graph) as KnowledgeGraph);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[知识图谱 手动保存] 失败', e);
+    window.alert(`手动保存失败：${msg}`);
+  }
+};
+
+/**
+ * 调试：从磁盘重新读取当前 JSON 覆盖内存视图。
+ * 注意：不会先把内存里未防抖的改动写盘；若需保留请先点「手动保存」。
+ */
+const manualLoadKnowledgeGraph = async () => {
+  const path = activeKnowledgeGraphPath.value;
+  if (!path) {
+    window.alert('当前没有图谱文件路径，请先从列表打开一项。');
+    return;
+  }
+  const seq = ++kgSelectRequestSeq;
+  try {
+    const { FileSystemKnowledgeGraphService } = await import('../../infrastructure/services/knowledge-graph-file.service');
+    const service = new FileSystemKnowledgeGraphService();
+    const resolvedPath = await service.resolveKnowledgeGraphPath(path);
+    const file = await service.readGraph(resolvedPath);
+    if (seq !== kgSelectRequestSeq) return;
+    activeKnowledgeGraphPath.value = resolvedPath;
+    activeKnowledgeGraph.value = file.graph;
+    activeKnowledgeGraphId.value = file.id;
+    kgSidebarLayoutRandomizeKey.value = 0;
+    kgGraphSwitchEpoch.value += 1;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[知识图谱 手动加载] 失败', e);
+    window.alert(`手动加载失败：${msg}`);
+  }
+};
+
+/** 仅更新内存，不写 JSON；落盘请点「手动保存」 */
+const handleKnowledgeGraphLayoutUpdate = (graph: KnowledgeGraph) => {
+  activeKnowledgeGraph.value = graph;
+};
+
 const handleKnowledgeGraphDeleted = () => {
-  activeKnowledgeGraph.value = null;
+  clearKnowledgeGraphSession();
 };
 
 const handleKnowledgeGraphJumpTo = async (payload: {
@@ -641,8 +769,11 @@ const handleSelectDocument = async (id: string) => {
   updateFragmentSidebarContext();
 };
 
-// 监听侧边栏切换，当切换回文件夹时恢复路径
+// 监听侧边栏切换：离开知识图谱时清空会话（图谱 JSON 仅手动保存写盘）；切换回文件夹时恢复路径
 watch(activeSidebar, async (newType, oldType) => {
+  if (oldType === 'knowledge-graphs' && newType !== 'knowledge-graphs') {
+    clearKnowledgeGraphSession();
+  }
   // 只有当从其他侧边栏切换到文件夹时才恢复
   if (newType === 'folders' && oldType !== 'folders' && lastOpenedFolderPath.value) {
     // 等待组件渲染完成
@@ -1151,6 +1282,52 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.kg-main-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-primary, #e2e8f0);
+  background: var(--bg-primary, #fff);
+}
+
+.kg-main-toolbar-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.kg-main-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.kg-main-toolbar-btn {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.kg-main-toolbar-btn:hover {
+  background: var(--bg-hover, #f1f5f9);
+}
+
+.kg-main-graph-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .image-preview-container {

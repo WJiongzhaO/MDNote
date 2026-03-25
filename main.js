@@ -912,20 +912,27 @@ ipcMain.handle('dialog:save-file', async (_event, options) => {
   return result.filePath;
 });
 
+// 规范化路径（供渲染进程统一 knowledge-graphs 等路径）
+ipcMain.handle('file:normalize-path', async (_event, p) => {
+  if (typeof p !== 'string' || !p) return p;
+  return path.normalize(p);
+});
+
 // 读取目录内容
 ipcMain.handle('file:read-directory', async (event, dirPath) => {
   try {
-    if (!fs.existsSync(dirPath)) {
+    const rootDir = typeof dirPath === 'string' ? path.normalize(dirPath) : dirPath;
+    if (!fs.existsSync(rootDir)) {
       return [];
     }
-    const items = fs.readdirSync(dirPath, { withFileTypes: true });
+    const items = fs.readdirSync(rootDir, { withFileTypes: true });
     const result = [];
 
     const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
     const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
 
     for (const item of items) {
-      const fullPath = path.join(dirPath, item.name);
+      const fullPath = path.join(rootDir, item.name);
 
       if (item.isDirectory() && systemDirs.includes(item.name)) {
         continue;
@@ -959,8 +966,9 @@ ipcMain.handle('file:read-directory', async (event, dirPath) => {
 // 读取文件内容
 ipcMain.handle('file:read-file-content', async (event, filePath) => {
   try {
-    if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath, 'utf8');
+    const normalized = path.normalize(filePath);
+    if (fs.existsSync(normalized)) {
+      return fs.readFileSync(normalized, 'utf8');
     }
     return null;
   } catch (error) {
@@ -972,11 +980,12 @@ ipcMain.handle('file:read-file-content', async (event, filePath) => {
 // 写入文件内容
 ipcMain.handle('file:write-file-content', async (event, filePath, content) => {
   try {
-    const dir = path.dirname(filePath);
+    const normalized = typeof filePath === 'string' ? path.normalize(filePath) : filePath;
+    const dir = path.dirname(normalized);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(filePath, content, 'utf8');
+    fs.writeFileSync(normalized, content, 'utf8');
     return true;
   } catch (error) {
     console.error('Error writing file content:', error);

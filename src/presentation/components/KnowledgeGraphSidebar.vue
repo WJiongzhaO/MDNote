@@ -15,7 +15,7 @@
     <ul v-else class="kg-list">
       <li
         v-for="g in graphs"
-        :key="g.id"
+        :key="g.fullPath"
         :class="['kg-item', { active: g.id === activeId }]"
         @click="handleSelect(g)"
       >
@@ -80,8 +80,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, watch } from 'vue';
 import { FileSystemKnowledgeGraphService, type KnowledgeGraphInfo } from '../../infrastructure/services/knowledge-graph-file.service';
+
+const props = withDefaults(
+  defineProps<{
+    /** 父级当前打开的图谱 id，侧边栏 v-if 重建时用于恢复列表高亮 */
+    selectedGraphId?: string | null;
+  }>(),
+  { selectedGraphId: null }
+);
 
 const emit = defineEmits<{
   (e: 'select-graph', info: KnowledgeGraphInfo): void;
@@ -125,6 +133,14 @@ const handleSelect = (g: KnowledgeGraphInfo) => {
   activeId.value = g.id;
   emit('select-graph', g);
 };
+
+watch(
+  () => props.selectedGraphId,
+  (id) => {
+    activeId.value = id ?? null;
+  },
+  { immediate: true }
+);
 
 const startRename = (g: KnowledgeGraphInfo) => {
   editingId.value = g.id;

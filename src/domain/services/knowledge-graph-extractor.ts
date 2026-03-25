@@ -26,9 +26,14 @@ export interface KgEdge {
   relation?: string;
 }
 
+/** 画布上的节点坐标（Cytoscape），用于固定布局、避免每次打开随机变化 */
+export type KgNodePositions = Record<string, { x: number; y: number }>;
+
 export interface KnowledgeGraph {
   nodes: KgNode[];
   edges: KgEdge[];
+  /** 存在且覆盖当前全部节点 id 时，按固定坐标展示，不再自动跑随机力导向 */
+  nodePositions?: KgNodePositions;
 }
 
 /** 样例用假文档 id，仅用于演示跳转列表（实际跳转时不会加载） */
@@ -121,7 +126,32 @@ export const sampleKnowledgeGraph: KnowledgeGraph = {
     { source: 'l_3', target: 'l_5', relation: '相关' },
     { source: 'l_7', target: 'l_9', relation: '对比' },
     { source: 'l_8', target: 'l_9', relation: '对比' }
-  ]
+  ],
+  /**
+   * 样例默认画布：刻意不对称、非网格（区别于 fillMissingNodePositions 的矩阵补位）。
+   * 用于在编辑器/侧栏中一眼区分「走 JSON 或内置 preset」与「缺坐标后的自动补格」。
+   */
+  nodePositions: {
+    s_0: { x: 400, y: 88 },
+    s_1: { x: 208, y: 212 },
+    s_2: { x: 352, y: 228 },
+    s_3: { x: 508, y: 204 },
+    s_4: { x: 264, y: 348 },
+    l_0: { x: 628, y: 292 },
+    l_1: { x: 568, y: 392 },
+    l_2: { x: 692, y: 368 },
+    l_3: { x: 432, y: 124 },
+    l_4: { x: 118, y: 296 },
+    l_5: { x: 488, y: 36 },
+    l_6: { x: 596, y: 28 },
+    l_7: { x: 72, y: 432 },
+    l_8: { x: 196, y: 536 },
+    l_9: { x: 132, y: 388 },
+    t_0: { x: 316, y: 432 },
+    t_1: { x: 528, y: 492 },
+    t_2: { x: 236, y: 464 },
+    t_3: { x: 384, y: 572 }
+  }
 };
 
 /** 生成 Mermaid 安全的节点 id（字母数字与下划线） */

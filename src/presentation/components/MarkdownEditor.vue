@@ -215,13 +215,28 @@
               保存为知识图谱
             </button>
             <button type="button" class="toolbar-btn sample-btn" @click="showSampleGraph" title="查看样例效果">查看样例</button>
+            <button
+              type="button"
+              class="toolbar-btn sample-btn"
+              v-if="knowledgeGraphData"
+              @click="randomizeKnowledgeGraphLayout"
+              title="重新随机排列节点（会丢弃当前坐标，直到再次自动保存）"
+            >
+              随机重新布局
+            </button>
             <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">✕</button>
           </div>
         </div>
         <div v-if="isSampleMode" class="knowledge-graph-sample-hint">（样例展示，实际数据将由 RAG 等方式提取）</div>
         <div v-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">正在生成图谱…</div>
         <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">{{ knowledgeGraphError }}</div>
-        <KnowledgeGraphView v-else-if="knowledgeGraphData" :graph="knowledgeGraphData" class="knowledge-graph-body" />
+        <KnowledgeGraphView
+          v-else-if="knowledgeGraphData"
+          :graph="knowledgeGraphData"
+          :layout-randomize-key="kgLayoutRandomizeKey"
+          class="knowledge-graph-body"
+          @graph-update="onKnowledgeGraphUpdate"
+        />
       </div>
     </div>
   </div>
@@ -243,6 +258,13 @@ import { useEditorShortcuts } from '../composables/useShortcutManager';
 import { Application } from '../../core/application';
 import { TYPES } from '../../core/container/container.types';
 import { extractKnowledgeGraph, sampleKnowledgeGraph, type KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
+import {
+  mergeNodePositionsIntoGraph,
+  mergeKgPositionSources,
+  loadKgLayoutFromLocalStorage,
+  saveKgLayoutToLocalStorage,
+  clearKgLayoutLocalStorage
+} from '../../domain/services/knowledge-graph-layout';
 import { FileSystemKnowledgeGraphService } from '../../infrastructure/services/knowledge-graph-file.service';
 
 interface Props {
@@ -328,6 +350,7 @@ const knowledgeGraphData = ref<KnowledgeGraph | null>(null);
 const knowledgeGraphError = ref('');
 const isKnowledgeGraphRendering = ref(false);
 const isSampleMode = ref(false);
+const kgLayoutRandomizeKey = ref(0);
 const knowledgeGraphService = new FileSystemKnowledgeGraphService();
 
 // 导出相关状态
@@ -2359,12 +2382,34 @@ const closeFormulaEditor = () => {
   currentFormulaCode.value = '';
 };
 
+function getKnowledgeGraphDocKey(): string {
+  if (isSampleMode.value) return 'sample';
+  return props.document?.id || currentFilePath.value || 'untitled';
+}
+
+const onKnowledgeGraphUpdate = (g: KnowledgeGraph) => {
+  knowledgeGraphData.value = g;
+  const key = getKnowledgeGraphDocKey();
+  if (g.nodePositions && key) {
+    saveKgLayoutToLocalStorage(key, g.nodePositions);
+  }
+};
+
+const randomizeKnowledgeGraphLayout = () => {
+  if (!knowledgeGraphData.value) return;
+  const { nodePositions: _np, ...rest } = knowledgeGraphData.value;
+  knowledgeGraphData.value = { ...rest };
+  clearKgLayoutLocalStorage(getKnowledgeGraphDocKey());
+  kgLayoutRandomizeKey.value += 1;
+};
+
 // 知识图谱相关方法
 const openKnowledgeGraph = () => {
   showKnowledgeGraphModal.value = true;
   const fullContent = getContent();
   if (!fullContent || !fullContent.trim()) {
-    knowledgeGraphData.value = sampleKnowledgeGraph;
+    const merged = mergeNodePositionsIntoGraph(sampleKnowledgeGraph, loadKgLayoutFromLocalStorage('sample'));
+    knowledgeGraphData.value = merged;
     knowledgeGraphError.value = '';
     isSampleMode.value = true;
     isKnowledgeGraphRendering.value = false;
@@ -2376,7 +2421,8 @@ const openKnowledgeGraph = () => {
   knowledgeGraphData.value = null;
   try {
     const graph = extractKnowledgeGraph(fullContent);
-    knowledgeGraphData.value = graph;
+    const docKey = props.document?.id || currentFilePath.value || 'untitled';
+    knowledgeGraphData.value = mergeNodePositionsIntoGraph(graph, loadKgLayoutFromLocalStorage(docKey));
   } catch (e) {
     knowledgeGraphError.value = e instanceof Error ? e.message : '生成知识图谱失败';
     knowledgeGraphData.value = null;
@@ -2386,7 +2432,7 @@ const openKnowledgeGraph = () => {
 };
 
 const showSampleGraph = () => {
-  knowledgeGraphData.value = sampleKnowledgeGraph;
+  knowledgeGraphData.value = mergeNodePositionsIntoGraph(sampleKnowledgeGraph, loadKgLayoutFromLocalStorage('sample'));
   knowledgeGraphError.value = '';
   isSampleMode.value = true;
 };
@@ -2400,12 +2446,20 @@ const closeKnowledgeGraph = () => {
 
 const saveKnowledgeGraph = async () => {
   try {
+    const docKeyForLayout = () =>
+      isSampleMode.value ? 'sample' : props.document?.id || currentFilePath.value || 'untitled';
+
     if (isSampleMode.value && knowledgeGraphData.value) {
+      const graphToSave = mergeKgPositionSources(
+        knowledgeGraphData.value,
+        knowledgeGraphData.value.nodePositions,
+        loadKgLayoutFromLocalStorage('sample')
+      );
       await knowledgeGraphService.saveGraph({
         title: '样例：数据结构知识图谱',
         documentId: null,
         documentTitle: null,
-        graph: knowledgeGraphData.value
+        graph: graphToSave
       });
       knowledgeGraphError.value = '';
       return;
@@ -2422,11 +2476,16 @@ const saveKnowledgeGraph = async () => {
       documentId: documentId ?? undefined,
       documentTitle: documentTitle ?? undefined
     });
+    const graphToSave = mergeKgPositionSources(
+      graphWithOccurrences,
+      knowledgeGraphData.value?.nodePositions,
+      loadKgLayoutFromLocalStorage(docKeyForLayout())
+    );
     await knowledgeGraphService.saveGraph({
       title: titleToUse,
       documentId,
       documentTitle,
-      graph: graphWithOccurrences
+      graph: graphToSave
     });
     knowledgeGraphError.value = '';
   } catch (e) {

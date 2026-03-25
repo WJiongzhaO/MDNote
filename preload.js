@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readDirectory: (dirPath) => ipcRenderer.invoke('file:read-directory', dirPath),
     readFileContent: (filePath) => ipcRenderer.invoke('file:read-file-content', filePath),
     writeFileContent: (filePath, content) => ipcRenderer.invoke('file:write-file-content', filePath, content),
+    normalizePath: (filePath) => ipcRenderer.invoke('file:normalize-path', filePath),
     deleteNode: (nodePath) => ipcRenderer.invoke('file:delete-node', nodePath),
     renameNode: (oldPath, newName) => ipcRenderer.invoke('file:rename-node', oldPath, newName),
     saveLastOpenedFolder: (folderPath) => ipcRenderer.invoke('file:save-last-opened-folder', folderPath),
