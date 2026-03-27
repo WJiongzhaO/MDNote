@@ -18,6 +18,8 @@ export interface KgNode {
   level?: number; // 仅 section：标题级别 1-6
   /** 在文档中的出现位置，保存时传入 documentId/documentTitle 后会有值 */
   occurrences?: KgNodeOccurrence[];
+  /** 绑定的知识片段 id；双击节点可跳转至文档中 {{ref:...}} 位置 */
+  fragmentId?: string;
 }
 
 export interface KgEdge {

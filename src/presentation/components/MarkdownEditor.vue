@@ -233,9 +233,12 @@
         <KnowledgeGraphView
           v-else-if="knowledgeGraphData"
           :graph="knowledgeGraphData"
+          :graph-load-key="getKnowledgeGraphDocKey()"
           :layout-randomize-key="kgLayoutRandomizeKey"
           class="knowledge-graph-body"
+          :render-markdown="renderMarkdown"
           @graph-update="onKnowledgeGraphUpdate"
+          @jump-to-fragment="onKnowledgeGraphJumpToFragment"
         />
       </div>
     </div>
@@ -266,6 +269,8 @@ import {
   clearKgLayoutLocalStorage
 } from '../../domain/services/knowledge-graph-layout';
 import { FileSystemKnowledgeGraphService } from '../../infrastructure/services/knowledge-graph-file.service';
+import { resolveFragmentReferenceJump } from '../../domain/services/knowledge-graph-fragment-jump';
+import { readDocumentTextForKnowledgeJump } from '../utils/knowledge-graph-jump.util';
 
 interface Props {
   document: DocumentResponse | null;
@@ -274,6 +279,7 @@ interface Props {
 
 interface Emits {
   (e: 'update-document', id: string, title: string, content: string): void;
+  (e: 'navigate-knowledge-jump', payload: { documentId: string; start: number; end: number }): void;
 }
 
 const props = defineProps<Props>();
@@ -2395,6 +2401,45 @@ const onKnowledgeGraphUpdate = (g: KnowledgeGraph) => {
   }
 };
 
+const onKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string }) => {
+  try {
+    const application = Application.getInstance();
+    await application.getApplicationService().initialize();
+    const fragmentUseCases = application.getKnowledgeFragmentUseCases();
+    const target = await resolveFragmentReferenceJump(payload.fragmentId, {
+      getFragment: async (id) => {
+        const f = await fragmentUseCases.getFragment(id);
+        if (!f) return null;
+        return {
+          sourceDocumentId: f.sourceDocumentId,
+          referencedDocuments: f.referencedDocuments
+        };
+      },
+      readDocumentText: readDocumentTextForKnowledgeJump
+    });
+    if (!target) return;
+    const docId = props.document?.id ?? '';
+    const filePath = (props.document as { filePath?: string } | null)?.filePath ?? currentFilePath.value;
+    const sameVault = docId && docId === target.documentId;
+    const sameFile =
+      filePath &&
+      (target.documentId === filePath ||
+        target.documentId.replace(/^file:/, '') === filePath.replace(/^file:/, ''));
+    if (sameVault || sameFile) {
+      await nextTick();
+      setSelectionRange(target.start, target.end);
+      return;
+    }
+    emit('navigate-knowledge-jump', {
+      documentId: target.documentId,
+      start: target.start,
+      end: target.end
+    });
+  } catch (e) {
+    console.error('[知识图谱] 按片段跳转失败', e);
+  }
+};
+
 const randomizeKnowledgeGraphLayout = () => {
   if (!knowledgeGraphData.value) return;
   const { nodePositions: _np, ...rest } = knowledgeGraphData.value;
@@ -4264,6 +4309,8 @@ defineExpose({
 /* 知识图谱模态框 */
 .knowledge-graph-modal {
   box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
 }
 .knowledge-graph-header {
   display: flex;
@@ -4310,7 +4357,10 @@ defineExpose({
   color: var(--error-color, #c62828);
 }
 .knowledge-graph-body {
-  min-height: 320px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-overlay {

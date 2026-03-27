@@ -102,7 +102,9 @@
           :graph="activeKnowledgeGraph"
           :graph-load-key="knowledgeGraphViewKey"
           :layout-randomize-key="kgSidebarLayoutRandomizeKey"
+          :render-markdown="renderMarkdown"
           @jump-to="handleKnowledgeGraphJumpTo"
+          @jump-to-fragment="handleKnowledgeGraphJumpToFragment"
           @graph-update="handleKnowledgeGraphLayoutUpdate"
         />
       </div>
@@ -118,6 +120,7 @@
           :document="currentDocument"
           :render-markdown="renderMarkdown"
           @update-document="handleUpdateDocument"
+          @navigate-knowledge-jump="handleNavigateKnowledgeJump"
           ref="markdownEditorRef"
         />
       </template>
@@ -235,6 +238,8 @@ import { FileSystemTemplateService, type DocumentTemplateInfo } from '../../infr
 import { INITIAL_DOCUMENT_TEMPLATES } from '../../infrastructure/services/default-templates';
 import QuickSearchDialog from './QuickSearchDialog.vue';
 import type { KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
+import { resolveFragmentReferenceJump } from '../../domain/services/knowledge-graph-fragment-jump';
+import { readDocumentTextForKnowledgeJump } from '../utils/knowledge-graph-jump.util';
 
 const route = useRoute();
 const router = useRouter();
@@ -585,6 +590,45 @@ const handleKnowledgeGraphJumpTo = async (payload: {
   const editor = markdownEditorRef.value as any;
   if (editor?.setSelectionRange) {
     editor.setSelectionRange(payload.start, payload.end);
+  }
+};
+
+const handleNavigateKnowledgeJump = async (payload: {
+  documentId: string;
+  start: number;
+  end: number;
+}) => {
+  await handleKnowledgeGraphJumpTo({
+    documentId: payload.documentId,
+    start: payload.start,
+    end: payload.end
+  });
+};
+
+const handleKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string }) => {
+  try {
+    const application = Application.getInstance();
+    await application.getApplicationService().initialize();
+    const fragmentUseCases = application.getKnowledgeFragmentUseCases();
+    const target = await resolveFragmentReferenceJump(payload.fragmentId, {
+      getFragment: async (id) => {
+        const f = await fragmentUseCases.getFragment(id);
+        if (!f) return null;
+        return {
+          sourceDocumentId: f.sourceDocumentId,
+          referencedDocuments: f.referencedDocuments
+        };
+      },
+      readDocumentText: readDocumentTextForKnowledgeJump
+    });
+    if (!target) return;
+    await handleKnowledgeGraphJumpTo({
+      documentId: target.documentId,
+      start: target.start,
+      end: target.end
+    });
+  } catch (e) {
+    console.error('[知识图谱] 按片段跳转失败', e);
   }
 };
 
