@@ -91,6 +91,7 @@
             @dragenter.prevent="handleEditorDragEnter"
             @dragleave="handleEditorDragLeave"
             @click="handleEditorClick"
+            @contextmenu="handleContextMenu"
             ref="editorElement"
           ></div>
           <div v-if="isDragging" class="drag-overlay">
@@ -159,6 +160,33 @@
       <div class="context-menu-item" @click="switchReferenceMode('detached')">
         <span class="menu-icon">🔓</span>
         <span>脱钩（转为文档内容）</span>
+      </div>
+    </div>
+
+    <!-- 文本格式化右键菜单 -->
+    <div
+      v-if="textContextMenu.visible"
+      class="context-menu"
+      :style="{ top: textContextMenu.y + 'px', left: textContextMenu.x + 'px' }"
+      @click.stop
+      ref="textContextMenuElement"
+    >
+      <div class="context-menu-item" @click="applyTextFormat('bold')">
+        <span class="menu-icon">B</span>
+        <span>加粗</span>
+      </div>
+      <div class="context-menu-item" @click="applyTextFormat('italic')">
+        <span class="menu-icon">I</span>
+        <span>斜体</span>
+      </div>
+      <div class="context-menu-item" @click="applyTextFormat('strikethrough')">
+        <span class="menu-icon">S</span>
+        <span>删除线</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" @click="addSelectionAsFragment">
+        <span class="menu-icon">📝</span>
+        <span>添加为知识片段</span>
       </div>
     </div>
 
@@ -327,6 +355,7 @@ import { useEditorShortcuts } from '../composables/useShortcutManager';
 import { Application } from '../../core/application';
 import { TYPES } from '../../core/container/container.types';
 import { extractKnowledgeGraph, sampleKnowledgeGraph, type KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
+import { NodeType } from '../../domain/types/knowledge-fragment.types';
 import {
   mergeNodePositionsIntoGraph,
   mergeKgPositionSources,
@@ -576,6 +605,19 @@ const referenceContextMenu = ref<{
   startIndex: 0,
   endIndex: 0,
   currentMode: 'linked'
+});
+
+// 文本格式化右键菜单状态
+const textContextMenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+  savedRange: Range | null;
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  savedRange: null
 });
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -3922,6 +3964,7 @@ const handleEditorClick = async (event: MouseEvent) => {
 
 // 点击外部关闭菜单
 const contextMenuElement = ref<HTMLDivElement>();
+const textContextMenuElement = ref<HTMLDivElement>();
 const handleClickOutside = (event: MouseEvent) => {
   if (referenceContextMenu.value.visible) {
     const target = event.target as HTMLElement;
@@ -3932,6 +3975,17 @@ const handleClickOutside = (event: MouseEvent) => {
     if (menu && !menu.contains(target) &&
         (!editor || !editor.contains(target) || !target.closest('.editor-reference'))) {
       referenceContextMenu.value.visible = false;
+    }
+  }
+  
+  if (textContextMenu.value.visible) {
+    const target = event.target as HTMLElement;
+    const menu = textContextMenuElement.value;
+    const editor = editorElement.value;
+
+    // 如果点击的不是菜单本身，也不是编辑器，则关闭菜单
+    if (menu && !menu.contains(target) && (!editor || !editor.contains(target))) {
+      textContextMenu.value.visible = false;
     }
   }
 };
@@ -4087,6 +4141,234 @@ const switchReferenceMode = async (newMode: 'detached') => {
     console.error('Error detaching fragment:', error);
     alert('脱钩失败：' + (error instanceof Error ? error.message : '未知错误'));
   }
+};
+
+// 处理右键菜单
+const handleContextMenu = (event: MouseEvent) => {
+  event.preventDefault();
+  
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    return;
+  }
+  
+  const selectedText = selection.toString().trim();
+  if (!selectedText) {
+    return;
+  }
+  
+  // 保存选区
+  const range = selection.getRangeAt(0);
+  
+  textContextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    savedRange: range.cloneRange()
+  };
+};
+
+// 应用文本格式化
+const applyTextFormat = (formatType: 'bold' | 'italic' | 'strikethrough') => {
+  console.log('[右键菜单] applyTextFormat 被调用:', formatType);
+  textContextMenu.value.visible = false;
+  
+  const editor = editorElement.value;
+  if (!editor) {
+    console.error('[右键菜单] 编辑器元素不存在');
+    return;
+  }
+  
+  // 恢复选区
+  const savedRange = textContextMenu.value.savedRange;
+  if (!savedRange) {
+    console.error('[右键菜单] 保存的选区不存在');
+    return;
+  }
+  
+  console.log('[右键菜单] 恢复选区:', savedRange);
+  editor.focus();
+  const selection = window.getSelection();
+  if (!selection) {
+    console.error('[右键菜单] 无法获取选区');
+    return;
+  }
+  
+  selection.removeAllRanges();
+  selection.addRange(savedRange);
+  
+  const selectedText = selection.toString();
+  console.log('[右键菜单] 选中文本:', selectedText);
+  if (!selectedText) {
+    console.warn('[右键菜单] 选中文本为空');
+    return;
+  }
+  
+  let formattedText = '';
+  switch (formatType) {
+    case 'bold':
+      formattedText = `**${selectedText}**`;
+      break;
+    case 'italic':
+      formattedText = `*${selectedText}*`;
+      break;
+    case 'strikethrough':
+      formattedText = `~~${selectedText}~~`;
+      break;
+  }
+  
+  console.log('[右键菜单] 格式化后的文本:', formattedText);
+  
+  // 使用 execCommand 插入文本
+  const success = document.execCommand('insertText', false, formattedText);
+  console.log('[右键菜单] insertText 执行结果:', success);
+  
+  // 手动触发内容更新
+  nextTick(() => {
+    const newContent = editor.textContent || '';
+    console.log('[右键菜单] 编辑器新内容:', newContent);
+    mainContent.value = newContent;
+    content.value = mergeContent(frontmatter.value, mainContent.value);
+    renderContent();
+    checkChanges();
+    debouncedSave();
+  });
+};
+
+// 添加选中文本为知识片段
+const addSelectionAsFragment = async () => {
+  console.log('[右键菜单] addSelectionAsFragment 被调用');
+  textContextMenu.value.visible = false;
+  
+  const editor = editorElement.value;
+  if (!editor) {
+    console.error('[右键菜单] 编辑器元素不存在');
+    return;
+  }
+  
+  // 恢复选区
+  const savedRange = textContextMenu.value.savedRange;
+  if (!savedRange) {
+    console.error('[右键菜单] 保存的选区不存在');
+    return;
+  }
+  
+  editor.focus();
+  const selection = window.getSelection();
+  if (!selection) {
+    console.error('[右键菜单] 无法获取选区');
+    return;
+  }
+  
+  selection.removeAllRanges();
+  selection.addRange(savedRange);
+  
+  const selectedText = selection.toString().trim();
+  console.log('[右键菜单] 选中文本:', selectedText);
+  if (!selectedText) {
+    console.warn('[右键菜单] 选中文本为空');
+    return;
+  }
+  
+  try {
+    const { InversifyContainer } = await import('../../core/container/inversify.container');
+    const container = InversifyContainer.getInstance();
+    
+    const fragmentUseCase = container.get<any>(TYPES.KnowledgeFragmentUseCases);
+    
+    const nodes = parseMarkdownToNodes(selectedText);
+    const title = selectedText.substring(0, 30) + (selectedText.length > 30 ? '...' : '');
+    
+    const documentContext = getDocumentContext();
+    const fragment = await fragmentUseCase.createFragment({
+      title,
+      nodes: nodes.map(n => n.toJSON ? n.toJSON() : n),
+      tags: [],
+      sourceDocumentId: documentContext.documentId,
+      sourceFilePath: documentContext.filePath
+    });
+    
+    const refMarker = `{{ref:${fragment.id}}}`;
+    console.log('[右键菜单] 插入引用标记:', refMarker);
+    document.execCommand('insertText', false, refMarker);
+    
+    console.log('[右键菜单] 知识片段创建成功:', fragment);
+    
+    // 手动触发内容更新
+    nextTick(() => {
+      const newContent = editor.textContent || '';
+      console.log('[右键菜单] 编辑器新内容:', newContent);
+      mainContent.value = newContent;
+      content.value = mergeContent(frontmatter.value, mainContent.value);
+      renderContent();
+      checkChanges();
+      debouncedSave();
+    });
+  } catch (error) {
+    console.error('[右键菜单] 创建知识片段失败:', error);
+    alert('创建知识片段失败：' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
+
+// 简单的Markdown解析为AST节点（简化版）
+const parseMarkdownToNodes = (markdown: string): any[] => {
+  const nodes: any[] = [];
+  const lines = markdown.split('\n');
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // 标题
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      nodes.push({
+        type: NodeType.HEADING,
+        level: headingMatch[1].length,
+        text: headingMatch[2]
+      });
+      continue;
+    }
+
+    // 代码块
+    if (line.startsWith('```')) {
+      const language = line.substring(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      nodes.push({
+        type: NodeType.CODE_BLOCK,
+        content: codeLines.join('\n'),
+        language
+      });
+      continue;
+    }
+
+    // 图片
+    const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+    if (imageMatch) {
+      const imageSrc = imageMatch[2];
+      nodes.push({
+        type: NodeType.IMAGE,
+        src: imageSrc,
+        alt: imageMatch[1]
+      });
+      continue;
+    }
+
+    // 普通文本
+    if (line.trim()) {
+      nodes.push({
+        type: NodeType.TEXT,
+        content: line,
+        marks: []
+      });
+    }
+  }
+
+  return nodes;
 };
 
 
