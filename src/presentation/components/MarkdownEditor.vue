@@ -2009,6 +2009,9 @@ onMounted(() => {
     useAutoRender(previewElement1);
   }
 
+  // 添加点击外部关闭右键菜单的事件监听
+  document.addEventListener('click', handleClickOutside);
+
   if (content.value) {
     renderContent();
     // 确保编辑器内容正确显示
@@ -2024,6 +2027,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  // 移除点击外部关闭右键菜单的事件监听
+  document.removeEventListener('click', handleClickOutside);
+
   // 组件卸载前，如果有未保存的更改，强制保存
   if (hasChanges.value) {
     // 清除防抖定时器，立即保存
@@ -4288,18 +4294,22 @@ const addSelectionAsFragment = async () => {
       sourceFilePath: documentContext.filePath
     });
     
-    const refMarker = `{{ref:${fragment.id}}}`;
+    const refMarker = `{{ref:${fragment.id}:linked}}`;
     console.log('[右键菜单] 插入引用标记:', refMarker);
     document.execCommand('insertText', false, refMarker);
     
     console.log('[右键菜单] 知识片段创建成功:', fragment);
     
     // 手动触发内容更新
-    nextTick(() => {
+    nextTick(async () => {
       const newContent = editor.textContent || '';
       console.log('[右键菜单] 编辑器新内容:', newContent);
       mainContent.value = newContent;
       content.value = mergeContent(frontmatter.value, mainContent.value);
+      
+      // 应用编辑器标注以正确渲染知识片段
+      await applyEditorAnnotations();
+      
       renderContent();
       checkChanges();
       debouncedSave();
