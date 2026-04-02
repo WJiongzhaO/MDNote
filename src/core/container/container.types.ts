@@ -6,6 +6,8 @@ export const TYPES = {
   DocumentRepository: Symbol.for('DocumentRepository'),
   FolderRepository: Symbol.for('FolderRepository'),
   KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
+  FragmentCategoryRepository: Symbol.for('FragmentCategoryRepository'),
+  GitRepository: Symbol.for('GitRepository'),
   VaultRepository: Symbol.for('VaultRepository'),
   VaultRegistryRepository: Symbol.for('VaultRegistryRepository'),
 
@@ -34,6 +36,8 @@ export const TYPES = {
   DocumentUseCases: Symbol.for('DocumentUseCases'),
   FolderUseCases: Symbol.for('FolderUseCases'),
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
+  FragmentCategoryUseCases: Symbol.for('FragmentCategoryUseCases'),
+  GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
   VaultUseCases: Symbol.for('VaultUseCases'),
@@ -52,6 +56,11 @@ export const TYPES = {
   ShortcutCommandsFactory: Symbol.for('ShortcutCommandsFactory'),
   KeyboardEventProcessor: Symbol.for('KeyboardEventProcessor'),
   PlatformAdapter: Symbol.for('PlatformAdapter'),
+
+  // 工作3 引用图谱与健康度
+  ReferenceGraphService: Symbol.for('ReferenceGraphService'),
+  KnowledgeHealthService: Symbol.for('KnowledgeHealthService'),
+  RecommendationService: Symbol.for('RecommendationService'),
 
   // 导出服务
   ExportFactory: Symbol.for('ExportFactory'),

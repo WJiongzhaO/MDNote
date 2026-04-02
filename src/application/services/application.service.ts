@@ -10,6 +10,9 @@ import { MarkdownProcessorInitializer } from '../../domain/services/markdown-pro
 import { DocumentUseCases } from '../usecases/document.usecases';
 import { FolderUseCases } from '../usecases/folder.usecases';
 import { KnowledgeFragmentUseCases } from '../usecases/knowledge-fragment.usecases';
+import type { FragmentCategoryUseCases } from '../usecases/fragment-category.usecases';
+import type { KnowledgeHealthService } from './knowledge-health.service';
+import type { RecommendationService } from './recommendation.service';
 
 @injectable()
 export class ApplicationService {
@@ -65,9 +68,19 @@ export class ApplicationService {
     if (this.knowledgeFragmentUseCases) {
       return this.knowledgeFragmentUseCases;
     }
-    // 如果还没有初始化，尝试从容器获取（延迟加载）
-    // 使用动态import而不是require，以支持浏览器环境
     throw new Error('ApplicationService not initialized. Call initialize() first.');
+  }
+
+  getFragmentCategoryUseCases(): FragmentCategoryUseCases {
+    return InversifyContainer.getInstance().get<FragmentCategoryUseCases>(TYPES.FragmentCategoryUseCases);
+  }
+
+  getKnowledgeHealthService(): KnowledgeHealthService {
+    return InversifyContainer.getInstance().get<KnowledgeHealthService>(TYPES.KnowledgeHealthService);
+  }
+
+  getRecommendationService(): RecommendationService {
+    return InversifyContainer.getInstance().get<RecommendationService>(TYPES.RecommendationService);
   }
 
   // 向后兼容的方法

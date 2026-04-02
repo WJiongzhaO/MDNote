@@ -1,17 +1,72 @@
 <template>
   <div class="editor-container">
-    <!-- 格式化工具栏 -->
-    <EditorToolbar
-      v-if="document || currentFilePath"
-      :editor="editorElement"
-      :content="mainContent"
-      @update:content="handleToolbarUpdate"
-      @open-mermaid="openMermaidEditor"
-      @open-formula="openFormulaEditor"
-      @open-knowledge-graph="openKnowledgeGraph"
-      @export="handleExport"
-      @insert-fragment="handleInsertFragment"
-    />
+    <div class="editor-header">
+      <div v-if="document || currentFilePath" class="editor-toolbar">
+        <button
+          class="toolbar-btn"
+          @click="openMermaidEditor"
+          title="编辑Mermaid图表"
+        >
+          📊 Mermaid编辑器
+        </button>
+        <!-- 添加公式编辑器按钮 -->
+        <button
+          class="toolbar-btn"
+          @click="openFormulaEditor"
+          title="编辑数学公式"
+        >
+          📐 公式编辑器
+        </button>
+        <!-- 生成知识图谱 -->
+        <button
+          class="toolbar-btn"
+          @click="openKnowledgeGraph"
+          title="根据当前文章生成知识图谱"
+        >
+          🕸️ 知识图谱
+        </button>
+        <button
+          class="toolbar-btn"
+          :class="{ active: showRecommendationPanel }"
+          @click="showRecommendationPanel = !showRecommendationPanel"
+          title="显示/隐藏基于当前文档上下文的片段推荐"
+        >
+          💡 推荐片段
+        </button>
+        <!-- 导出按钮 -->
+        <div class="export-menu">
+          <button
+            class="toolbar-btn"
+            @click="showExportMenu = !showExportMenu"
+            title="导出文档"
+          >
+            📤 导出
+          </button>
+          <div v-if="showExportMenu" class="export-dropdown" @click.stop>
+            <div class="export-item" @click="handleExport('pdf')">
+              📕 PDF (.pdf)
+            </div>
+            <div class="export-item" @click="handleExport('html')">
+              🌐 HTML (.html)
+            </div>
+            <div class="export-item" @click="handleExport('markdown')">
+              📝 Markdown (.md)
+            </div>
+          </div>
+      </div>
+    </div>
+
+      <!-- 新增：格式化工具栏 -->
+      <EditorToolbar
+        v-if="document || currentFilePath"
+        :editor="editorElement"
+        :content="mainContent"
+        @update:content="handleToolbarUpdate"
+        @open-mermaid="openMermaidEditor"
+        @open-formula="openFormulaEditor"
+        @insert-fragment="handleInsertFragment"
+      />
+    </div>
 
     <div class="editor-content" v-if="document || currentFilePath">
       <div class="editor-pane">
@@ -62,6 +117,16 @@
             @scroll="handlePreviewScroll(1)"
         ></div>
         </div>
+      </div>
+      <div v-if="showRecommendationPanel" class="recommendation-pane">
+        <FragmentRecommendationPanel
+          :title-keywords="recommendationTitleKeywords"
+          :document-tags="recommendationDocumentTags"
+          :context-keywords="recommendationContextKeywords"
+          :already-referenced-fragment-ids="recommendationReferencedIds"
+          :recent-used-fragment-ids="recentInsertedFragmentIds"
+          @insert="handleInsertFragment"
+        />
       </div>
     </div>
 
@@ -253,6 +318,7 @@ import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
 import ExportConfigModal from './ExportConfigModal.vue';
 import ExportProgressModal from './ExportProgressModal.vue';
 import KnowledgeGraphView from './KnowledgeGraphView.vue';
+import FragmentRecommendationPanel from './fragment/FragmentRecommendationPanel.vue';
 import type { DocumentResponse } from '../../application';
 import type { ExportConfig } from '../../domain/types/export-config.types';
 import { useAssetRenderer } from '../composables/useAssetRenderer';
@@ -358,6 +424,92 @@ const isKnowledgeGraphRendering = ref(false);
 const isSampleMode = ref(false);
 const kgLayoutRandomizeKey = ref(0);
 const knowledgeGraphService = new FileSystemKnowledgeGraphService();
+
+/** 工作3：文档编辑区右侧「推荐片段」面板 */
+const showRecommendationPanel = ref(true);
+/** 本会话内最近插入的片段 ID（用于推荐加权，最多保留 12 条） */
+const recentInsertedFragmentIds = ref<string[]>([]);
+
+function extractTagsFromFrontmatter(fm: string): string[] {
+  if (!fm) return [];
+  const lines = fm.split('\n');
+  for (const line of lines) {
+    const m = line.match(/^\s*tags?:\s*(.+)$/);
+    if (m) {
+      const v = m[1].trim();
+      if (v.startsWith('[')) {
+        try {
+          const arr = JSON.parse(v.replace(/'/g, '"'));
+          if (Array.isArray(arr)) return arr.map(String);
+        } catch {
+          /* ignore */
+        }
+      }
+      return v.split(/[,\s]+/).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function extractRefIdsFromMain(md: string): string[] {
+  const ids = new Set<string>();
+  const re = /\{\{ref:([^}:]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(md)) !== null) ids.add(m[1].trim());
+  return [...ids];
+}
+
+/** 正文关键词：去掉代码块与引用标记，避免把 JSON/代码 token 误当主题词 */
+function extractContextKeywordsFromMain(md: string): string[] {
+  if (!md) return [];
+  let s = md.replace(/```[\s\S]*?```/g, '\n');
+  s = s.replace(/\{\{ref:[^}]+\}\}/g, '\n');
+  s = s.replace(/\[知识片段：[^\]]+\]/g, '\n');
+  const raw = s
+    .toLowerCase()
+    .split(/[\s\n\r\t，。！？、；：""''（）【】\[\]\\/|,.!?;:]+/)
+    .map(w => w.replace(/^[^a-z0-9\u4e00-\u9fff]+|[^a-z0-9\u4e00-\u9fff]+$/gi, ''))
+    .filter(w => w.length >= 2 && w.length <= 32);
+  const stop = new Set([
+    'the',
+    'and',
+    'for',
+    'with',
+    'this',
+    'that',
+    'from',
+    '的',
+    '是',
+    '在',
+    '和',
+    '与',
+    '或',
+    '等',
+    '可以',
+    '一个',
+    '没有',
+    '我们',
+    '你们',
+    '他们'
+  ]);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const w of raw) {
+    if (stop.has(w)) continue;
+    if (seen.has(w)) continue;
+    seen.add(w);
+    out.push(w);
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+const recommendationTitleKeywords = computed(() =>
+  title.value.split(/[\s/\\._-]+/).filter(w => w.length > 1).slice(0, 24)
+);
+const recommendationDocumentTags = computed(() => extractTagsFromFrontmatter(frontmatter.value));
+const recommendationReferencedIds = computed(() => extractRefIdsFromMain(mainContent.value));
+const recommendationContextKeywords = computed(() => extractContextKeywordsFromMain(mainContent.value));
 
 // 导出相关状态
 const isExporting = ref(false);
@@ -3384,6 +3536,11 @@ const handleInsertFragmentAtPosition = async (fragmentId: string, position: numb
     await renderContent();
     await nextTick();
     debouncedSave();
+
+    recentInsertedFragmentIds.value = [
+      fragmentId,
+      ...recentInsertedFragmentIds.value.filter(id => id !== fragmentId)
+    ].slice(0, 12);
   } catch (error) {
     console.error('Error inserting fragment:', error);
     alert('插入知识片段失败：' + (error instanceof Error ? error.message : '未知错误'));
@@ -3916,18 +4073,14 @@ const switchReferenceMode = async (newMode: 'detached') => {
 
     referenceContextMenu.value.visible = false;
 
-    // 更新编辑器显示
+    // 先根据最新 mainContent 重建编辑器 DOM（含其它仍存在的引用的 data-fragment-id），再 checkChanges；
+    // 切勿用 textContent 整段覆盖，否则会丢失引用 span，getTextContent 无法还原 {{ref:...}}，导致预览与其它引用错位。
     await nextTick();
-    const editor = editorElement.value;
-    if (editor) {
-      // 更新编辑器内容为纯文本（脱钩后的内容是普通文本，不需要标注）
-      editor.textContent = mainContent.value;
-      console.log('[MarkdownEditor] 脱钩完成，编辑器内容已更新为普通文本');
-    }
+    await applyEditorAnnotations();
+    console.log('[MarkdownEditor] 脱钩完成，已重新应用引用标注');
 
-    // 更新 mainContent 和 content
     checkChanges();
-    renderContent();
+    await renderContent();
 
     console.log('[MarkdownEditor] 知识片段已脱钩，内容已转换为文档内容');
   } catch (error) {
@@ -4099,6 +4252,21 @@ defineExpose({
 
 .editor-pane {
   border-right: 1px solid var(--border-secondary);
+}
+
+.recommendation-pane {
+  flex: 0 0 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-secondary);
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.toolbar-btn.active {
+  background: var(--bg-active);
+  border-color: var(--accent-primary);
 }
 
 .editor-wrapper {

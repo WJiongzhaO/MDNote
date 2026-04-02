@@ -66,28 +66,30 @@ export class Application {
   }
 
   /**
-   * 获取导出用例实例
+   * 获取片段分类用例实例（工作2）
    */
-  getExportUseCases() {
-    return this.container.get(Symbol.for('ExportUseCases'));
+  getFragmentCategoryUseCases() {
+    return this.applicationService.getFragmentCategoryUseCases();
   }
 
   /**
-   * 获取变量系统用例实例
+   * 获取知识健康度服务（工作3）
    */
-  getVariableUseCases() {
-    return this.container.get(TYPES.VariableUseCases);
+  getKnowledgeHealthService() {
+    return this.applicationService.getKnowledgeHealthService();
   }
 
   /**
-   * 获取应用实例（单例模式）
+   * 获取推荐服务（工作3）
    */
-  private static instance: Application;
-  
-  static getInstance(): Application {
-    if (!Application.instance) {
-      Application.instance = new Application();
-    }
-    return Application.instance;
+  getRecommendationService() {
+    return this.applicationService.getRecommendationService();
+  }
+
+  /**
+   * 获取Git用例实例
+   */
+  getGitUseCases() {
+    return this.container.get(Symbol.for('GitUseCases'));
   }
 }

@@ -1,13 +1,28 @@
 <template>
   <div class="new-app-layout">
+    <!-- 顶部工具栏 -->
+    <div class="top-toolbar">
+      <div class="toolbar-left">
+        <button class="toolbar-btn" @click="goToVaultSelect" title="返回知识库">
+          <span class="toolbar-icon">🏠</span>
+        </button>
+        <span class="toolbar-vault-name" v-if="currentVaultName">
+          {{ currentVaultName }}
+        </span>
+      </div>
+      <div class="toolbar-right">
+        <button class="toolbar-btn" @click="goToFragmentManagement" title="片段管理">
+          <span class="toolbar-icon">📚</span>
+        </button>
+        <button class="toolbar-btn" @click="goToHealthDashboard" title="健康度">
+          <span class="toolbar-icon">📊</span>
+        </button>
+      </div>
+    </div>
+
     <div class="main-content">
       <!-- 左侧图标栏 -->
-      <SidebarIconBar
-        :active-sidebar="activeSidebar"
-        @switch-sidebar="handleSwitchSidebar"
-        @back-to-vault-select="handleBackToVaultSelect"
-        @manage-fragments="handleManageFragments"
-      />
+      <SidebarIconBar :active-sidebar="activeSidebar" @switch-sidebar="handleSwitchSidebar" />
 
       <!-- 可调整大小的侧边栏 -->
       <ResizableSidebar
@@ -44,6 +59,9 @@
           @open-template="handleOpenTemplate"
         />
 
+        <!-- Git 侧边栏 -->
+        <GitPanel v-if="activeSidebar === 'git-history'" :repo-path="dataPath" />
+
         <!-- 变量管理侧边栏 -->
         <VariableSidebar
           v-if="activeSidebar === 'variables'"
@@ -64,54 +82,15 @@
       <!-- 主编辑区域 -->
       <!-- 知识图谱主视图 -->
       <div v-if="activeSidebar === 'knowledge-graphs'" class="knowledge-graph-main">
-        <div
-          v-if="activeKnowledgeGraph && activeKnowledgeGraph.nodes && activeKnowledgeGraph.nodes.length > 0"
-          class="kg-main-toolbar"
-        >
-          <span class="kg-main-toolbar-title">知识图谱</span>
-          <div class="kg-main-toolbar-actions">
-            <button
-              type="button"
-              class="kg-main-toolbar-btn"
-              title="唯一写盘方式：将当前内存中的图谱写入 JSON（拖拽、随机布局等不会自动保存）"
-              @click="manualSaveKnowledgeGraph"
-            >
-              手动保存
-            </button>
-            <button
-              type="button"
-              class="kg-main-toolbar-btn"
-              title="从磁盘重新读取当前 JSON 覆盖内存（与上次「手动保存」后的文件一致）"
-              @click="manualLoadKnowledgeGraph"
-            >
-              手动加载
-            </button>
-            <button
-              type="button"
-              class="kg-main-toolbar-btn"
-              title="丢弃已保存坐标并重新随机排列节点"
-              @click="randomizeSidebarKnowledgeGraphLayout"
-            >
-              随机重新布局
-            </button>
-          </div>
-        </div>
-        <KnowledgeGraphView
-          :key="knowledgeGraphViewKey"
-          class="kg-main-graph-view"
-          :graph="activeKnowledgeGraph"
-          :graph-load-key="knowledgeGraphViewKey"
-          :layout-randomize-key="kgSidebarLayoutRandomizeKey"
-          :render-markdown="renderMarkdown"
-          @jump-to="handleKnowledgeGraphJumpTo"
-          @jump-to-fragment="handleKnowledgeGraphJumpToFragment"
-          @graph-update="handleKnowledgeGraphLayoutUpdate"
-        />
+        <KnowledgeGraphView :graph="activeKnowledgeGraph" @jump-to="handleKnowledgeGraphJumpTo" />
       </div>
       <!-- 其他：图片预览 + Markdown 编辑器 -->
       <template v-else>
         <!-- 图片预览区域 -->
-        <div v-if="currentDocument && (currentDocument as any).fileType === 'image'" class="image-preview-container">
+        <div
+          v-if="currentDocument && (currentDocument as any).fileType === 'image'"
+          class="image-preview-container"
+        >
           <div class="image-preview-content" v-html="currentDocument?.content"></div>
         </div>
         <!-- Markdown 编辑器 -->
@@ -165,9 +144,7 @@
               class="content"
               v-html="templatePreviewHtml[selectedTemplatePath] || '加载预览中...'"
             ></div>
-            <div v-else class="placeholder">
-              请选择左侧模板查看预览
-            </div>
+            <div v-else class="placeholder">请选择左侧模板查看预览</div>
           </div>
         </div>
 
@@ -196,7 +173,7 @@
       :current="searchCurrentIndex"
       @close="closeQuickSearch"
       @update:query="handleSearchQueryChange"
-      @update:replace="value => (replaceText = value)"
+      @update:replace="(value) => (replaceText = value)"
       @options-change="handleSearchOptionsChange"
       @next="goToNextMatch"
       @prev="goToPrevMatch"
@@ -218,31 +195,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch, provide, toRaw } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { Application } from '../../core/application';
-import { useDocuments } from '../composables/useDocuments';
-import { useFolders } from '../composables/useFolders';
-import MarkdownEditor from './MarkdownEditor.vue';
-import FileExplorer from './FileExplorer.vue';
-import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue';
-import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue';
-import VariableSidebar from './VariableSidebar.vue';
-import KnowledgeGraphSidebar from './KnowledgeGraphSidebar.vue';
-import KnowledgeGraphView from './KnowledgeGraphView.vue';
-import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue';
-import ResizableSidebar from './ResizableSidebar.vue';
-import FragmentManager from './FragmentManager.vue';
-import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-fragment.dto';
-import { FileSystemTemplateService, type DocumentTemplateInfo } from '../../infrastructure/services/template.service';
-import { INITIAL_DOCUMENT_TEMPLATES } from '../../infrastructure/services/default-templates';
-import QuickSearchDialog from './QuickSearchDialog.vue';
-import type { KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
-import { resolveFragmentReferenceJump } from '../../domain/services/knowledge-graph-fragment-jump';
-import { readDocumentTextForKnowledgeJump } from '../utils/knowledge-graph-jump.util';
+import { ref, onMounted, computed, nextTick, watch, provide } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Application } from '../../core/application'
+import { useDocuments } from '../composables/useDocuments'
+import { useFolders } from '../composables/useFolders'
+import MarkdownEditor from './MarkdownEditor.vue'
+import FileExplorer from './FileExplorer.vue'
+import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue'
+import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue'
+import VariableSidebar from './VariableSidebar.vue'
+import GitPanel from './git/GitPanel.vue'
+import KnowledgeGraphSidebar from './KnowledgeGraphSidebar.vue'
+import KnowledgeGraphView from './KnowledgeGraphView.vue'
+import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue'
+import ResizableSidebar from './ResizableSidebar.vue'
+import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-fragment.dto'
+import {
+  FileSystemTemplateService,
+  type DocumentTemplateInfo,
+} from '../../infrastructure/services/template.service'
+import { INITIAL_DOCUMENT_TEMPLATES } from '../../infrastructure/services/default-templates'
+import QuickSearchDialog from './QuickSearchDialog.vue'
 
-const route = useRoute();
-const router = useRouter();
+const route = useRoute()
+const router = useRouter()
 
 const {
   documents,
@@ -254,113 +231,110 @@ const {
   updateDocument,
   loadDocument,
   loadDocumentsByFolder,
-  loadDocumentTree,
-  createSubDocument,
-  moveDocumentToParent,
-  renderMarkdown
-} = useDocuments();
+  renderMarkdown,
+} = useDocuments()
 
-const {
-  folderTree,
-  createFolder,
-  updateFolder,
-  deleteFolder,
-  loadFolders
-} = useFolders();
+const { folderTree, createFolder, updateFolder, deleteFolder, loadFolders } = useFolders()
 
-const activeSidebar = ref<SidebarType>('folders'); // 默认显示文件夹
-const showFragmentManager = ref(false); // 显示知识片段管理器
-const selectedFolderId = ref<string | null>(null);
-const fileExplorerRef = ref<InstanceType<typeof FileExplorer> | null>(null);
-const markdownEditorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
-const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSidebar> | null>(null);
-const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null);
-const currentFilePath = ref<string>('');
-const lastOpenedFolderPath = ref<string>(''); // 保存最后打开的文件夹路径
-const dataPath = ref<string>(''); // 当前数据路径 - 从 Electron API 获取
-const activeKnowledgeGraph = ref<KnowledgeGraph | null>(null);
-const activeKnowledgeGraphPath = ref<string | null>(null);
-/** 与列表选中同步（侧边栏 v-if 销毁重建时用于恢复高亮） */
-const activeKnowledgeGraphId = ref<string | null>(null);
-const kgSidebarLayoutRandomizeKey = ref(0);
-/** 切换图谱文件时递增，强制主视图重建，避免 Cytoscape 残留上一张图的状态 */
-const kgGraphSwitchEpoch = ref(0);
-/** 列表点击切换图谱时的请求序号，防止多次 await 完成后旧读盘覆盖新选中 */
-let kgSelectRequestSeq = 0;
+const activeSidebar = ref<SidebarType>('folders') // 默认显示文件夹
+const selectedFolderId = ref<string | null>(null)
+const fileExplorerRef = ref<InstanceType<typeof FileExplorer> | null>(null)
+const markdownEditorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
+const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSidebar> | null>(null)
+const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null)
+const currentFilePath = ref<string>('')
+const lastOpenedFolderPath = ref<string>('') // 保存最后打开的文件夹路径
+const dataPath = ref<string>('') // Git 仓库路径 - 从 Electron API 获取
+const activeKnowledgeGraph = ref<any | null>(null)
+const currentVaultName = ref<string>('')
 
-const knowledgeGraphViewKey = computed(
-  () =>
-    `${activeKnowledgeGraphPath.value ?? ''}#${activeKnowledgeGraphId.value ?? ''}#${kgGraphSwitchEpoch.value}`
-);
-const documentViewMode = ref<'list' | 'tree'>('list'); // 文档视图模式：列表或树形
-
-// 模板创建对话框状态
-const showTemplateCreateDialog = ref(false);
-const templateTargetFolder = ref<string>('');
-const templateFileName = ref<string>('');
-const templateList = ref<DocumentTemplateInfo[]>([]);
-const selectedTemplatePath = ref<string | null>(null);
-const templatePreviewHtml = ref<Record<string, string>>({});
-
-const templateService = new FileSystemTemplateService();
-
-// 快速搜索状态
-const showQuickSearch = ref(false);
-const searchQuery = ref('');
-const replaceText = ref('');
-const searchCaseSensitive = ref(false);
-const searchUseRegex = ref(false);
-const searchScope = ref<'document' | 'project'>('document');
-const searchTotal = ref(0);
-const searchCurrentIndex = ref(0);
-
-interface SearchMatch {
-  index: number;
-  length: number;
+// 导航函数
+const goToVaultSelect = () => {
+  router.push('/')
 }
 
-let currentDocumentMatches: SearchMatch[] = [];
+const goToFragmentManagement = () => {
+  router.push('/fragments')
+}
+
+const goToHealthDashboard = () => {
+  router.push('/fragments/health')
+}
+
+// 从路由获取知识库名称
+const loadVaultName = () => {
+  const vaultId = route.query.vaultId as string
+  if (vaultId) {
+    currentVaultName.value = vaultId
+  }
+}
+
+// 模板创建对话框状态
+const showTemplateCreateDialog = ref(false)
+const templateTargetFolder = ref<string>('')
+const templateFileName = ref<string>('')
+const templateList = ref<DocumentTemplateInfo[]>([])
+const selectedTemplatePath = ref<string | null>(null)
+const templatePreviewHtml = ref<Record<string, string>>({})
+
+const templateService = new FileSystemTemplateService()
+
+// 快速搜索状态
+const showQuickSearch = ref(false)
+const searchQuery = ref('')
+const replaceText = ref('')
+const searchCaseSensitive = ref(false)
+const searchUseRegex = ref(false)
+const searchScope = ref<'document' | 'project'>('document')
+const searchTotal = ref(0)
+const searchCurrentIndex = ref(0)
+
+interface SearchMatch {
+  index: number
+  length: number
+}
+
+let currentDocumentMatches: SearchMatch[] = []
 
 // 为VariableSidebar提供依赖
-const currentDocumentContent = ref('');
-const currentDocumentPath = ref<string>('');
+const currentDocumentContent = ref('')
+const currentDocumentPath = ref<string>('')
 
-provide('currentDocumentPath', currentDocumentPath);
-provide('currentDocumentContent', currentDocumentContent);
-
+provide('currentDocumentPath', currentDocumentPath)
+provide('currentDocumentContent', currentDocumentContent)
 
 // 处理选择文件（从文件资源管理器）
 const handleSelectFile = async (filePath: string) => {
   // 如果 filePath 为空，说明是清空选中状态（例如文件被删除）
   if (!filePath) {
-    currentFilePath.value = '';
-    currentDocumentPath.value = '';
-    currentDocument.value = null;
-    currentDocumentContent.value = '';
-    return;
+    currentFilePath.value = ''
+    currentDocumentPath.value = ''
+    currentDocument.value = null
+    currentDocumentContent.value = ''
+    return
   }
 
-  currentFilePath.value = filePath;
-  currentDocumentPath.value = filePath;
+  currentFilePath.value = filePath
+  currentDocumentPath.value = filePath
 
   try {
-    const electronAPI = (window as any).electronAPI;
+    const electronAPI = (window as any).electronAPI
     if (electronAPI && electronAPI.file) {
       // 使用策略模式的FileOpenerManager
-      const { InversifyContainer } = await import('../../core/container/inversify.container');
-      const { TYPES } = await import('../../core/container/container.types');
-      const container = InversifyContainer.getInstance();
-      const fileOpenerManager = container.get<any>(TYPES.FileOpenerManager);
+      const { InversifyContainer } = await import('../../core/container/inversify.container')
+      const { TYPES } = await import('../../core/container/container.types')
+      const container = InversifyContainer.getInstance()
+      const fileOpenerManager = container.get<any>(TYPES.FileOpenerManager)
 
       // 检查是否为图片文件（图片不需要读取文本内容）
-      const isImageFile = /\.(png|jpg|jpeg|gif|bmp|webp|svg|ico|tiff|tif)$/i.test(filePath);
+      const isImageFile = /\.(png|jpg|jpeg|gif|bmp|webp|svg|ico|tiff|tif)$/i.test(filePath)
 
-      let content: string | undefined;
+      let content: string | undefined
       if (!isImageFile && electronAPI.file.readFileContent) {
-        content = await electronAPI.file.readFileContent(filePath);
+        content = await electronAPI.file.readFileContent(filePath)
       }
 
-      const result = await fileOpenerManager.openFile(filePath, content);
+      const result = await fileOpenerManager.openFile(filePath, content)
 
       // 创建临时文档对象以兼容现有组件
       const tempDocument: any = {
@@ -372,20 +346,20 @@ const handleSelectFile = async (filePath: string) => {
         updatedAt: new Date().toISOString(),
         filePath: filePath,
         fileType: result.fileType,
-        metadata: result.metadata
-      };
+        metadata: result.metadata,
+      }
 
-      currentDocument.value = tempDocument;
-      currentDocumentContent.value = result.content;
+      currentDocument.value = tempDocument
+      currentDocumentContent.value = result.content
 
-      await nextTick();
-      updateFragmentSidebarContext();
+      await nextTick()
+      updateFragmentSidebarContext()
     }
   } catch (error) {
-    console.error('Error reading file:', error);
-    alert('读取文件失败：' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('Error reading file:', error)
+    alert('读取文件失败：' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 // 处理创建子文档
 const handleCreateSubDocument = async (parentId: string) => {
@@ -417,54 +391,55 @@ const handleMoveDocumentToParent = async (documentId: string, newParentId: strin
 
 // 处理打开本地文件夹
 const handleOpenLocalFolder = async (folderPath: string) => {
-  lastOpenedFolderPath.value = folderPath;
+  lastOpenedFolderPath.value = folderPath
 
-  dataPath.value = folderPath;
-  console.log('[NewAppLayout] handleOpenLocalFolder - dataPath updated to:', folderPath);
+  // 更新 Git 仓库路径为当前打开的文件夹
+  dataPath.value = folderPath
+  console.log('[NewAppLayout] handleOpenLocalFolder - dataPath updated to:', folderPath)
 
   // 关键：同步更新主进程的 dataPath
   try {
-    const electronAPI = (window as any).electronAPI;
+    const electronAPI = (window as any).electronAPI
     if (electronAPI && electronAPI.file && electronAPI.file.setCustomDataPath) {
-      console.log('[NewAppLayout] Calling setCustomDataPath with:', folderPath);
-      await electronAPI.file.setCustomDataPath(folderPath);
-      console.log('[NewAppLayout] setCustomDataPath success');
+      console.log('[NewAppLayout] Calling setCustomDataPath with:', folderPath)
+      await electronAPI.file.setCustomDataPath(folderPath)
+      console.log('[NewAppLayout] setCustomDataPath success')
     }
   } catch (error) {
-    console.error('[NewAppLayout] Error setting custom data path:', error);
+    console.error('[NewAppLayout] Error setting custom data path:', error)
   }
 
   // 保存上次打开的文件夹
   try {
-    const electronAPI = (window as any).electronAPI;
+    const electronAPI = (window as any).electronAPI
     if (electronAPI && electronAPI.file && electronAPI.file.saveLastOpenedFolder) {
-      await electronAPI.file.saveLastOpenedFolder(folderPath);
+      await electronAPI.file.saveLastOpenedFolder(folderPath)
     }
   } catch (error) {
-    console.error('Error saving last opened folder:', error);
+    console.error('Error saving last opened folder:', error)
   }
 
   // 文件夹已经在FileExplorer中打开，这里可以做其他处理
   // 确保切换到文件夹侧边栏
   if (activeSidebar.value !== 'folders') {
-    activeSidebar.value = 'folders';
+    activeSidebar.value = 'folders'
   }
-};
+}
 
 // 监听 dataPath 变化
 watch(dataPath, (newPath) => {
-  console.log('[NewAppLayout] dataPath changed:', newPath);
-});
+  console.log('[NewAppLayout] dataPath changed:', newPath)
+})
 
 // 切换侧边栏时，如果切换回文件夹，恢复之前打开的文件夹
 const handleSwitchSidebar = async (type: SidebarType) => {
-  activeSidebar.value = type;
+  activeSidebar.value = type
   // 当切换到知识片段侧边栏时，确保上下文已更新
   if (type === 'fragments') {
-    await nextTick();
-    updateFragmentSidebarContext();
+    await nextTick()
+    updateFragmentSidebarContext()
   }
-};
+}
 
 // 返回知识库选择页面
 const handleBackToVaultSelect = () => {
@@ -492,21 +467,16 @@ function clearKnowledgeGraphSession() {
 const handleSelectKnowledgeGraph = async (info: any) => {
   const seq = ++kgSelectRequestSeq;
   try {
-    const { FileSystemKnowledgeGraphService } = await import('../../infrastructure/services/knowledge-graph-file.service');
-    const service = new FileSystemKnowledgeGraphService();
-    const resolvedPath = await service.resolveKnowledgeGraphPath(info.fullPath);
-    if (seq !== kgSelectRequestSeq) return;
-    const file = await service.readGraph(resolvedPath);
-    if (seq !== kgSelectRequestSeq) return;
-    activeKnowledgeGraphPath.value = resolvedPath;
-    activeKnowledgeGraph.value = file.graph;
-    activeKnowledgeGraphId.value = file.id;
-    kgSidebarLayoutRandomizeKey.value = 0;
-    kgGraphSwitchEpoch.value += 1;
+    const { FileSystemKnowledgeGraphService } = await import(
+      '../../infrastructure/services/knowledge-graph-file.service'
+    )
+    const service = new FileSystemKnowledgeGraphService()
+    const file = await service.readGraph(info.fullPath)
+    activeKnowledgeGraph.value = file.graph
   } catch (e) {
-    console.error('加载知识图谱失败:', e);
+    console.error('加载知识图谱失败:', e)
   }
-};
+}
 
 const randomizeSidebarKnowledgeGraphLayout = () => {
   if (!activeKnowledgeGraph.value) return;
@@ -569,29 +539,29 @@ const handleKnowledgeGraphLayoutUpdate = (graph: KnowledgeGraph) => {
 };
 
 const handleKnowledgeGraphDeleted = () => {
-  clearKnowledgeGraphSession();
-};
+  activeKnowledgeGraph.value = null
+}
 
 const handleKnowledgeGraphJumpTo = async (payload: {
-  documentId: string;
-  documentTitle?: string;
-  start: number;
-  end: number;
+  documentId: string
+  documentTitle?: string
+  start: number
+  end: number
 }) => {
   if (payload.documentId === 'sample-doc') {
-    return;
+    return
   }
-  activeSidebar.value = null;
+  activeSidebar.value = null
   if (currentDocument.value?.id !== payload.documentId) {
-    await loadDocument(payload.documentId);
+    await loadDocument(payload.documentId)
   }
-  await nextTick();
-  await nextTick();
-  const editor = markdownEditorRef.value as any;
+  await nextTick()
+  await nextTick()
+  const editor = markdownEditorRef.value as any
   if (editor?.setSelectionRange) {
-    editor.setSelectionRange(payload.start, payload.end);
+    editor.setSelectionRange(payload.start, payload.end)
   }
-};
+}
 
 const handleNavigateKnowledgeJump = async (payload: {
   documentId: string;
@@ -634,101 +604,109 @@ const handleKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string 
 
 // 处理从文件树触发的“通过模板创建”事件
 const handleCreateFromTemplate = async (parentPath: string) => {
-  templateTargetFolder.value = parentPath || '';
-  templateFileName.value = '';
-  selectedTemplatePath.value = null;
-  templatePreviewHtml.value = {};
+  templateTargetFolder.value = parentPath || ''
+  templateFileName.value = ''
+  selectedTemplatePath.value = null
+  templatePreviewHtml.value = {}
 
   try {
-    templateList.value = await templateService.listTemplates();
+    templateList.value = await templateService.listTemplates()
   } catch (error) {
-    console.error('加载模板列表失败:', error);
-    alert('加载模板列表失败，请先在模板侧边栏中配置模板。');
-    return;
+    console.error('加载模板列表失败:', error)
+    alert('加载模板列表失败，请先在模板侧边栏中配置模板。')
+    return
   }
 
   if (templateList.value.length === 0) {
-    alert('当前还没有任何模板，请先在“文档模板”侧边栏中创建模板。');
-    return;
+    alert('当前还没有任何模板，请先在“文档模板”侧边栏中创建模板。')
+    return
   }
 
-  showTemplateCreateDialog.value = true;
-};
+  showTemplateCreateDialog.value = true
+}
 
 const selectDialogTemplate = async (tpl: DocumentTemplateInfo) => {
-  selectedTemplatePath.value = tpl.fullPath;
+  selectedTemplatePath.value = tpl.fullPath
   if (!templateFileName.value) {
-    templateFileName.value = `${tpl.name}.md`;
+    templateFileName.value = `${tpl.name}.md`
   }
 
   if (!templatePreviewHtml.value[tpl.fullPath]) {
     try {
-      const content = await templateService.readTemplate(tpl.fullPath);
-      const snippet = content.substring(0, 800);
-      templatePreviewHtml.value[tpl.fullPath] = await renderMarkdown(snippet, `file:${tpl.fullPath}`);
+      const content = await templateService.readTemplate(tpl.fullPath)
+      const snippet = content.substring(0, 800)
+      templatePreviewHtml.value[tpl.fullPath] = await renderMarkdown(
+        snippet,
+        `file:${tpl.fullPath}`,
+      )
     } catch (error) {
-      console.error('渲染模板预览失败:', error);
-      templatePreviewHtml.value[tpl.fullPath] = '<p>预览加载失败</p>';
+      console.error('渲染模板预览失败:', error)
+      templatePreviewHtml.value[tpl.fullPath] = '<p>预览加载失败</p>'
     }
   }
-};
+}
 
 const confirmCreateFromTemplate = async () => {
   if (!templateTargetFolder.value) {
-    alert('未找到目标文件夹路径，请先在文件树中打开目标文件夹。');
-    return;
+    alert('未找到目标文件夹路径，请先在文件树中打开目标文件夹。')
+    return
   }
   if (!templateFileName.value.trim()) {
-    alert('请填写新文档文件名');
-    return;
+    alert('请填写新文档文件名')
+    return
   }
   if (!selectedTemplatePath.value) {
-    alert('请选择要使用的模板');
-    return;
+    alert('请选择要使用的模板')
+    return
   }
 
   const finalName = templateFileName.value.trim().endsWith('.md')
     ? templateFileName.value.trim()
-    : `${templateFileName.value.trim()}.md`;
-  const newFilePath = `${templateTargetFolder.value}/${finalName}`;
+    : `${templateFileName.value.trim()}.md`
+  const newFilePath = `${templateTargetFolder.value}/${finalName}`
 
   try {
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI || !electronAPI.file || !electronAPI.file.writeFileContent || !electronAPI.file.readFileContent) {
-      alert('文件系统 API 不可用，无法创建文件');
-      return;
+    const electronAPI = (window as any).electronAPI
+    if (
+      !electronAPI ||
+      !electronAPI.file ||
+      !electronAPI.file.writeFileContent ||
+      !electronAPI.file.readFileContent
+    ) {
+      alert('文件系统 API 不可用，无法创建文件')
+      return
     }
 
-    const content = await electronAPI.file.readFileContent(selectedTemplatePath.value);
-    await electronAPI.file.writeFileContent(newFilePath, content);
+    const content = await electronAPI.file.readFileContent(selectedTemplatePath.value)
+    await electronAPI.file.writeFileContent(newFilePath, content)
 
     // 刷新文件树视图，确保新文件立刻可见
     if (fileExplorerRef.value && templateTargetFolder.value) {
       try {
-        await (fileExplorerRef.value as any).loadFolder(templateTargetFolder.value);
+        await (fileExplorerRef.value as any).loadFolder(templateTargetFolder.value)
         // 等待文件树更新后，更新选中状态
-        await nextTick();
+        await nextTick()
         // 使用 setSelectedPath 设置选中状态（FileTreeNode 会使用路径标准化比较）
         if ((fileExplorerRef.value as any).setSelectedPath) {
-          (fileExplorerRef.value as any).setSelectedPath(newFilePath);
+          ;(fileExplorerRef.value as any).setSelectedPath(newFilePath)
         }
       } catch (e) {
-        console.warn('刷新文件树失败，但文件已经创建:', e);
+        console.warn('刷新文件树失败，但文件已经创建:', e)
       }
     }
 
-    showTemplateCreateDialog.value = false;
+    showTemplateCreateDialog.value = false
     // 创建完成后直接在编辑器中打开新文件
-    await handleSelectFile(newFilePath);
+    await handleSelectFile(newFilePath)
   } catch (error) {
-    console.error('通过模板创建文档失败:', error);
-    alert('创建文档失败：' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('通过模板创建文档失败:', error)
+    alert('创建文档失败：' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 const cancelCreateFromTemplate = () => {
-  showTemplateCreateDialog.value = false;
-};
+  showTemplateCreateDialog.value = false
+}
 
 // 更新知识片段侧边栏的文档上下文
 const updateFragmentSidebarContext = () => {
@@ -736,82 +714,88 @@ const updateFragmentSidebarContext = () => {
 
   if (!knowledgeFragmentSidebarRef.value) {
     // 组件还未挂载，静默返回
-    return;
+    return
   }
 
-  const context: { documentId?: string; filePath?: string } = {};
+  const context: { documentId?: string; filePath?: string } = {}
 
   // 优先从MarkdownEditor获取上下文（因为它有最新的状态）
   if (markdownEditorRef.value) {
-    const editorContext = (markdownEditorRef.value as any).getDocumentContext?.();
+    const editorContext = (markdownEditorRef.value as any).getDocumentContext?.()
     if (editorContext) {
-      context.documentId = editorContext.documentId;
-      context.filePath = editorContext.filePath;
+      context.documentId = editorContext.documentId
+      context.filePath = editorContext.filePath
     }
   }
 
   // 如果编辑器没有上下文，使用NewAppLayout的状态
   if (!context.documentId && !context.filePath) {
     if (currentDocument.value) {
-      context.documentId = currentDocument.value.id;
+      context.documentId = currentDocument.value.id
       // 如果文档对象包含 filePath（外部文件），也要传递
       if ((currentDocument.value as any).filePath) {
-        context.filePath = (currentDocument.value as any).filePath;
+        context.filePath = (currentDocument.value as any).filePath
       }
     } else if (currentFilePath.value) {
-      context.filePath = currentFilePath.value;
+      context.filePath = currentFilePath.value
     }
   }
 
   // 如果已经有 documentId 但没有 filePath，尝试从 currentDocument 或 currentFilePath 获取
   if (context.documentId && !context.filePath) {
     if (currentDocument.value && (currentDocument.value as any).filePath) {
-      context.filePath = (currentDocument.value as any).filePath;
+      context.filePath = (currentDocument.value as any).filePath
     } else if (currentFilePath.value) {
-      context.filePath = currentFilePath.value;
+      context.filePath = currentFilePath.value
     }
   }
 
   // 更新知识片段侧边栏文档上下文
-  (knowledgeFragmentSidebarRef.value as any).setDocumentContext(context);
-};
+  ;(knowledgeFragmentSidebarRef.value as any).setDocumentContext(context)
+}
 
 // 监听当前文档或文件变化，更新知识片段侧边栏的文档上下文
 watch([currentDocument, currentFilePath], () => {
   // 只有当知识片段侧边栏已挂载时才更新上下文
   if (knowledgeFragmentSidebarRef.value) {
     nextTick(() => {
-      updateFragmentSidebarContext();
-    });
+      updateFragmentSidebarContext()
+    })
   }
-});
+})
 
 // 监听MarkdownEditor的变化（通过nextTick确保组件已挂载）
-watch(() => markdownEditorRef.value, () => {
-  if (markdownEditorRef.value && knowledgeFragmentSidebarRef.value) {
-    nextTick(() => {
-      updateFragmentSidebarContext();
-    });
-  }
-});
+watch(
+  () => markdownEditorRef.value,
+  () => {
+    if (markdownEditorRef.value && knowledgeFragmentSidebarRef.value) {
+      nextTick(() => {
+        updateFragmentSidebarContext()
+      })
+    }
+  },
+)
 
 // 监听知识片段侧边栏的挂载，当它挂载后更新上下文
-watch(() => knowledgeFragmentSidebarRef.value, () => {
-  if (knowledgeFragmentSidebarRef.value) {
-    nextTick(() => {
-      updateFragmentSidebarContext();
-    });
-  }
-});
+watch(
+  () => knowledgeFragmentSidebarRef.value,
+  () => {
+    if (knowledgeFragmentSidebarRef.value) {
+      nextTick(() => {
+        updateFragmentSidebarContext()
+      })
+    }
+  },
+)
 
 // 当选择文档时，也更新上下文
 const handleSelectDocument = async (id: string) => {
   // 清空外部文件路径（因为选择了数据库文档）
-  currentFilePath.value = '';
-  await loadDocument(id);
-  await nextTick();
-  updateFragmentSidebarContext();
-};
+  currentFilePath.value = ''
+  await loadDocument(id)
+  await nextTick()
+  updateFragmentSidebarContext()
+}
 
 // 监听侧边栏切换：离开知识图谱时清空会话（图谱 JSON 仅手动保存写盘）；切换回文件夹时恢复路径
 watch(activeSidebar, async (newType, oldType) => {
@@ -821,157 +805,160 @@ watch(activeSidebar, async (newType, oldType) => {
   // 只有当从其他侧边栏切换到文件夹时才恢复
   if (newType === 'folders' && oldType !== 'folders' && lastOpenedFolderPath.value) {
     // 等待组件渲染完成
-    await nextTick();
+    await nextTick()
     // 再次等待，确保FileExplorer组件已完全挂载
-    await nextTick();
+    await nextTick()
     // 使用setTimeout确保DOM完全更新
     setTimeout(() => {
       if (fileExplorerRef.value && lastOpenedFolderPath.value) {
-        console.log('恢复文件夹路径:', lastOpenedFolderPath.value);
-        (fileExplorerRef.value as any).loadFolder(lastOpenedFolderPath.value);
+        console.log('恢复文件夹路径:', lastOpenedFolderPath.value)
+        ;(fileExplorerRef.value as any).loadFolder(lastOpenedFolderPath.value)
       }
-    }, 100);
+    }, 100)
   }
-});
+})
 
 const handleUpdateDocument = async (id: string, title: string, content: string) => {
   await updateDocument({
     id,
     title,
-    content
-  });
+    content,
+  })
 
   // 同步更新currentDocumentContent，供VariableSidebar使用
-  currentDocumentContent.value = content;
-  currentDocumentPath.value = id;
-};
+  currentDocumentContent.value = content
+  currentDocumentPath.value = id
+}
 
 // 处理知识片段更新事件
 const handleFragmentUpdated = async (fragmentId: string) => {
   // 刷新编辑器预览（不重新加载内容，因为内容中保持引用标志）
   if (markdownEditorRef.value) {
     try {
-      const editor = markdownEditorRef.value as any;
+      const editor = markdownEditorRef.value as any
       // 只刷新预览，不改变编辑器内容
       // 因为文档内容中保持引用标志 {{ref:xxx}}，预览时会自动解析为最新内容
-      editor.refreshContent?.();
+      editor.refreshContent?.()
     } catch (error) {
-      console.error('Error refreshing editor after fragment update:', error);
+      console.error('Error refreshing editor after fragment update:', error)
     }
   }
-};
+}
 
 // 监听菜单事件
 onMounted(async () => {
-  console.log('[NewAppLayout] onMounted - Initializing...');
+  console.log('[NewAppLayout] onMounted - Initializing...')
 
-  const electronAPI = (window as any).electronAPI;
+  // 加载知识库名称
+  loadVaultName()
 
-  const vaultPath = route.query.vaultPath as string | undefined;
-  const vaultId = route.query.vaultId as string | undefined;
+  const electronAPI = (window as any).electronAPI
+
+  const vaultPath = route.query.vaultPath as string | undefined
+  const vaultId = route.query.vaultId as string | undefined
 
   if (vaultPath) {
-    console.log('[NewAppLayout] Loading vault from route params:', vaultPath);
-    dataPath.value = vaultPath;
-    lastOpenedFolderPath.value = vaultPath;
+    console.log('[NewAppLayout] Loading vault from route params:', vaultPath)
+    dataPath.value = vaultPath
+    lastOpenedFolderPath.value = vaultPath
 
     try {
       if (electronAPI && electronAPI.file && electronAPI.file.setCustomDataPath) {
-        await electronAPI.file.setCustomDataPath(vaultPath);
+        await electronAPI.file.setCustomDataPath(vaultPath)
       }
       if (electronAPI && electronAPI.file && electronAPI.file.saveLastOpenedFolder) {
-        await electronAPI.file.saveLastOpenedFolder(vaultPath);
+        await electronAPI.file.saveLastOpenedFolder(vaultPath)
       }
     } catch (error) {
-      console.error('[NewAppLayout] Error setting vault path:', error);
+      console.error('[NewAppLayout] Error setting vault path:', error)
     }
   } else {
     try {
       if (electronAPI && electronAPI.file && electronAPI.file.getCustomDataPath) {
-        const customPath = await electronAPI.file.getCustomDataPath();
+        const customPath = await electronAPI.file.getCustomDataPath()
         if (customPath) {
-          console.log('[NewAppLayout] Found custom data path:', customPath);
-          dataPath.value = customPath;
+          console.log('[NewAppLayout] Found custom data path:', customPath)
+          dataPath.value = customPath
         } else {
-          console.log('[NewAppLayout] No custom data path, using default');
+          console.log('[NewAppLayout] No custom data path, using default')
           if (electronAPI.file.getDataPath) {
-            const path = await electronAPI.file.getDataPath();
-            dataPath.value = path;
-            console.log('[NewAppLayout] Using default data path:', path);
+            const path = await electronAPI.file.getDataPath()
+            dataPath.value = path
+            console.log('[NewAppLayout] Using default data path:', path)
           }
         }
       } else if (electronAPI && electronAPI.file && electronAPI.file.getDataPath) {
-        const path = await electronAPI.file.getDataPath();
-        dataPath.value = path;
-        console.log('[NewAppLayout] Using data path from getDataPath:', path);
+        const path = await electronAPI.file.getDataPath()
+        dataPath.value = path
+        console.log('[NewAppLayout] Using data path from getDataPath:', path)
       }
 
-      console.log('[NewAppLayout] Final initialized dataPath:', dataPath.value);
+      console.log('[NewAppLayout] Final initialized dataPath:', dataPath.value)
     } catch (error) {
-      console.error('[NewAppLayout] Error getting dataPath:', error);
+      console.error('[NewAppLayout] Error getting dataPath:', error)
     }
   }
 
-  await loadFolders();
-  await loadDocumentsByFolder(null);
+  await loadFolders()
+  await loadDocumentsByFolder(null)
 
   if (electronAPI && electronAPI.menu) {
     electronAPI.menu.onSave(async () => {
       if (markdownEditorRef.value && currentFilePath.value) {
-        const editor = markdownEditorRef.value as any;
-        const content = editor.getContent?.();
+        const editor = markdownEditorRef.value as any
+        const content = editor.getContent?.()
         if (content !== undefined && electronAPI.file && electronAPI.file.writeFileContent) {
-          await electronAPI.file.writeFileContent(currentFilePath.value, content);
+          await electronAPI.file.writeFileContent(currentFilePath.value, content)
         }
       }
-    });
+    })
   }
 
   if (electronAPI && electronAPI.on) {
     electronAPI.on('app:restore-last-folder', async (folderPath: string) => {
       if (folderPath) {
-        lastOpenedFolderPath.value = folderPath;
+        lastOpenedFolderPath.value = folderPath
         if (activeSidebar.value === 'folders' && fileExplorerRef.value) {
-          await nextTick();
-          (fileExplorerRef.value as any).loadFolder(folderPath);
+          await nextTick()
+          ;(fileExplorerRef.value as any).loadFolder(folderPath)
         }
       }
-    });
+    })
   }
 
   if (vaultPath) {
     if (activeSidebar.value !== 'folders') {
-      activeSidebar.value = 'folders';
+      activeSidebar.value = 'folders'
     }
-    await nextTick();
-    await nextTick();
+    await nextTick()
+    await nextTick()
     if (fileExplorerRef.value) {
-      (fileExplorerRef.value as any).loadFolder(vaultPath);
+      ;(fileExplorerRef.value as any).loadFolder(vaultPath)
     }
   } else {
     try {
       if (electronAPI && electronAPI.file && electronAPI.file.getLastOpenedFolder) {
-        const lastFolder = await electronAPI.file.getLastOpenedFolder();
+        const lastFolder = await electronAPI.file.getLastOpenedFolder()
         if (lastFolder) {
-          lastOpenedFolderPath.value = lastFolder;
+          lastOpenedFolderPath.value = lastFolder
           if (activeSidebar.value !== 'folders') {
-            activeSidebar.value = 'folders';
+            activeSidebar.value = 'folders'
           }
-          await nextTick();
-          await nextTick();
+          await nextTick()
+          await nextTick()
           if (fileExplorerRef.value) {
-            (fileExplorerRef.value as any).loadFolder(lastFolder);
+            ;(fileExplorerRef.value as any).loadFolder(lastFolder)
           }
         }
       }
     } catch (error) {
-      console.error('Error loading last opened folder:', error);
+      console.error('Error loading last opened folder:', error)
     }
   }
 
-  const application = Application.getInstance();
-  const documentUseCases = application.getDocumentUseCases();
-  const existingDocs = await documentUseCases.getAllDocuments();
+  const application = Application.getInstance()
+  const documentUseCases = application.getDocumentUseCases()
+  const existingDocs = await documentUseCases.getAllDocuments()
   if (existingDocs.length === 0) {
     await createDocument({
       title: '欢迎使用 MD Note',
@@ -998,310 +985,319 @@ onMounted(async () => {
 ---
 
 开始使用吧！`,
-      folderId: null
-    });
+      folderId: null,
+    })
   }
 
   try {
-    await templateService.ensureInitialTemplates(INITIAL_DOCUMENT_TEMPLATES);
+    await templateService.ensureInitialTemplates(INITIAL_DOCUMENT_TEMPLATES)
   } catch (e) {
-    console.error('初始化默认模板失败:', e);
+    console.error('初始化默认模板失败:', e)
   }
 
   if (typeof window !== 'undefined') {
-    window.addEventListener('mdnote:open-quick-search', handleOpenQuickSearch);
+    window.addEventListener('mdnote:open-quick-search', handleOpenQuickSearch)
   }
-});
+})
 
 const handleCreateFolder = async (name: string, parentId: string | null = null) => {
   await createFolder({
     name,
-    parentId
-  });
-};
+    parentId,
+  })
+}
 
 const handleUpdateFolder = async (id: string, name: string) => {
   await updateFolder({
     id,
-    name
-  });
-};
+    name,
+  })
+}
 
 const handleDeleteFolder = async (id: string) => {
-  await deleteFolder(id);
+  await deleteFolder(id)
   if (selectedFolderId.value === id) {
-    selectedFolderId.value = null;
+    selectedFolderId.value = null
   }
-};
+}
 
 const handleMoveDocument = async (documentId: string, targetFolderId: string | null) => {
-  const application = Application.getInstance();
-  const documentUseCases = application.getDocumentUseCases();
-  const currentDoc = await documentUseCases.getDocument(documentId);
+  const application = Application.getInstance()
+  const documentUseCases = application.getDocumentUseCases()
+  const currentDoc = await documentUseCases.getDocument(documentId)
 
   if (currentDoc) {
     await updateDocument({
       id: documentId,
       title: currentDoc.title,
       content: currentDoc.content,
-      folderId: targetFolderId
-    });
-    await loadDocumentsByFolder(selectedFolderId.value);
+      folderId: targetFolderId,
+    })
+    await loadDocumentsByFolder(selectedFolderId.value)
   }
-};
+}
 
 const handleInsertFragment = async (fragmentId: string) => {
   if (markdownEditorRef.value && currentDocument.value) {
     // 调用MarkdownEditor的handleInsertFragment方法
-    const editor = markdownEditorRef.value as any;
+    const editor = markdownEditorRef.value as any
     if (editor && typeof editor.handleInsertFragment === 'function') {
-      await editor.handleInsertFragment(fragmentId);
+      await editor.handleInsertFragment(fragmentId)
     }
   }
-};
+}
 
 // 变量相关事件处理
 const handleVariableUpdated = async (updatedContent: string) => {
   // 当变量更新时，更新编辑器内容
-  currentDocumentContent.value = updatedContent;
+  currentDocumentContent.value = updatedContent
 
   if (markdownEditorRef.value) {
-    const editor = markdownEditorRef.value as any;
+    const editor = markdownEditorRef.value as any
     // 更新编辑器内容
     if (editor && editor.setContent) {
-      const currentDoc = currentDocument.value;
+      const currentDoc = currentDocument.value
       if (currentDoc) {
         // 如果是数据库文档，更新标题和内容
-        editor.setContent(currentDoc.title, updatedContent, currentDocumentPath.value);
+        editor.setContent(currentDoc.title, updatedContent, currentDocumentPath.value)
       } else if (currentFilePath.value) {
         // 如果是外部文件，只更新内容
-        const fileName = currentFilePath.value.split(/[/\\]/).pop() || '未命名';
-        editor.setContent(fileName, updatedContent, currentFilePath.value);
+        const fileName = currentFilePath.value.split(/[/\\]/).pop() || '未命名'
+        editor.setContent(fileName, updatedContent, currentFilePath.value)
       }
     }
   }
-};
+}
 
 const handleInsertVariable = async (variableName: string) => {
   if (markdownEditorRef.value) {
-    const editor = markdownEditorRef.value as any;
+    const editor = markdownEditorRef.value as any
     if (editor && editor.insertText) {
-      const variablePlaceholder = `{{${variableName}}}`;
-      editor.insertText(variablePlaceholder);
+      const variablePlaceholder = `{{${variableName}}}`
+      editor.insertText(variablePlaceholder)
     }
   }
-};
+}
 
 // 从模板侧边栏打开模板：复用文件打开逻辑
 const handleOpenTemplate = async (fullPath: string) => {
-  await handleSelectFile(fullPath);
-};
+  await handleSelectFile(fullPath)
+}
 
 // ===== 快速搜索相关逻辑 =====
 
 const buildSearchRegex = (): RegExp | null => {
-  if (!searchQuery.value) return null;
+  if (!searchQuery.value) return null
   try {
-    const source = searchUseRegex.value ? searchQuery.value : searchQuery.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const flags = searchCaseSensitive.value ? 'g' : 'gi';
-    return new RegExp(source, flags);
+    const source = searchUseRegex.value
+      ? searchQuery.value
+      : searchQuery.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const flags = searchCaseSensitive.value ? 'g' : 'gi'
+    return new RegExp(source, flags)
   } catch (error) {
-    console.error('构建搜索正则失败:', error);
-    return null;
+    console.error('构建搜索正则失败:', error)
+    return null
   }
-};
+}
 
 const performDocumentSearch = () => {
-  currentDocumentMatches = [];
-  searchTotal.value = 0;
-  searchCurrentIndex.value = 0;
+  currentDocumentMatches = []
+  searchTotal.value = 0
+  searchCurrentIndex.value = 0
 
-  if (!markdownEditorRef.value || !searchQuery.value) return;
+  if (!markdownEditorRef.value || !searchQuery.value) return
 
-  const editor = markdownEditorRef.value as any;
-  if (!editor.getContent) return;
+  const editor = markdownEditorRef.value as any
+  if (!editor.getContent) return
 
   // 获取完整内容（包含 frontmatter）
-  const fullContent = editor.getContent() as string;
-  const regex = buildSearchRegex();
-  if (!regex) return;
+  const fullContent = editor.getContent() as string
+  const regex = buildSearchRegex()
+  if (!regex) return
 
   // 分离 frontmatter 和 mainContent，计算 frontmatter 长度
-  const frontmatterMatch = fullContent.trimStart().match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
-  const frontmatterLength = frontmatterMatch ? frontmatterMatch[0].length : 0;
+  const frontmatterMatch = fullContent.trimStart().match(/^---\s*\n([\s\S]*?)\n---\s*\n?/)
+  const frontmatterLength = frontmatterMatch ? frontmatterMatch[0].length : 0
 
-  let match: RegExpExecArray | null;
+  let match: RegExpExecArray | null
   while ((match = regex.exec(fullContent)) !== null) {
     // 如果匹配在 frontmatter 中，跳过（因为编辑器只显示 mainContent）
     if (match.index < frontmatterLength) {
-      continue;
+      continue
     }
 
     // 将位置转换为相对于 mainContent 的位置
-    const mainContentIndex = match.index - frontmatterLength;
+    const mainContentIndex = match.index - frontmatterLength
     currentDocumentMatches.push({
       index: mainContentIndex,
-      length: match[0].length
-    });
+      length: match[0].length,
+    })
     if (match[0].length === 0) {
-      regex.lastIndex++;
+      regex.lastIndex++
     }
   }
 
-  searchTotal.value = currentDocumentMatches.length;
-  searchCurrentIndex.value = 0;
+  searchTotal.value = currentDocumentMatches.length
+  searchCurrentIndex.value = 0
 
   // 更新预览中的高亮
   if (markdownEditorRef.value) {
-    const editor = markdownEditorRef.value as any;
+    const editor = markdownEditorRef.value as any
     if (editor.setSearchHighlights) {
-      editor.setSearchHighlights(searchQuery.value, searchCaseSensitive.value, searchUseRegex.value);
+      editor.setSearchHighlights(searchQuery.value, searchCaseSensitive.value, searchUseRegex.value)
     }
   }
-};
+}
 
 const revealCurrentMatchInEditor = () => {
-  if (!markdownEditorRef.value) return;
-  const editor = markdownEditorRef.value as any;
-  if (!editor.setCurrentSearchMatch || currentDocumentMatches.length === 0) return;
+  if (!markdownEditorRef.value) return
+  const editor = markdownEditorRef.value as any
+  if (!editor.setCurrentSearchMatch || currentDocumentMatches.length === 0) return
 
-  const match = currentDocumentMatches[searchCurrentIndex.value];
-  if (!match) return;
+  const match = currentDocumentMatches[searchCurrentIndex.value]
+  if (!match) return
   // 只更新“当前匹配”的样式，不改变 selection，避免光标跑到文档里
-  editor.setCurrentSearchMatch(match.index, match.index + match.length);
-};
+  editor.setCurrentSearchMatch(match.index, match.index + match.length)
+}
 
 const goToNextMatch = () => {
-  if (currentDocumentMatches.length === 0) return;
-  searchCurrentIndex.value = (searchCurrentIndex.value + 1) % currentDocumentMatches.length;
-  revealCurrentMatchInEditor();
-};
+  if (currentDocumentMatches.length === 0) return
+  searchCurrentIndex.value = (searchCurrentIndex.value + 1) % currentDocumentMatches.length
+  revealCurrentMatchInEditor()
+}
 
 const goToPrevMatch = () => {
-  if (currentDocumentMatches.length === 0) return;
+  if (currentDocumentMatches.length === 0) return
   searchCurrentIndex.value =
-    (searchCurrentIndex.value - 1 + currentDocumentMatches.length) % currentDocumentMatches.length;
-  revealCurrentMatchInEditor();
-};
+    (searchCurrentIndex.value - 1 + currentDocumentMatches.length) % currentDocumentMatches.length
+  revealCurrentMatchInEditor()
+}
 
 const replaceCurrent = () => {
-  if (!markdownEditorRef.value || currentDocumentMatches.length === 0) return;
-  const editor = markdownEditorRef.value as any;
-  if (!editor.replaceTextWithUndo) return;
+  if (!markdownEditorRef.value || currentDocumentMatches.length === 0) return
+  const editor = markdownEditorRef.value as any
+  if (!editor.replaceTextWithUndo) return
 
-  const match = currentDocumentMatches[searchCurrentIndex.value];
-  if (!match) return;
+  const match = currentDocumentMatches[searchCurrentIndex.value]
+  if (!match) return
 
   // 使用支持撤销的替换方法
   // 注意：这里使用的是 mainContent 中的位置，需要确保位置正确
-  const success = editor.replaceTextWithUndo(match.index, match.index + match.length, replaceText.value);
+  const success = editor.replaceTextWithUndo(
+    match.index,
+    match.index + match.length,
+    replaceText.value,
+  )
 
   if (success) {
     // 重新搜索并跳到下一处
-    performDocumentSearch();
+    performDocumentSearch()
     if (currentDocumentMatches.length > 0) {
-      revealCurrentMatchInEditor();
+      revealCurrentMatchInEditor()
     }
   }
-};
+}
 
 const replaceAll = () => {
-  if (!markdownEditorRef.value || !searchQuery.value || currentDocumentMatches.length === 0) return;
-  const editor = markdownEditorRef.value as any;
-  if (!editor.replaceTextWithUndo) return;
+  if (!markdownEditorRef.value || !searchQuery.value || currentDocumentMatches.length === 0) return
+  const editor = markdownEditorRef.value as any
+  if (!editor.replaceTextWithUndo) return
 
   // 从后往前替换，避免位置偏移问题
   // 同时每个替换都会加入到撤销历史中
   for (let i = currentDocumentMatches.length - 1; i >= 0; i--) {
-    const match = currentDocumentMatches[i];
+    const match = currentDocumentMatches[i]
     if (match) {
-      editor.replaceTextWithUndo(match.index, match.index + match.length, replaceText.value);
+      editor.replaceTextWithUndo(match.index, match.index + match.length, replaceText.value)
     }
   }
 
   // 替换后重新统计
-  performDocumentSearch();
-};
+  performDocumentSearch()
+}
 
 const handleSearchQueryChange = (value: string) => {
-  searchQuery.value = value;
+  searchQuery.value = value
   if (searchScope.value === 'document') {
-    performDocumentSearch();
-    revealCurrentMatchInEditor();
+    performDocumentSearch()
+    revealCurrentMatchInEditor()
   } else {
     // 仅更新预览高亮（项目搜索的高亮逻辑可后续扩展）
     if (markdownEditorRef.value) {
-      const editor = markdownEditorRef.value as any;
+      const editor = markdownEditorRef.value as any
       if (editor.setSearchHighlights) {
-        editor.setSearchHighlights(searchQuery.value, searchCaseSensitive.value, searchUseRegex.value);
+        editor.setSearchHighlights(
+          searchQuery.value,
+          searchCaseSensitive.value,
+          searchUseRegex.value,
+        )
       }
     }
   }
-};
+}
 
 const handleSearchOptionsChange = (options: {
-  caseSensitive: boolean;
-  useRegex: boolean;
-  scope: 'document' | 'project';
+  caseSensitive: boolean
+  useRegex: boolean
+  scope: 'document' | 'project'
 }) => {
-  searchCaseSensitive.value = options.caseSensitive;
-  searchUseRegex.value = options.useRegex;
-  searchScope.value = options.scope;
+  searchCaseSensitive.value = options.caseSensitive
+  searchUseRegex.value = options.useRegex
+  searchScope.value = options.scope
 
   if (searchScope.value === 'document') {
-    performDocumentSearch();
-    revealCurrentMatchInEditor();
+    performDocumentSearch()
+    revealCurrentMatchInEditor()
   }
   // TODO: 项目搜索可以在这里触发（需要结合主进程或文件系统 API）
-};
+}
 
 const closeQuickSearch = () => {
-  showQuickSearch.value = false;
+  showQuickSearch.value = false
   // 关闭时清除高亮
   if (markdownEditorRef.value) {
-    const editor = markdownEditorRef.value as any;
+    const editor = markdownEditorRef.value as any
     if (editor.setSearchHighlights) {
-      editor.setSearchHighlights('', searchCaseSensitive.value, searchUseRegex.value);
+      editor.setSearchHighlights('', searchCaseSensitive.value, searchUseRegex.value)
     }
   }
-};
+}
 
 const handleOpenQuickSearch = () => {
-  showQuickSearch.value = true;
+  showQuickSearch.value = true
 
   // 使用编辑器当前选中文本作为默认搜索词
   if (markdownEditorRef.value) {
-    const editor = markdownEditorRef.value as any;
+    const editor = markdownEditorRef.value as any
     if (editor.getSelectedText) {
-      const selected = editor.getSelectedText() as string;
+      const selected = editor.getSelectedText() as string
       if (selected && selected.trim()) {
-        searchQuery.value = selected;
+        searchQuery.value = selected
       }
     }
   }
 
   if (searchScope.value === 'document') {
-    performDocumentSearch();
-    revealCurrentMatchInEditor();
+    performDocumentSearch()
+    revealCurrentMatchInEditor()
   }
-};
+}
 
 const findFolderById = (id: string): { id: string; name: string } | null => {
   const findInTree = (tree: any[]): any => {
     for (const item of tree) {
       if (item.id === id) {
-        return item;
+        return item
       }
       if (item.children) {
-        const found = findInTree(item.children);
-        if (found) return found;
+        const found = findInTree(item.children)
+        if (found) return found
       }
     }
-    return null;
-  };
-  return findInTree(folderTree.value);
-};
-
+    return null
+  }
+  return findInTree(folderTree.value)
+}
 </script>
 
 <style scoped>
@@ -1601,5 +1597,57 @@ const findFolderById = (id: string): { id: string; name: string } | null => {
     opacity: 1;
   }
 }
-</style>
 
+/* 顶部工具栏 */
+.top-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg-secondary, #f9fafb);
+  border-bottom: 1px solid var(--border-primary, #e5e7eb);
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.toolbar-icon {
+  font-size: 1.125rem;
+}
+
+.toolbar-vault-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  padding: 4px 12px;
+  background: var(--bg-primary, #fff);
+  border-radius: 6px;
+  border: 1px solid var(--border-primary, #e5e7eb);
+}
+
+.main-content {
+  display: flex;
+  height: calc(100vh - 53px);
+}
+</style>

@@ -16,6 +16,13 @@ import { ApplicationService } from '../../application/services/application.servi
 import { DocumentUseCases } from '../../application/usecases/document.usecases';
 import { FolderUseCases } from '../../application/usecases/folder.usecases';
 import { KnowledgeFragmentUseCases } from '../../application/usecases/knowledge-fragment.usecases';
+import { FragmentCategoryUseCases } from '../../application/usecases/fragment-category.usecases';
+import type { FragmentCategoryRepository } from '../../domain/repositories/fragment-category.repository.interface';
+import { LocalStorageFragmentCategoryRepository } from '../../infrastructure/repositories/local-storage.fragment-category.repository.impl';
+import { ReferenceGraphService } from '../../application/services/reference-graph.service';
+import { KnowledgeHealthService } from '../../application/services/knowledge-health.service';
+import { RecommendationService } from '../../application/services/recommendation.service';
+import { GitUseCases } from '../../application/usecases/GitUseCases';
 import { VaultUseCases } from '../../application/usecases/vault.usecases';
 import { StorageAdapter } from '../../infrastructure/storage.adapter';
 import { FileSystemAssetManager } from '../../infrastructure/services/file-system-asset-manager.service';
@@ -79,6 +86,9 @@ export class ApplicationModule {
     container.bind(TYPES.KnowledgeFragmentRepository)
       .toConstantValue(StorageAdapter.createKnowledgeFragmentRepository());
 
+    container.bind<FragmentCategoryRepository>(TYPES.FragmentCategoryRepository)
+      .toConstantValue(new LocalStorageFragmentCategoryRepository());
+
     // 配置领域服务（暂时保持单例模式，后续重构）
     container.bind<MarkdownProcessor>(TYPES.MarkdownProcessor)
       .toConstantValue(MarkdownProcessor.getInstance());
@@ -136,6 +146,24 @@ export class ApplicationModule {
 
     container.bind<KnowledgeFragmentUseCases>(TYPES.KnowledgeFragmentUseCases)
       .to(KnowledgeFragmentUseCases);
+
+    container.bind<FragmentCategoryUseCases>(TYPES.FragmentCategoryUseCases)
+      .to(FragmentCategoryUseCases);
+
+    container.bind<ReferenceGraphService>(TYPES.ReferenceGraphService)
+      .to(ReferenceGraphService);
+    container.bind<KnowledgeHealthService>(TYPES.KnowledgeHealthService)
+      .to(KnowledgeHealthService);
+    container.bind<RecommendationService>(TYPES.RecommendationService)
+      .to(RecommendationService);
+
+    // 配置 Git 仓储和用例
+    // 使用ElectronGitRepository，通过IPC与主进程通信
+    container.bind<IGitRepository>(TYPES.GitRepository)
+      .to(ElectronGitRepository);
+
+    container.bind<GitUseCases>(TYPES.GitUseCases)
+      .to(GitUseCases);
 
     // 配置知识库仓储和用例
     container.bind<VaultRepository>(TYPES.VaultRepository)

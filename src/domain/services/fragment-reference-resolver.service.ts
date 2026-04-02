@@ -12,6 +12,29 @@ import { FragmentReferenceParser } from './fragment-reference-parser.service';
 export class FragmentReferenceResolver {
   private readonly parser: FragmentReferenceParser;
 
+  /** 简单识别 fenced code 区间，避免把代码块内的 `{{ref:...}}` 当作文档级引用替换，导致 JSON 等内容被破坏或错位 */
+  private getFencedCodeIntervals(content: string): Array<{ start: number; end: number }> {
+    const ranges: Array<{ start: number; end: number }> = [];
+    let i = 0;
+    while (i < content.length) {
+      const open = content.indexOf('```', i);
+      if (open === -1) break;
+      const close = content.indexOf('```', open + 3);
+      if (close === -1) break;
+      ranges.push({ start: open, end: close + 3 });
+      i = close + 3;
+    }
+    return ranges;
+  }
+
+  private isRangeInsideFencedCode(
+    intervals: Array<{ start: number; end: number }>,
+    start: number,
+    end: number
+  ): boolean {
+    return intervals.some(r => start >= r.start && end <= r.end);
+  }
+
   constructor(
     @inject(TYPES.KnowledgeFragmentRepository)
     private readonly fragmentRepository: KnowledgeFragmentRepository,
@@ -35,11 +58,16 @@ export class FragmentReferenceResolver {
       return content;
     }
 
+    const fencedIntervals = this.getFencedCodeIntervals(content);
     let resolvedContent = content;
 
     // 从后往前替换，避免索引偏移问题
     for (let i = references.length - 1; i >= 0; i--) {
       const ref = references[i];
+
+      if (this.isRangeInsideFencedCode(fencedIntervals, ref.startIndex, ref.endIndex)) {
+        continue;
+      }
 
       // 根据形态处理
       const mode = (ref as any).mode || (ref.isConnected ? 'linked' : 'detached');
@@ -67,7 +95,13 @@ export class FragmentReferenceResolver {
         // 优先从缓存读取（如果提供了缓存）
         if (fileCache && fileCache.references) {
           const cachedRef = fileCache.references.find((r: any) => r.fragmentId === ref.fragmentId && r.isConnected);
-          if (cachedRef && cachedRef.content) {
+          if (cachedRef && cachedRef.content != null && cachedRef.content !== '') {
+            const raw = cachedRef.content;
+            if (typeof raw !== 'string') {
+              console.warn(
+                `[FragmentReferenceResolver] Invalid cache content type for ${ref.fragmentId}, ignoring cache`
+              );
+            } else {
             // 检查缓存是否有效：比较片段更新时间
             const fragment = await this.fragmentRepository.findById({ value: ref.fragmentId });
             if (fragment) {
@@ -76,7 +110,7 @@ export class FragmentReferenceResolver {
               
               // 如果片段未更新，直接使用缓存内容（已包含处理后的图片路径）
               if (fragmentUpdatedAt <= cacheUpdatedAt) {
-                fragmentMarkdown = cachedRef.content;
+                fragmentMarkdown = raw;
                 console.log(`[FragmentReferenceResolver] Using cached content for fragment ${ref.fragmentId}`);
               } else {
                 // 片段已更新，需要重新处理
@@ -85,7 +119,8 @@ export class FragmentReferenceResolver {
               }
             } else {
               // 片段不存在，使用缓存内容
-              fragmentMarkdown = cachedRef.content;
+              fragmentMarkdown = raw;
+            }
             }
           }
         }
@@ -94,8 +129,13 @@ export class FragmentReferenceResolver {
         if (!fragmentMarkdown) {
           const fragment = await this.fragmentRepository.findById({ value: ref.fragmentId });
           if (!fragment) {
-            // 片段不存在，保留标志或显示错误提示
-            console.warn(`Fragment ${ref.fragmentId} not found, keeping reference tag`);
+            console.warn(`Fragment ${ref.fragmentId} not found, replacing with placeholder`);
+            resolvedContent = this.replaceAt(
+              resolvedContent,
+              ref.startIndex,
+              ref.endIndex,
+              `\n\n> **⚠ 知识片段不可用**（可能已删除） · \`${ref.fragmentId}\`\n\n`
+            );
             continue;
           }
 
