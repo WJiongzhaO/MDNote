@@ -1,5 +1,5 @@
 <template>
-  <div 
+  <div
     class="vault-card"
     :class="{ 'path-missing': !vault.pathExists }"
     @click="handleClick"
@@ -8,7 +8,7 @@
       <span v-if="vault.pathExists">📚</span>
       <span v-else class="warning">⚠️</span>
     </div>
-    
+
     <div class="vault-info">
       <h3 class="vault-name">{{ vault.name }}</h3>
       <p class="vault-path" :title="vault.path">{{ vault.path }}</p>
@@ -17,10 +17,13 @@
         <span v-else>最后访问: {{ formatDate(vault.lastAccessedAt) }}</span>
       </p>
     </div>
-    
+
     <div class="vault-actions">
-      <button class="action-btn" @click.stop="handleRemove" title="从列表移除">
-        ×
+      <button class="action-btn action-btn-remove" @click.stop="handleRemoveFromList" title="从列表移除">
+        📤
+      </button>
+      <button class="action-btn action-btn-delete" @click.stop="handleDelete" title="彻底删除">
+        🗑️
       </button>
     </div>
   </div>
@@ -37,7 +40,8 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   select: [vaultId: string];
-  remove: [vaultId: string];
+  removeFromList: [vaultId: string];
+  delete: [vaultId: string];
 }>();
 
 const handleClick = () => {
@@ -46,9 +50,15 @@ const handleClick = () => {
   }
 };
 
-const handleRemove = () => {
+const handleRemoveFromList = () => {
   if (confirm(`确定要从列表中移除"${props.vault.name}"吗？\n\n注意：这只会从列表中移除，不会删除实际文件夹。`)) {
-    emit('remove', props.vault.id);
+    emit('removeFromList', props.vault.id);
+  }
+};
+
+const handleDelete = () => {
+  if (confirm(`确定要彻底删除知识库"${props.vault.name}"吗？\n\n警告：这将删除整个知识库文件夹及其所有内容，此操作不可撤销！`)) {
+    emit('delete', props.vault.id);
   }
 };
 
@@ -58,7 +68,7 @@ const formatDate = (dateStr: string): string => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) {
       return '今天';
     } else if (diffDays === 1) {
@@ -162,6 +172,8 @@ const formatDate = (dateStr: string): string => {
 
 .vault-actions {
   flex-shrink: 0;
+  display: flex;
+  gap: 4px;
 }
 
 .action-btn {
@@ -174,12 +186,17 @@ const formatDate = (dateStr: string): string => {
   border: none;
   border-radius: 6px;
   color: var(--text-tertiary);
-  font-size: 1.2rem;
+  font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.action-btn:hover {
+.action-btn-remove:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
+.action-btn-delete:hover {
   background: var(--bg-hover);
   color: var(--accent-danger);
 }

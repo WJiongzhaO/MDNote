@@ -32,6 +32,8 @@
           :key="vault.id"
           :vault="vault"
           @select="handleSelectVault"
+          @remove-from-list="handleRemoveFromList"
+          @delete="handleDeleteVault"
         />
       </div>
     </div>
@@ -114,6 +116,28 @@ const handleSelectVault = async (vaultId: string) => {
     alert('打开知识库失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
 }
+
+const handleRemoveFromList = async (vaultId: string) => {
+  try {
+    const useCases = getVaultUseCases();
+    await useCases.removeFromRegistry(vaultId);
+    await loadVaults();
+  } catch (error) {
+    console.error('从列表移除失败:', error);
+    alert('从列表移除失败: ' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
+
+const handleDeleteVault = async (vaultId: string) => {
+  try {
+    const useCases = getVaultUseCases();
+    await useCases.deleteVaultFromRegistryAndDisk(vaultId);
+    await loadVaults();
+  } catch (error) {
+    console.error('删除知识库失败:', error);
+    alert('删除知识库失败: ' + (error instanceof Error ? error.message : '未知错误'));
+  }
+};
 
 const handleCreateVault = async (data: { name: string }) => {
   try {

@@ -92,30 +92,4 @@ export class Application {
   getGitUseCases() {
     return this.container.get(Symbol.for('GitUseCases'));
   }
-
-  /**
-   * 获取导出用例实例
-   */
-  getExportUseCases() {
-    return this.container.get(Symbol.for('ExportUseCases'));
-  }
-
-  /**
-   * 获取变量系统用例实例
-   */
-  getVariableUseCases() {
-    return this.container.get(TYPES.VariableUseCases);
-  }
-
-  /**
-   * 获取应用实例（单例模式）
-   */
-  private static instance: Application;
-  
-  static getInstance(): Application {
-    if (!Application.instance) {
-      Application.instance = new Application();
-    }
-    return Application.instance;
-  }
 }

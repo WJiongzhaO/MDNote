@@ -90,4 +90,12 @@
   --preview-code-bg: #2d2d2d;
   --preview-quote-border: #3e3e42;
   --preview-link: #7c8cff;
+
+  /* SVG 图标反色 */
+  --svg-filter: invert(1);
+}
+
+/* 暗色模式下 SVG 图标反色 */
+[data-theme="dark"] .svg-icon {
+  filter: var(--svg-filter);
 }

@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import NewAppLayout from '../components/NewAppLayout.vue';
-import AppLayout from '../components/AppLayout.vue';
 import FolderManager from '../components/FolderManager.vue';
 import VaultSelectView from '../views/VaultSelectView.vue';
 import FragmentManagementView from '../views/FragmentManagementView.vue';

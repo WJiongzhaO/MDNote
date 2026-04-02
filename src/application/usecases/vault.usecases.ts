@@ -316,6 +316,25 @@ export class VaultUseCases {
     return this.mapToResponse(vault);
   }
 
+  async removeFromRegistry(vaultId: string): Promise<void> {
+    await this.vaultRegistryRepository.removeVault(vaultId);
+  }
+
+  async deleteVaultFromRegistryAndDisk(vaultId: string): Promise<void> {
+    const vaultItem = await this.vaultRegistryRepository.getVaultById(vaultId);
+    
+    if (!vaultItem) {
+      throw new Error('知识库不存在');
+    }
+
+    const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+    if (electronAPI && electronAPI.vault && electronAPI.vault.deleteDirectory) {
+      await electronAPI.vault.deleteDirectory(vaultItem.path);
+    }
+
+    await this.vaultRegistryRepository.removeVault(vaultId);
+  }
+
   private mapToResponse(vault: KnowledgeVault): VaultResponse {
     return {
       id: vault.getId().value,
