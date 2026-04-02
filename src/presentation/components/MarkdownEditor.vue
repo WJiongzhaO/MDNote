@@ -69,8 +69,17 @@
     </div>
 
     <div class="editor-content" v-if="document || currentFilePath">
-      <div class="editor-pane">
-        <div class="editor-label">Markdown 编辑器</div>
+      <div class="editor-pane" :class="{ 'full-width': !showPreview }">
+        <div class="editor-label">
+          <span>Markdown 编辑器</span>
+          <button
+            class="preview-toggle-btn"
+            :title="showPreview ? '隐藏预览' : '显示预览'"
+            @click="showPreview = !showPreview"
+          >
+            {{ showPreview ? '👁️' : '👁️‍🗨️' }}
+          </button>
+        </div>
         <div
           class="editor-wrapper"
           :class="{ 'drag-over': isDragging }"
@@ -100,7 +109,7 @@
         </div>
       </div>
 
-      <div class="preview-pane">
+      <div v-if="showPreview" class="preview-pane">
         <div class="editor-label">实时预览</div>
         <div class="markdown-preview-container">
         <div
@@ -393,6 +402,7 @@ const previewElement1 = ref<HTMLDivElement>();
 const editorElement = ref<HTMLDivElement>(); // 编辑器元素（contenteditable div）
 const focusSinkElement = ref<HTMLDivElement>(); // 隐藏的焦点接收器
 const currentFilePath = ref<string>(''); // 当前打开的外部文件路径
+const showPreview = ref(true); // 控制预览区的显示
 
 // 双缓冲预览
 const previewBuffers = ref<string[]>(['', '']); // 两个预览缓冲区
@@ -3987,10 +3997,9 @@ const handleClickOutside = (event: MouseEvent) => {
   if (textContextMenu.value.visible) {
     const target = event.target as HTMLElement;
     const menu = textContextMenuElement.value;
-    const editor = editorElement.value;
 
-    // 如果点击的不是菜单本身，也不是编辑器，则关闭菜单
-    if (menu && !menu.contains(target) && (!editor || !editor.contains(target))) {
+    // 如果点击的不是菜单本身，则关闭菜单
+    if (menu && !menu.contains(target)) {
       textContextMenu.value.visible = false;
     }
   }
@@ -4601,6 +4610,32 @@ defineExpose({
   border-bottom: 1px solid var(--border-secondary);
   font-weight: 500;
   color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.preview-toggle-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+}
+
+.editor-pane.full-width {
+  flex: 1;
+  border-right: none;
 }
 
 .markdown-preview-container {
