@@ -18,22 +18,21 @@
 
     <div class="vault-list-section">
       <h2 class="section-title">已有知识库</h2>
-      
-      <div v-if="loading" class="loading-state">
-        加载中...
-      </div>
-      
+
+      <div v-if="loading" class="loading-state">加载中...</div>
+
       <div v-else-if="vaults.length === 0" class="empty-state">
         <p>暂无知识库</p>
         <p class="hint">点击上方按钮创建或打开知识库</p>
       </div>
-      
+
       <div v-else class="vault-grid">
         <VaultCard
           v-for="vault in vaults"
           :key="vault.id"
           :vault="vault"
           @select="handleSelectVault"
+          @remove="handleRemoveVault"
         />
       </div>
     </div>
@@ -47,112 +46,123 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { Application } from '../../core/application';
-import { InversifyContainer } from '../../core/container/inversify.container';
-import { TYPES } from '../../core/container/container.types';
-import type { VaultUseCases } from '../../application/usecases/vault.usecases';
-import type { VaultRegistryItemDTO } from '../../application/dto/vault.dto';
-import VaultCard from '../components/VaultCard.vue';
-import NewVaultDialog from '../components/NewVaultDialog.vue';
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { Application } from '../../core/application'
+import { InversifyContainer } from '../../core/container/inversify.container'
+import { TYPES } from '../../core/container/container.types'
+import type { VaultUseCases } from '../../application/usecases/vault.usecases'
+import type { VaultRegistryItemDTO } from '../../application/dto/vault.dto'
+import VaultCard from '../components/VaultCard.vue'
+import NewVaultDialog from '../components/NewVaultDialog.vue'
 
-const router = useRouter();
-const vaults = ref<VaultRegistryItemDTO[]>([]);
-const loading = ref(true);
-const showNewVaultDialog = ref(false);
+const router = useRouter()
+const vaults = ref<VaultRegistryItemDTO[]>([])
+const loading = ref(true)
+const showNewVaultDialog = ref(false)
 
-let vaultUseCases: VaultUseCases | null = null;
+let vaultUseCases: VaultUseCases | null = null
 
 const getVaultUseCases = (): VaultUseCases => {
   if (!vaultUseCases) {
-    const container = InversifyContainer.getInstance();
-    vaultUseCases = container.get<VaultUseCases>(TYPES.VaultUseCases);
+    const container = InversifyContainer.getInstance()
+    vaultUseCases = container.get<VaultUseCases>(TYPES.VaultUseCases)
   }
-  return vaultUseCases!;
-};
+  return vaultUseCases!
+}
 
 const loadVaults = async () => {
-  loading.value = true;
+  loading.value = true
   try {
-    const useCases = getVaultUseCases();
-    vaults.value = await useCases.getRegisteredVaults();
+    const useCases = getVaultUseCases()
+    vaults.value = await useCases.getRegisteredVaults()
   } catch (error) {
-    console.error('加载知识库列表失败:', error);
+    console.error('加载知识库列表失败:', error)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const handleSelectVault = async (vaultId: string) => {
   try {
-    const useCases = getVaultUseCases();
-    const result = await useCases.openVault(vaultId);
-    
+    const useCases = getVaultUseCases()
+    const result = await useCases.openVault(vaultId)
+
     if (result.success) {
       router.push({
         path: '/app',
-        query: { vaultId: result.vault.id, vaultPath: result.vault.path }
-      });
+        query: { vaultId: result.vault.id, vaultPath: result.vault.path },
+      })
     } else {
-      alert(result.error || '无法打开知识库');
+      alert(result.error || '无法打开知识库')
     }
   } catch (error) {
-    console.error('打开知识库失败:', error);
-    alert('打开知识库失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('打开知识库失败:', error)
+    alert('打开知识库失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 const handleCreateVault = async (data: { name: string }) => {
   try {
-    const useCases = getVaultUseCases();
+    const useCases = getVaultUseCases()
     const result = await useCases.createAndRegisterVault({
-      name: data.name
-    });
-    
-    showNewVaultDialog.value = false;
-    
+      name: data.name,
+    })
+
+    showNewVaultDialog.value = false
+
     router.push({
       path: '/app',
-      query: { vaultId: result.id, vaultPath: result.path }
-    });
+      query: { vaultId: result.id, vaultPath: result.path },
+    })
   } catch (error) {
-    console.error('创建知识库失败:', error);
-    alert('创建知识库失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('创建知识库失败:', error)
+    alert('创建知识库失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
+
+const handleRemoveVault = async (vaultId: string) => {
+  try {
+    const useCases = getVaultUseCases()
+    await useCases.unregisterVault(vaultId)
+    await loadVaults()
+  } catch (error) {
+    console.error('移除知识库失败:', error)
+    alert('移除知识库失败: ' + (error instanceof Error ? error.message : '未知错误'))
+  }
+}
 
 const openFolderAsVault = async () => {
   try {
-    const electronAPI = (window as any).electronAPI;
+    const electronAPI = (window as any).electronAPI
     if (!electronAPI || !electronAPI.dialog || !electronAPI.dialog.openFolder) {
-      alert('文件对话框不可用');
-      return;
+      alert('文件对话框不可用')
+      return
     }
 
-    const folderPath = await electronAPI.dialog.openFolder({ skipSaveLastFolder: true });
-    
+    const folderPath = await electronAPI.dialog.openFolder({ skipSaveLastFolder: true })
+
     if (folderPath) {
-      const useCases = getVaultUseCases();
-      const result = await useCases.importFolderAsVault(folderPath);
-      
+      const useCases = getVaultUseCases()
+      const result = await useCases.importFolderAsVault(folderPath)
+
       router.push({
         path: '/app',
-        query: { vaultId: result.id, vaultPath: result.path }
-      });
+        query: { vaultId: result.id, vaultPath: result.path },
+      })
     }
   } catch (error) {
-    console.error('打开文件夹失败:', error);
-    alert('打开文件夹失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('打开文件夹失败:', error)
+    alert('打开文件夹失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 onMounted(async () => {
-  const app = Application.getInstance();
-  await app.start();
-  
-  await loadVaults();
-});
+  const app = Application.getInstance()
+  await app.start('default')
+
+  await loadVaults()
+})
 </script>
 
 <style scoped>
@@ -163,6 +173,7 @@ onMounted(async () => {
   align-items: center;
   padding: 60px 40px;
   background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  box-sizing: border-box;
 }
 
 .vault-select-header {
@@ -188,6 +199,8 @@ onMounted(async () => {
   display: flex;
   gap: 16px;
   margin-bottom: 48px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .btn {
@@ -237,6 +250,7 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 24px 0;
+  text-align: center;
 }
 
 .loading-state,
@@ -256,5 +270,32 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 600px) {
+  .vault-select-view {
+    padding: 40px 20px;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .vault-actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .vault-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
