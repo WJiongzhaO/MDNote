@@ -36,9 +36,6 @@
           @open-template="handleOpenTemplate"
         />
 
-        <!-- Git 侧边栏 -->
-        <GitPanel v-if="activeSidebar === 'git-history'" :repo-path="dataPath" />
-
         <!-- 变量管理侧边栏 -->
         <VariableSidebar
           v-if="activeSidebar === 'variables'"
@@ -174,7 +171,6 @@ import FileExplorer from './FileExplorer.vue'
 import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue'
 import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue'
 import VariableSidebar from './VariableSidebar.vue'
-import GitPanel from './git/GitPanel.vue'
 import KnowledgeGraphSidebar from './KnowledgeGraphSidebar.vue'
 import KnowledgeGraphView from './KnowledgeGraphView.vue'
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue'
@@ -212,7 +208,6 @@ const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSid
 const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null)
 const currentFilePath = ref<string>('')
 const lastOpenedFolderPath = ref<string>('') // 保存最后打开的文件夹路径
-const dataPath = ref<string>('') // Git 仓库路径 - 从 Electron API 获取
 const activeKnowledgeGraph = ref<any | null>(null)
 
 // 当前知识库ID
@@ -316,10 +311,6 @@ const handleSelectFile = async (filePath: string) => {
 const handleOpenLocalFolder = async (folderPath: string) => {
   lastOpenedFolderPath.value = folderPath
 
-  // 更新 Git 仓库路径为当前打开的文件夹
-  dataPath.value = folderPath
-  console.log('[NewAppLayout] handleOpenLocalFolder - dataPath updated to:', folderPath)
-
   // 关键：同步更新主进程的 dataPath
   try {
     const electronAPI = (window as any).electronAPI
@@ -348,11 +339,6 @@ const handleOpenLocalFolder = async (folderPath: string) => {
     activeSidebar.value = 'folders'
   }
 }
-
-// 监听 dataPath 变化
-watch(dataPath, (newPath) => {
-  console.log('[NewAppLayout] dataPath changed:', newPath)
-})
 
 // 切换侧边栏时，如果切换回文件夹，恢复之前打开的文件夹
 const handleSwitchSidebar = async (type: SidebarType) => {

@@ -11,7 +11,7 @@ import { DocumentUseCases } from '../usecases/document.usecases'
 import { FolderUseCases } from '../usecases/folder.usecases'
 import { KnowledgeFragmentUseCases } from '../usecases/knowledge-fragment.usecases'
 import type { FragmentCategoryUseCases } from '../usecases/fragment-category.usecases'
-import type { KnowledgeHealthService } from './knowledge-health.service'
+import { KnowledgeHealthService } from './knowledge-health.service'
 import type { RecommendationService } from './recommendation.service'
 
 @injectable()

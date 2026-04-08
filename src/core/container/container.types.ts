@@ -7,7 +7,6 @@ export const TYPES = {
   FolderRepository: Symbol.for('FolderRepository'),
   KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
   FragmentCategoryRepository: Symbol.for('FragmentCategoryRepository'),
-  GitRepository: Symbol.for('GitRepository'),
   VaultRepository: Symbol.for('VaultRepository'),
   VaultRegistryRepository: Symbol.for('VaultRegistryRepository'),
 
@@ -38,7 +37,6 @@ export const TYPES = {
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
   FragmentCategoryUseCases: Symbol.for('FragmentCategoryUseCases'),
   KnowledgeHealthService: Symbol.for('KnowledgeHealthService'),
-  GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
   VaultUseCases: Symbol.for('VaultUseCases'),
@@ -60,7 +58,6 @@ export const TYPES = {
 
   // 工作3 引用图谱与健康度
   ReferenceGraphService: Symbol.for('ReferenceGraphService'),
-  KnowledgeHealthService: Symbol.for('KnowledgeHealthService'),
   RecommendationService: Symbol.for('RecommendationService'),
 
   // 导出服务

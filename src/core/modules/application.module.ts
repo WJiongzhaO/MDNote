@@ -13,7 +13,6 @@ import { FragmentCategoryUseCases } from '../../application/usecases/fragment-ca
 import { KnowledgeHealthService } from '../../application/services/knowledge-health.service'
 import { RecommendationService } from '../../application/services/recommendation.service'
 import { ReferenceGraphService } from '../../application/services/reference-graph.service'
-import { GitUseCases } from '../../application/usecases/GitUseCases'
 import { VaultUseCases } from '../../application/usecases/vault.usecases'
 import { StorageAdapter } from '../../infrastructure/storage.adapter'
 import { FileSystemAssetManager } from '../../infrastructure/services/file-system-asset-manager.service'
@@ -22,12 +21,9 @@ import { FragmentReferenceResolver } from '../../domain/services/fragment-refere
 import { FragmentReferenceRegistrationService } from '../../domain/services/fragment-reference-registration.service'
 import { FragmentReferenceSyncService } from '../../domain/services/fragment-reference-sync.service'
 import { FileSystemImageStorageService } from '../../infrastructure/services/image-storage.service'
-import { ElectronGitRepository } from '../../infrastructure/repositories/git/ElectronGitRepository'
 import { FileSystemVaultRepository } from '../../infrastructure/repositories/file-system.vault.repository.impl'
 import { FileSystemVaultRegistryRepository } from '../../infrastructure/repositories/vault-registry.repository.impl'
 import type { VaultRegistryRepository } from '../../domain/repositories/vault-registry.repository.interface'
-
-import type { IGitRepository } from '../../domain/repositories/git.repository.interface'
 
 import { MermaidRendererService } from '../../domain/services/mermaid-renderer.service'
 import { MermaidMarkdownExtension } from '../../domain/services/mermaid-markdown-extension.service'
@@ -139,10 +135,6 @@ export class ApplicationModule {
       .to(KnowledgeHealthService);
     container.bind<RecommendationService>(TYPES.RecommendationService)
       .to(RecommendationService);
-
-    container.bind<IGitRepository>(TYPES.GitRepository).to(ElectronGitRepository)
-
-    container.bind<GitUseCases>(TYPES.GitUseCases).to(GitUseCases)
 
     container.bind<VaultRepository>(TYPES.VaultRepository).toSingleton(FileSystemVaultRepository)
 
