@@ -32,16 +32,9 @@
           :key="vault.id"
           :vault="vault"
           @select="handleSelectVault"
-          @remove-from-list="handleRemoveFromList"
-          @delete="handleDeleteVault"
+          @remove="handleRemoveVault"
         />
       </div>
-    </div>
-
-    <div class="direct-access">
-      <button class="btn btn-link" @click="goToFragments">片段管理</button>
-      <span class="separator">|</span>
-      <button class="btn btn-link" @click="goToHealthDashboard">健康度仪表盘</button>
     </div>
 
     <NewVaultDialog
@@ -67,14 +60,6 @@ const router = useRouter()
 const vaults = ref<VaultRegistryItemDTO[]>([])
 const loading = ref(true)
 const showNewVaultDialog = ref(false)
-
-const goToFragments = () => {
-  router.push('/fragments')
-}
-
-const goToHealthDashboard = () => {
-  router.push('/fragments/health')
-}
 
 let vaultUseCases: VaultUseCases | null = null
 
@@ -117,28 +102,6 @@ const handleSelectVault = async (vaultId: string) => {
   }
 }
 
-const handleRemoveFromList = async (vaultId: string) => {
-  try {
-    const useCases = getVaultUseCases();
-    await useCases.removeFromRegistry(vaultId);
-    await loadVaults();
-  } catch (error) {
-    console.error('从列表移除失败:', error);
-    alert('从列表移除失败: ' + (error instanceof Error ? error.message : '未知错误'));
-  }
-};
-
-const handleDeleteVault = async (vaultId: string) => {
-  try {
-    const useCases = getVaultUseCases();
-    await useCases.deleteVaultFromRegistryAndDisk(vaultId);
-    await loadVaults();
-  } catch (error) {
-    console.error('删除知识库失败:', error);
-    alert('删除知识库失败: ' + (error instanceof Error ? error.message : '未知错误'));
-  }
-};
-
 const handleCreateVault = async (data: { name: string }) => {
   try {
     const useCases = getVaultUseCases()
@@ -155,6 +118,17 @@ const handleCreateVault = async (data: { name: string }) => {
   } catch (error) {
     console.error('创建知识库失败:', error)
     alert('创建知识库失败: ' + (error instanceof Error ? error.message : '未知错误'))
+  }
+}
+
+const handleRemoveVault = async (vaultId: string) => {
+  try {
+    const useCases = getVaultUseCases()
+    await useCases.unregisterVault(vaultId)
+    await loadVaults()
+  } catch (error) {
+    console.error('移除知识库失败:', error)
+    alert('移除知识库失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
 }
 
@@ -185,7 +159,7 @@ const openFolderAsVault = async () => {
 
 onMounted(async () => {
   const app = Application.getInstance()
-  await app.start()
+  await app.start('default')
 
   await loadVaults()
 })
@@ -199,6 +173,7 @@ onMounted(async () => {
   align-items: center;
   padding: 60px 40px;
   background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  box-sizing: border-box;
 }
 
 .vault-select-header {
@@ -224,6 +199,8 @@ onMounted(async () => {
   display: flex;
   gap: 16px;
   margin-bottom: 48px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .btn {
@@ -273,6 +250,7 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 24px 0;
+  text-align: center;
 }
 
 .loading-state,
@@ -291,31 +269,33 @@ onMounted(async () => {
 .vault-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.direct-access {
-  margin-top: 40px;
-  display: flex;
-  align-items: center;
+  gap: 20px;
+  width: 100%;
   justify-content: center;
-  gap: 12px;
 }
 
-.direct-access .separator {
-  color: var(--text-tertiary);
-}
+@media (max-width: 600px) {
+  .vault-select-view {
+    padding: 40px 20px;
+  }
 
-.btn-link {
-  background: none;
-  border: none;
-  color: var(--accent-info);
-  cursor: pointer;
-  font-size: 0.95rem;
-  padding: 4px 8px;
-}
+  .title {
+    font-size: 2rem;
+  }
 
-.btn-link:hover {
-  text-decoration: underline;
+  .vault-actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .vault-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -223,7 +223,7 @@ async function loadSummary() {
   loadError.value = null
   try {
     const app = Application.getInstance()
-    await app.getApplicationService().initialize()
+    await app.getApplicationService().initialize(vaultId.value)
     summary.value = await app.getKnowledgeHealthService().getVaultHealthSummary(vaultId.value)
   } catch (e) {
     console.error(e)

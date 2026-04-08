@@ -37,6 +37,7 @@ export const TYPES = {
   FolderUseCases: Symbol.for('FolderUseCases'),
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
   FragmentCategoryUseCases: Symbol.for('FragmentCategoryUseCases'),
+  KnowledgeHealthService: Symbol.for('KnowledgeHealthService'),
   GitUseCases: Symbol.for('GitUseCases'),
   VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
@@ -78,15 +79,15 @@ export const TYPES = {
   TextFileOpenerStrategy: Symbol.for('TextFileOpenerStrategy'),
   JsonFileOpenerStrategy: Symbol.for('JsonFileOpenerStrategy'),
   ImageFileOpenerStrategy: Symbol.for('ImageFileOpenerStrategy'),
-} as const;
+} as const
 
 export interface ServiceContainer {
-  get<T>(serviceIdentifier: symbol): T;
-  bind<T>(serviceIdentifier: symbol): BindingToSyntax<T>;
+  get<T>(serviceIdentifier: symbol): T
+  bind<T>(serviceIdentifier: symbol): BindingToSyntax<T>
 }
 
 export interface BindingToSyntax<T> {
-  to(constructor: new (...args: any[]) => T): void;
-  toConstantValue(value: T): void;
-  toSingleton(constructor: new (...args: any[]) => T): void;
+  to(constructor: new (...args: any[]) => T): void
+  toConstantValue(value: T): void
+  toSingleton(constructor: new (...args: any[]) => T): void
 }

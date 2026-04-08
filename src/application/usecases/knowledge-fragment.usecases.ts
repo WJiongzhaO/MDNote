@@ -16,6 +16,7 @@ import type {
   BulkUpdateFragmentsParams,
 } from '../dto/knowledge-fragment.dto'
 import { FileSystemImageStorageService } from '../../infrastructure/services/image-storage.service'
+import { StorageAdapter } from '../../infrastructure/storage.adapter'
 
 /**
  * 知识片段用例
@@ -23,13 +24,20 @@ import { FileSystemImageStorageService } from '../../infrastructure/services/ima
 @injectable()
 export class KnowledgeFragmentUseCases {
   private readonly imageStorage: ImageStorageService
+  private repository: KnowledgeFragmentRepository
+  private readonly vaultId: string
 
-  constructor(
-    @inject(TYPES.KnowledgeFragmentRepository)
-    private readonly repository: KnowledgeFragmentRepository,
-  ) {
-    // 暂时直接实例化，后续可以通过DI注入
+  constructor(vaultId: string = 'default') {
+    this.vaultId = vaultId
+    this.repository = StorageAdapter.createKnowledgeFragmentRepository(vaultId)
     this.imageStorage = new FileSystemImageStorageService()
+  }
+
+  /**
+   * 切换知识库
+   */
+  switchVault(vaultId: string): void {
+    this.repository = StorageAdapter.createKnowledgeFragmentRepository(vaultId)
   }
 
   /**

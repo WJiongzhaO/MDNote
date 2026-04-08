@@ -7,7 +7,16 @@ import type { KnowledgeFragmentData } from './file-system.knowledge-fragment.rep
  * 基于LocalStorage的知识片段仓储实现
  */
 export class LocalStorageKnowledgeFragmentRepository implements KnowledgeFragmentRepository {
-  private readonly STORAGE_KEY = 'mdnote-knowledge-fragments'
+  private readonly STORAGE_KEY_PREFIX = 'mdnote-knowledge-fragments'
+  private readonly vaultId: string
+
+  constructor(vaultId: string = 'default') {
+    this.vaultId = vaultId
+  }
+
+  private getStorageKey(): string {
+    return `${this.STORAGE_KEY_PREFIX}-${this.vaultId}`
+  }
 
   async save(fragment: KnowledgeFragment): Promise<void> {
     const fragments = this.getAllFragmentsFromStorage()
@@ -113,7 +122,7 @@ export class LocalStorageKnowledgeFragmentRepository implements KnowledgeFragmen
 
   private getAllFragmentsFromStorage(): KnowledgeFragmentData[] {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY)
+      const stored = localStorage.getItem(this.getStorageKey())
       if (!stored) {
         return []
       }
@@ -127,7 +136,7 @@ export class LocalStorageKnowledgeFragmentRepository implements KnowledgeFragmen
 
   private saveFragmentsToStorage(fragments: KnowledgeFragmentData[]): void {
     try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(fragments))
+      localStorage.setItem(this.getStorageKey(), JSON.stringify(fragments))
     } catch (error) {
       console.error('Error saving knowledge fragments to localStorage:', error)
       throw new Error('Failed to save knowledge fragments to local storage')

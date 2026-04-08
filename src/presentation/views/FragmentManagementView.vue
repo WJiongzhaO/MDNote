@@ -251,9 +251,15 @@ const router = useRouter()
 function goHome() {
   router.push('/')
 }
-const vaultId = ref(
-  (props.vaultId as string | undefined) ?? (route.query.vaultId as string | undefined) ?? 'default',
-)
+
+// 使用 computed 响应式获取 vaultId，确保路由参数变化时能正确更新
+const vaultId = computed(() => {
+  return (
+    (props.vaultId as string | undefined) ??
+    (route.query.vaultId as string | undefined) ??
+    'default'
+  )
+})
 const categoryTree = ref<FragmentCategoryTreeNode[]>([])
 const selectedCategoryId = ref<string | null>(null)
 const dragOverCategoryId = ref<string | null>(null)
@@ -361,7 +367,7 @@ const categoriesFlat = computed(() => flattenCategories(categoryTree.value))
 
 async function loadCategoryTree() {
   const app = Application.getInstance()
-  await app.getApplicationService().initialize()
+  await app.getApplicationService().initialize(vaultId.value)
   const catUC = app.getFragmentCategoryUseCases()
   categoryTree.value = await catUC.getCategoryTree(vaultId.value)
 }
@@ -371,7 +377,7 @@ async function load() {
   loadError.value = null
   try {
     const app = Application.getInstance()
-    await app.getApplicationService().initialize()
+    await app.getApplicationService().initialize(vaultId.value)
     const useCases = app.getKnowledgeFragmentUseCases()
     const list = await useCases.listFragments({
       keyword: filters.value.keyword || undefined,
@@ -427,7 +433,7 @@ function clearAllFilters() {
 async function loadTags() {
   try {
     const app = Application.getInstance()
-    await app.getApplicationService().initialize()
+    await app.getApplicationService().initialize(vaultId.value)
     const useCases = app.getKnowledgeFragmentUseCases()
     allTags.value = await useCases.getAllTags()
   } catch (e) {
@@ -554,6 +560,20 @@ watch(
   load,
   { deep: true },
 )
+
+// 监听知识库变化，重新加载数据
+watch(
+  () => vaultId.value,
+  async (newVaultId, oldVaultId) => {
+    if (newVaultId !== oldVaultId) {
+      console.log(`[FragmentManagementView] vaultId changed from ${oldVaultId} to ${newVaultId}`)
+      await loadCategoryTree()
+      await loadTags()
+      await load()
+    }
+  },
+)
+
 onMounted(async () => {
   await loadCategoryTree()
   await loadTags()

@@ -1,146 +1,178 @@
 import { inject, injectable } from 'inversify'
 import { TYPES } from '../../core/container/container.types'
 import type { KnowledgeFragmentRepository } from '../../domain/repositories/knowledge-fragment.repository.interface'
-import type { ReferenceGraphService } from './reference-graph.service'
-import { computeFragmentHealth } from './health-calculator.service'
 import type {
+  ReferenceGraph,
+  FragmentHealthResult,
   VaultHealthSummary,
-  ImpactOfFragmentChange,
+  FragmentImpactResult,
+  FragmentChildrenDetail,
 } from '../../domain/types/reference-graph.types'
+import { computeFragmentHealth } from './health-calculator.service'
+import { StorageAdapter } from '../../infrastructure/storage.adapter'
 
-/**
- * 工作3：知识健康度与影响分析门面（依赖图谱服务与片段仓储）
- */
 @injectable()
 export class KnowledgeHealthService {
-  constructor(
-    @inject(TYPES.KnowledgeFragmentRepository)
-    private readonly fragmentRepository: KnowledgeFragmentRepository,
-    @inject(TYPES.ReferenceGraphService)
-    private readonly graphService: ReferenceGraphService,
-  ) {}
+  private repository: KnowledgeFragmentRepository
+  private vaultId: string
 
-  /** 获取知识库健康度摘要（vaultId 预留，当前片段库全局故未按库过滤） */
-  async getVaultHealthSummary(_vaultId?: string): Promise<VaultHealthSummary> {
-    const fragments = await this.fragmentRepository.findAll()
-    const graph = await this.graphService.buildGraph()
+  constructor(vaultId: string = 'default') {
+    this.vaultId = vaultId
+    this.repository = StorageAdapter.createKnowledgeFragmentRepository(vaultId)
+  }
+
+  /**
+   * 切换知识库
+   */
+  switchVault(vaultId: string): void {
+    this.vaultId = vaultId
+    this.repository = StorageAdapter.createKnowledgeFragmentRepository(vaultId)
+  }
+
+  private buildReferenceGraph(): ReferenceGraph {
+    const fragmentToDocuments = new Map<string, string[]>()
+    const documentToFragments = new Map<string, string[]>()
+    const fragmentToChildren = new Map<string, string[]>()
+
+    return {
+      fragmentToDocuments,
+      documentToFragments,
+      fragmentToChildren,
+    }
+  }
+
+  async getFragmentHealth(fragmentId: string): Promise<FragmentHealthResult> {
+    const fragment = await this.repository.findById({ value: fragmentId })
+    if (!fragment) {
+      return {
+        healthScore: 0,
+        flags: { isolated: true, expired: false, lowTrust: false, deprecatedDependency: false },
+      }
+    }
+
+    const graph = this.buildReferenceGraph()
+    return computeFragmentHealth(fragment, graph)
+  }
+
+  async getImpactOfFragmentChange(fragmentId: string): Promise<FragmentImpactResult> {
+    const fragment = await this.repository.findById({ value: fragmentId })
+    if (!fragment) {
+      return { affectedCount: 0, documentTitles: [], highImpactCount: 0 }
+    }
+
+    const referencedDocs = fragment.getReferencedDocuments()
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+
+    const documentTitles: string[] = []
+    let highImpactCount = 0
+
+    for (const ref of referencedDocs) {
+      if (ref.documentTitle) {
+        documentTitles.push(ref.documentTitle)
+      }
+      if (ref.referencedAt.getTime() > thirtyDaysAgo) {
+        highImpactCount++
+      }
+    }
+
+    return {
+      affectedCount: referencedDocs.length,
+      documentTitles: documentTitles.slice(0, 10),
+      highImpactCount,
+    }
+  }
+
+  async getFragmentChildrenDetails(fragmentId: string): Promise<FragmentChildrenDetail[]> {
+    const allFragments = await this.repository.findAll()
+    return allFragments
+      .filter((f) => f.getDerivedFromId() === fragmentId)
+      .map((f) => ({
+        id: f.getId().value,
+        title: f.getTitle().value,
+        status: f.getStatus(),
+      }))
+  }
+
+  async getVaultHealthSummary(vaultId: string): Promise<VaultHealthSummary> {
+    const allFragments = await this.repository.findAll()
+    const graph = this.buildReferenceGraph()
 
     let activeCount = 0
     let isolatedCount = 0
     let pendingVerificationCount = 0
     let lowTrustCount = 0
-    const recentActive: VaultHealthSummary['recentActiveFragments'] = []
-    const topImpact: VaultHealthSummary['topImpactFragments'] = []
 
-    const refTimeByFragment = new Map<string, number>()
-    const healthByFragment = new Map<string, number>()
+    const recentActiveFragments: Array<{ id: string; title: string; referencedAt: string }> = []
+    const topImpactFragments: Array<{
+      id: string
+      title: string
+      referenceCount: number
+      healthScore: number
+    }> = []
 
-    for (const f of fragments) {
-      const { healthScore, flags } = computeFragmentHealth(f, graph)
-      if (f.getStatus() === 'active') activeCount++
-      if (flags.isolated) isolatedCount++
-      if (flags.expired) pendingVerificationCount++
-      if (flags.lowTrust) lowTrustCount++
+    const now = Date.now()
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
+    const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000
 
-      const refs = f.getReferencedDocuments()
-      const maxRefAt = refs.length ? Math.max(...refs.map((r) => r.referencedAt.getTime())) : 0
-      refTimeByFragment.set(f.getId().value, maxRefAt)
-      healthByFragment.set(f.getId().value, healthScore)
+    for (const fragment of allFragments) {
+      const status = fragment.getStatus()
+      if (status === 'active') activeCount++
+
+      const refs = fragment.getReferencedDocuments()
+      const children = graph.fragmentToChildren.get(fragment.getId().value) ?? []
+
+      if (refs.length === 0 && children.length === 0) {
+        isolatedCount++
+      }
+
+      const lastVerified = fragment.getLastVerifiedAt()
+      if (lastVerified && lastVerified.getTime() < ninetyDaysAgo) {
+        pendingVerificationCount++
+      }
+
+      const trustScore = fragment.getTrustScore()
+      if (trustScore < 60) {
+        lowTrustCount++
+      }
+
+      const healthResult = computeFragmentHealth(fragment, graph)
+
+      if (refs.length > 0) {
+        const lastRef = refs.reduce((max: (typeof refs)[0], ref: (typeof refs)[0]) =>
+          ref.referencedAt.getTime() > max.referencedAt.getTime() ? ref : max,
+        )
+        recentActiveFragments.push({
+          id: fragment.getId().value,
+          title: fragment.getTitle().value,
+          referencedAt: lastRef.referencedAt.toISOString(),
+        })
+      }
+
+      if (refs.length > 0) {
+        topImpactFragments.push({
+          id: fragment.getId().value,
+          title: fragment.getTitle().value,
+          referenceCount: refs.length,
+          healthScore: healthResult.healthScore,
+        })
+      }
     }
 
-    const sortedByRef = [...fragments].sort(
-      (a, b) =>
-        (refTimeByFragment.get(b.getId().value) ?? 0) -
-        (refTimeByFragment.get(a.getId().value) ?? 0),
+    recentActiveFragments.sort(
+      (a, b) => new Date(b.referencedAt).getTime() - new Date(a.referencedAt).getTime(),
     )
-    for (let i = 0; i < Math.min(10, sortedByRef.length); i++) {
-      const f = sortedByRef[i]
-      const refAt = refTimeByFragment.get(f.getId().value)
-      if (!refAt) continue
-      recentActive.push({
-        id: f.getId().value,
-        title: f.getTitle().value,
-        referencedAt: new Date(refAt).toISOString(),
-      })
-    }
+    recentActiveFragments.splice(5)
 
-    const sortedByImpact = [...fragments].sort(
-      (a, b) => (b.getReferencedDocuments().length || 0) - (a.getReferencedDocuments().length || 0),
-    )
-    for (let i = 0; i < Math.min(10, sortedByImpact.length); i++) {
-      const f = sortedByImpact[i]
-      topImpact.push({
-        id: f.getId().value,
-        title: f.getTitle().value,
-        referenceCount: f.getReferencedDocuments().length,
-        healthScore: healthByFragment.get(f.getId().value) ?? 0,
-      })
-    }
+    topImpactFragments.sort((a, b) => b.referenceCount - a.referenceCount)
+    topImpactFragments.splice(5)
 
     return {
       activeCount,
       isolatedCount,
       pendingVerificationCount,
       lowTrustCount,
-      recentActiveFragments: recentActive,
-      topImpactFragments: topImpact,
+      recentActiveFragments,
+      topImpactFragments,
     }
-  }
-
-  /** 单片段健康分与 flags */
-  async getFragmentHealth(
-    fragmentId: string,
-  ): Promise<{
-    healthScore: number
-    flags: import('../../domain/types/reference-graph.types').HealthFlags
-  } | null> {
-    const fragment = await this.fragmentRepository.findById({ value: fragmentId })
-    if (!fragment) return null
-    const graph = await this.graphService.buildGraph()
-    return computeFragmentHealth(fragment, graph)
-  }
-
-  /** 修改片段的影响范围 */
-  async getImpactOfFragmentChange(fragmentId: string): Promise<ImpactOfFragmentChange> {
-    const docIds = await this.graphService.getDocumentsByFragment(fragmentId)
-    const fragments = await this.fragmentRepository.findAll()
-    const byId = new Map(fragments.map((f) => [f.getId().value, f]))
-    const titles: string[] = []
-    let highImpactCount = 0
-    for (const docId of docIds) {
-      const refs = byId.get(fragmentId)?.getReferencedDocuments() ?? []
-      const r = refs.find((x) => x.documentId === docId)
-      titles.push(r?.documentTitle ?? docId)
-      if (r) {
-        const daysSinceRef = (Date.now() - r.referencedAt.getTime()) / (1000 * 60 * 60 * 24)
-        if (daysSinceRef <= 30) highImpactCount++
-      }
-    }
-    return {
-      documentIds: docIds,
-      documentTitles: titles,
-      affectedCount: docIds.length,
-      highImpactCount,
-    }
-  }
-
-  /** 获取片段的子片段列表（派生链） */
-  async getFragmentChildrenDetails(
-    fragmentId: string,
-  ): Promise<Array<{ id: string; title: string; status: string; updatedAt: string }>> {
-    const childIds = await this.graphService.getFragmentChildren(fragmentId)
-    const result: Array<{ id: string; title: string; status: string; updatedAt: string }> = []
-    for (const childId of childIds) {
-      const fragment = await this.fragmentRepository.findById({ value: childId })
-      if (fragment) {
-        result.push({
-          id: fragment.getId().value,
-          title: fragment.getTitle().value,
-          status: fragment.getStatus(),
-          updatedAt: fragment.getUpdatedAt().toISOString(),
-        })
-      }
-    }
-    return result
   }
 }

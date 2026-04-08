@@ -35,6 +35,65 @@ export interface KnowledgeFragmentData {
  */
 export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentRepository {
   private readonly FILE_NAME = 'knowledge-fragments.json'
+  private readonly vaultId: string
+
+  constructor(vaultId: string = 'default') {
+    this.vaultId = vaultId
+  }
+
+  private getFragmentDirName(): string {
+    // 使用 vaultId 作为目录名的一部分，确保不同知识库隔离存储
+    return `.mdnote-fragments-${this.vaultId}`
+  }
+
+  private async getAllFragmentsFromFile(): Promise<KnowledgeFragmentData[]> {
+    try {
+      const electronAPI = (window as any).electronAPI
+      if (!electronAPI || !electronAPI.file) {
+        console.warn(
+          '[FileSystemKnowledgeFragmentRepository] 文件 API 不可用，使用 LocalStorage fallback',
+        )
+        return this.getLocalStorageFallback()
+      }
+
+      // 获取当前知识库的路径（而不是全局数据路径）
+      let basePath: string
+      if (electronAPI.file.getDataPath) {
+        basePath = await electronAPI.file.getDataPath()
+      } else if (electronAPI.file.getCustomDataPath) {
+        basePath = await electronAPI.file.getCustomDataPath()
+      } else {
+        // 回退到 LocalStorage
+        return this.getLocalStorageFallback()
+      }
+
+      console.log(
+        `[FileSystemKnowledgeFragmentRepository] Loading from path: ${basePath}, vaultId: ${this.vaultId}`,
+      )
+
+      // 使用 vaultId 区分不同知识库的片段存储
+      const fragmentDir = `${basePath}/${this.getFragmentDirName()}`
+      const filePath = `${fragmentDir}/${this.FILE_NAME}`
+
+      console.log(`[FileSystemKnowledgeFragmentRepository] Full file path: ${filePath}`)
+
+      // 确保目录存在
+      try {
+        const dirExists = await electronAPI.file.exists(fragmentDir)
+        if (!dirExists) {
+          await electronAPI.file.mkdir(fragmentDir)
+        }
+      } catch {
+        // 目录可能已存在，忽略错误
+      }
+
+      const content = await electronAPI.file.readFileContent(filePath)
+      return content ? JSON.parse(content) : []
+    } catch (error) {
+      console.error('Error loading knowledge fragments from file:', error)
+      return this.getLocalStorageFallback()
+    }
+  }
 
   async save(fragment: KnowledgeFragment): Promise<void> {
     const fragments = await this.getAllFragmentsFromFile()
@@ -138,28 +197,10 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
     return Array.from(tagSet).sort()
   }
 
-  private async getAllFragmentsFromFile(): Promise<KnowledgeFragmentData[]> {
-    try {
-      const electronAPI = (window as any).electronAPI
-      // 知识片段库必须使用全局的 fragment API（知识片段库是全局共享的，不随项目切换）
-      // 不允许降级到 file API，因为 file API 使用项目路径，会导致知识片段库路径错误
-      if (!electronAPI || !electronAPI.fragment) {
-        console.warn('知识片段库 API 不可用，尝试使用 LocalStorage fallback')
-        return this.getLocalStorageFallback()
-      }
-
-      const data = await electronAPI.fragment.read(this.FILE_NAME)
-      return Array.isArray(data) ? data : []
-    } catch (error) {
-      console.error('Error loading knowledge fragments from file:', error)
-      // 使用 LocalStorage fallback，避免应用崩溃
-      return this.getLocalStorageFallback()
-    }
-  }
-
   private getLocalStorageFallback(): KnowledgeFragmentData[] {
     try {
-      const stored = localStorage.getItem('mdnote-knowledge-fragments')
+      const key = `mdnote-knowledge-fragments-${this.vaultId}`
+      const stored = localStorage.getItem(key)
       if (!stored) return []
       const parsed = JSON.parse(stored)
       return Array.isArray(parsed) ? parsed : []
@@ -171,25 +212,48 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
   private async saveFragmentsToFile(fragments: KnowledgeFragmentData[]): Promise<void> {
     try {
       const electronAPI = (window as any).electronAPI
-      // 知识片段库必须使用全局的 fragment API（知识片段库是全局共享的，不随项目切换）
-      // 不允许降级到 file API，因为 file API 使用项目路径，会导致知识片段库路径错误
-      if (!electronAPI || !electronAPI.fragment) {
-        console.warn('知识片段库 API 不可用，使用 LocalStorage fallback')
+      if (!electronAPI || !electronAPI.file) {
+        console.warn('文件 API 不可用，使用 LocalStorage fallback')
         this.saveLocalStorageFallback(fragments)
         return
       }
 
-      await electronAPI.fragment.write(this.FILE_NAME, fragments)
+      // 获取当前知识库的路径
+      let basePath: string
+      if (electronAPI.file.getDataPath) {
+        basePath = await electronAPI.file.getDataPath()
+      } else if (electronAPI.file.getCustomDataPath) {
+        basePath = await electronAPI.file.getCustomDataPath()
+      } else {
+        this.saveLocalStorageFallback(fragments)
+        return
+      }
+
+      // 使用 vaultId 区分不同知识库的片段存储
+      const fragmentDir = `${basePath}/${this.getFragmentDirName()}`
+      const filePath = `${fragmentDir}/${this.FILE_NAME}`
+
+      // 确保目录存在
+      try {
+        const dirExists = await electronAPI.file.exists(fragmentDir)
+        if (!dirExists) {
+          await electronAPI.file.mkdir(fragmentDir)
+        }
+      } catch {
+        // 目录可能已存在，忽略错误
+      }
+
+      await electronAPI.file.writeFileContent(filePath, JSON.stringify(fragments, null, 2))
     } catch (error) {
       console.error('Error saving knowledge fragments to file:', error)
-      // 使用 LocalStorage fallback
       this.saveLocalStorageFallback(fragments)
     }
   }
 
   private saveLocalStorageFallback(fragments: KnowledgeFragmentData[]): void {
     try {
-      localStorage.setItem('mdnote-knowledge-fragments', JSON.stringify(fragments))
+      const key = `mdnote-knowledge-fragments-${this.vaultId}`
+      localStorage.setItem(key, JSON.stringify(fragments))
     } catch (error) {
       console.error('Error saving knowledge fragments to localStorage:', error)
       throw new Error('Failed to save knowledge fragments')

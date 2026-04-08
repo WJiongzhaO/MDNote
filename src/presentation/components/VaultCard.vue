@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="vault-card"
-    :class="{ 'path-missing': !vault.pathExists }"
-    @click="handleClick"
-  >
+  <div class="vault-card" :class="{ 'path-missing': !vault.pathExists }" @click="handleClick">
     <div class="vault-icon">
       <span v-if="vault.pathExists">📚</span>
       <span v-else class="warning">⚠️</span>
@@ -19,71 +15,117 @@
     </div>
 
     <div class="vault-actions">
-      <button class="action-btn action-btn-remove" @click.stop="handleRemoveFromList" title="从列表移除">
-        📤
+      <button class="action-btn menu-btn" @click.stop="toggleMenu" title="更多操作">⋮</button>
+    </div>
+
+    <div v-if="showMenu" class="vault-menu" @click.stop>
+      <button class="menu-item" @click="openFragmentManager">
+        <span class="menu-icon">📋</span>
+        片段管理
       </button>
-      <button class="action-btn action-btn-delete" @click.stop="handleDelete" title="彻底删除">
-        🗑️
+      <button class="menu-item" @click="openHealthDashboard">
+        <span class="menu-icon">📊</span>
+        健康度仪表盘
+      </button>
+      <div class="menu-divider"></div>
+      <button class="menu-item remove" @click="handleRemove">
+        <span class="menu-icon">🗑️</span>
+        从列表移除
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { VaultRegistryItemDTO } from '../../application/dto/vault.dto';
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import type { VaultRegistryItemDTO } from '../../application/dto/vault.dto'
 
 interface Props {
-  vault: VaultRegistryItemDTO;
+  vault: VaultRegistryItemDTO
 }
 
-const props = defineProps<Props>();
+const props = defineProps<Props>()
+const router = useRouter()
+const showMenu = ref(false)
 
 const emit = defineEmits<{
-  select: [vaultId: string];
-  removeFromList: [vaultId: string];
-  delete: [vaultId: string];
-}>();
+  select: [vaultId: string]
+  remove: [vaultId: string]
+}>()
 
 const handleClick = () => {
   if (props.vault.pathExists) {
-    emit('select', props.vault.id);
+    emit('select', props.vault.id)
   }
-};
+}
 
-const handleRemoveFromList = () => {
-  if (confirm(`确定要从列表中移除"${props.vault.name}"吗？\n\n注意：这只会从列表中移除，不会删除实际文件夹。`)) {
-    emit('removeFromList', props.vault.id);
-  }
-};
+const toggleMenu = () => {
+  showMenu.value = !showMenu.value
+}
 
-const handleDelete = () => {
-  if (confirm(`确定要彻底删除知识库"${props.vault.name}"吗？\n\n警告：这将删除整个知识库文件夹及其所有内容，此操作不可撤销！`)) {
-    emit('delete', props.vault.id);
+const closeMenu = () => {
+  showMenu.value = false
+}
+
+const handleClickOutside = (e: MouseEvent) => {
+  const card = (e.target as HTMLElement).closest('.vault-card')
+  if (!card) {
+    closeMenu()
   }
-};
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
+
+const openFragmentManager = () => {
+  showMenu.value = false
+  router.push(`/vault/${props.vault.id}/fragments/`)
+}
+
+const openHealthDashboard = () => {
+  showMenu.value = false
+  router.push(`/vault/${props.vault.id}/fragments/health`)
+}
+
+const handleRemove = () => {
+  showMenu.value = false
+  if (
+    confirm(
+      `确定要从列表中移除"${props.vault.name}"吗？\n\n注意：这只会从列表中移除，不会删除实际文件夹。`,
+    )
+  ) {
+    emit('remove', props.vault.id)
+  }
+}
 
 const formatDate = (dateStr: string): string => {
   try {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
     if (diffDays === 0) {
-      return '今天';
+      return '今天'
     } else if (diffDays === 1) {
-      return '昨天';
+      return '昨天'
     } else if (diffDays < 7) {
-      return `${diffDays}天前`;
+      return `${diffDays}天前`
     } else if (diffDays < 30) {
-      return `${Math.floor(diffDays / 7)}周前`;
+      return `${Math.floor(diffDays / 7)}周前`
     } else {
-      return date.toLocaleDateString('zh-CN');
+      return date.toLocaleDateString('zh-CN')
     }
   } catch {
-    return dateStr;
+    return dateStr
   }
-};
+}
 </script>
 
 <style scoped>
@@ -97,6 +139,7 @@ const formatDate = (dateStr: string): string => {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .vault-card:hover {
@@ -131,8 +174,13 @@ const formatDate = (dateStr: string): string => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .vault-info {
@@ -172,8 +220,6 @@ const formatDate = (dateStr: string): string => {
 
 .vault-actions {
   flex-shrink: 0;
-  display: flex;
-  gap: 4px;
 }
 
 .action-btn {
@@ -186,18 +232,63 @@ const formatDate = (dateStr: string): string => {
   border: none;
   border-radius: 6px;
   color: var(--text-tertiary);
-  font-size: 1rem;
+  font-size: 1.2rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.action-btn-remove:hover {
-  background: var(--bg-hover);
-  color: var(--accent-primary);
-}
-
-.action-btn-delete:hover {
+.action-btn:hover {
   background: var(--bg-hover);
   color: var(--accent-danger);
+}
+
+.menu-btn {
+  font-size: 1.4rem;
+}
+
+.vault-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  min-width: 160px;
+  z-index: 100;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.menu-item.remove {
+  color: var(--accent-danger);
+}
+
+.menu-icon {
+  font-size: 1rem;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--border-primary);
+  margin: 4px 0;
 }
 </style>

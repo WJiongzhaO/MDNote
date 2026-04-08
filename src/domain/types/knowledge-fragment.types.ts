@@ -23,6 +23,16 @@ export interface FragmentReference {
   documentTitle: string
   referencedAt: Date
   isConnected: boolean // 是否还接受片段修改
+  vaultId?: string // 跨知识库引用时，记录来源知识库ID
+}
+
+/**
+ * 跨知识库引用信息
+ */
+export interface CrossVaultReference {
+  vaultId: string
+  fragmentId: string
+  title?: string
 }
 
 /**

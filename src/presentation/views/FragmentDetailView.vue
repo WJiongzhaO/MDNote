@@ -205,7 +205,7 @@ function fragmentLink(id: string) {
 
 async function loadCategoryTree() {
   const app = Application.getInstance()
-  await app.getApplicationService().initialize()
+  await app.getApplicationService().initialize(vaultId.value)
   categoryTree.value = await app.getFragmentCategoryUseCases().getCategoryTree(vaultId.value)
 }
 
@@ -215,7 +215,7 @@ async function load() {
   loadError.value = null
   try {
     const app = Application.getInstance()
-    await app.getApplicationService().initialize()
+    await app.getApplicationService().initialize(vaultId.value)
     const fragmentUC = app.getKnowledgeFragmentUseCases()
     const healthSvc = app.getKnowledgeHealthService()
     await loadCategoryTree()
