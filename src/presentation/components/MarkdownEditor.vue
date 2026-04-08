@@ -1,62 +1,7 @@
 <template>
   <div class="editor-container">
     <div class="editor-header">
-      <div v-if="document || currentFilePath" class="editor-toolbar">
-        <button
-          class="toolbar-btn"
-          @click="openMermaidEditor"
-          title="编辑Mermaid图表"
-        >
-          📊 Mermaid编辑器
-        </button>
-        <!-- 添加公式编辑器按钮 -->
-        <button
-          class="toolbar-btn"
-          @click="openFormulaEditor"
-          title="编辑数学公式"
-        >
-          📐 公式编辑器
-        </button>
-        <!-- 生成知识图谱 -->
-        <button
-          class="toolbar-btn"
-          @click="openKnowledgeGraph"
-          title="根据当前文章生成知识图谱"
-        >
-          🕸️ 知识图谱
-        </button>
-        <button
-          class="toolbar-btn"
-          :class="{ active: showRecommendationPanel }"
-          @click="showRecommendationPanel = !showRecommendationPanel"
-          title="显示/隐藏基于当前文档上下文的片段推荐"
-        >
-          💡 推荐片段
-        </button>
-        <!-- 导出按钮 -->
-        <div class="export-menu">
-          <button
-            class="toolbar-btn"
-            @click="showExportMenu = !showExportMenu"
-            title="导出文档"
-          >
-            📤 导出
-          </button>
-          <div v-if="showExportMenu" class="export-dropdown" @click.stop>
-            <div class="export-item" @click="handleExport('pdf')">
-              📕 PDF (.pdf)
-            </div>
-            <div class="export-item" @click="handleExport('html')">
-              🌐 HTML (.html)
-            </div>
-            <div class="export-item" @click="handleExport('markdown')">
-              📝 Markdown (.md)
-            </div>
-          </div>
-      </div>
-    </div>
-
-      <!-- 新增：格式化工具栏 -->
+      <!-- 格式化工具栏 -->
       <EditorToolbar
         v-if="document || currentFilePath"
         :editor="editorElement"
@@ -64,6 +9,7 @@
         @update:content="handleToolbarUpdate"
         @open-mermaid="openMermaidEditor"
         @open-formula="openFormulaEditor"
+        @open-knowledge-graph="openKnowledgeGraph"
         @insert-fragment="handleInsertFragment"
       />
     </div>
