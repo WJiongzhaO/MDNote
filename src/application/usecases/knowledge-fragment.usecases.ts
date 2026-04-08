@@ -170,11 +170,11 @@ export class KnowledgeFragmentUseCases {
     // 删除知识片段数据
     await this.repository.delete({ value: id })
 
-    // 删除对应的存储目录（使用全局路径）
+    // 删除对应的存储目录（当前知识库数据路径下 fragments/assets）
     try {
       const fragmentStoragePath = this.imageStorage.getFragmentStoragePath(id)
       const electronAPI = (window as any).electronAPI
-      // 优先使用 fragment API（全局路径）
+      // 优先使用 fragment API（相对当前知识库数据路径）
       if (electronAPI && electronAPI.fragment && electronAPI.fragment.deleteDir) {
         await electronAPI.fragment.deleteDir(fragmentStoragePath)
         console.log('已删除知识片段存储目录（全局）:', fragmentStoragePath)
@@ -274,7 +274,7 @@ export class KnowledgeFragmentUseCases {
 
             // 确保目标目录存在（使用全局 fragment API）
             const electronAPI = (window as any).electronAPI
-            // 优先使用 fragment API（全局路径）
+            // 优先使用 fragment API（相对当前知识库数据路径）
             if (electronAPI && electronAPI.fragment && electronAPI.fragment.mkdir) {
               try {
                 await electronAPI.fragment.mkdir(fragmentStoragePath)
@@ -291,7 +291,7 @@ export class KnowledgeFragmentUseCases {
               }
             }
 
-            // 复制图片到知识片段存储目录（使用全局路径）
+            // 复制图片到知识片段存储目录（当前知识库数据路径）
             const destImagePath = `${fragmentStoragePath}/${fileName}`
             const success = await this.copyImageToFragmentStorage(sourceImagePath, destImagePath)
 
@@ -338,7 +338,7 @@ export class KnowledgeFragmentUseCases {
   }
 
   /**
-   * 复制图片到知识片段存储目录（使用全局路径）
+   * 复制图片到知识片段存储目录（当前知识库数据路径）
    * @param sourcePath 源图片路径（可能是绝对路径或相对于项目的路径）
    * @param destPath 目标路径（相对于全局知识片段目录）
    */
@@ -346,10 +346,10 @@ export class KnowledgeFragmentUseCases {
     try {
       const electronAPI = (window as any).electronAPI
 
-      // 优先使用 fragment API（全局路径）
+      // 优先使用 fragment API（相对当前知识库数据路径）
       if (electronAPI && electronAPI.fragment && electronAPI.fragment.copy) {
         await electronAPI.fragment.copy(sourcePath, destPath)
-        console.log('[Fragment] 图片复制成功（全局路径）:', sourcePath, '->', destPath)
+        console.log('[Fragment] 图片复制成功:', sourcePath, '->', destPath)
         return true
       }
 

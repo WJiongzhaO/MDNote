@@ -1,4 +1,4 @@
-import type { KnowledgeGraph, KgNodePositions } from '../../domain/services/knowledge-graph-extractor';
+import type { KnowledgeGraph, KgNodePositions, KgViewport } from '../../domain/services/knowledge-graph-extractor';
 
 export interface KnowledgeGraphInfo {
   id: string;
@@ -82,12 +82,34 @@ function materializeKnowledgeGraphFromJson(raw: unknown): KnowledgeGraph {
     }
   }
 
-  return { nodes, edges, nodePositions };
+  let viewState: KgViewport | undefined;
+  const vsRaw = g.viewState;
+  if (vsRaw && typeof vsRaw === 'object' && !Array.isArray(vsRaw)) {
+    const o = vsRaw as Record<string, unknown>;
+    const zoom = Number(o.zoom);
+    const panObj = o.pan;
+    if (
+      Number.isFinite(zoom) &&
+      zoom > 0 &&
+      panObj &&
+      typeof panObj === 'object' &&
+      !Array.isArray(panObj)
+    ) {
+      const p = panObj as Record<string, unknown>;
+      const x = Number(p.x);
+      const y = Number(p.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        viewState = { zoom, pan: { x, y } };
+      }
+    }
+  }
+
+  return { nodes, edges, nodePositions, ...(viewState ? { viewState } : {}) };
 }
 
 /**
  * 知识图谱文件服务
- * 存储位置：全局“知识片段库”路径下的 knowledge-graphs 目录
+ * 存储位置：当前知识库（项目数据路径）下的 knowledge-graphs 目录
  */
 export class FileSystemKnowledgeGraphService {
   /** 与主进程 path.normalize 一致，避免 Windows 下列目录与读文件路径不一致 */
@@ -109,12 +131,12 @@ export class FileSystemKnowledgeGraphService {
    */
   private async getGraphsRoot(): Promise<string> {
     const electronAPI = (window as any).electronAPI;
-    if (!electronAPI || !electronAPI.fragment || !electronAPI.fragment.getGlobalPath) {
-      throw new Error('知识图谱需要全局路径支持（fragment API 不可用）');
+    if (!electronAPI?.file?.getDataPath) {
+      throw new Error('知识图谱需要项目数据路径（file.getDataPath 不可用）');
     }
 
-    const globalPath: string = await electronAPI.fragment.getGlobalPath();
-    const normalized = globalPath.replace(/[\\/]+$/, '');
+    const dataPath: string = await electronAPI.file.getDataPath();
+    const normalized = dataPath.replace(/[\\/]+$/, '');
     const joined = `${normalized}/knowledge-graphs`;
     return this.normalizeFsPath(joined);
   }

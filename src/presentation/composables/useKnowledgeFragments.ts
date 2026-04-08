@@ -1,4 +1,4 @@
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, unref, type MaybeRef } from 'vue'
 import { Application } from '../../core/application'
 import type {
   KnowledgeFragmentResponse,
@@ -8,22 +8,20 @@ import type {
 
 /**
  * 知识片段组合式函数
- * @param vaultId 可选的知识库ID，默认为 'default'
+ * @param vaultId 知识库 ID，可传入 ref/computed，随路由切换时会重新 initialize 并加载列表
  */
-export function useKnowledgeFragments(vaultId: string = 'default') {
+export function useKnowledgeFragments(vaultId: MaybeRef<string> = 'default') {
   const fragments = ref<KnowledgeFragmentResponse[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const fragmentUseCases = ref<
     ReturnType<typeof Application.getInstance>['getKnowledgeFragmentUseCases'] | null
   >(null)
-  const currentVaultId = ref(vaultId)
+  const currentVaultId = ref(unref(vaultId))
 
-  // 异步获取fragmentUseCases
   const application = Application.getInstance()
   const initFragmentUseCases = async (vid: string) => {
     try {
-      // 确保应用服务已初始化，传入当前 vaultId
       await application.getApplicationService().initialize(vid)
       fragmentUseCases.value = application.getKnowledgeFragmentUseCases()
     } catch (err) {
@@ -32,15 +30,14 @@ export function useKnowledgeFragments(vaultId: string = 'default') {
     }
   }
 
-  // 监听 vaultId 变化
   watch(
-    () => currentVaultId.value,
+    () => unref(vaultId),
     async (newVaultId, oldVaultId) => {
-      if (newVaultId !== oldVaultId) {
-        console.log(`[useKnowledgeFragments] vaultId changed from ${oldVaultId} to ${newVaultId}`)
-        await initFragmentUseCases(newVaultId)
-        await loadFragments()
-      }
+      if (newVaultId === oldVaultId) return
+      console.log(`[useKnowledgeFragments] vaultId changed from ${oldVaultId} to ${newVaultId}`)
+      currentVaultId.value = newVaultId
+      await initFragmentUseCases(newVaultId)
+      await loadFragments()
     },
   )
 
@@ -223,7 +220,9 @@ export function useKnowledgeFragments(vaultId: string = 'default') {
   }
 
   onMounted(async () => {
-    await initFragmentUseCases(currentVaultId.value)
+    const vid = unref(vaultId)
+    currentVaultId.value = vid
+    await initFragmentUseCases(vid)
     if (fragmentUseCases.value) {
       await loadFragments()
     }

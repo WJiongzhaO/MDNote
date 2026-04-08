@@ -13,7 +13,6 @@
         <button class="btn btn-icon" @click="showCreateDialog = true" title="创建知识片段">
           ➕
         </button>
-        <button class="btn btn-icon" @click="showSettingsDialog = true" title="设置">⚙️</button>
         <button class="btn btn-icon" @click="refreshFragments" title="刷新">🔄</button>
       </div>
     </div>
@@ -57,6 +56,7 @@
         class="fragment-item"
         @click="selectFragment(fragment)"
         @dblclick="editFragment(fragment)"
+        @contextmenu.prevent="onFragmentContextMenu($event, fragment)"
         :class="{ active: selectedFragmentId === fragment.id }"
         draggable="true"
         @dragstart="handleFragmentDragStart($event, fragment)"
@@ -128,43 +128,40 @@
           v-if="!fragment.previewType"
           class="fragment-preview"
           v-html="fragmentPreviewHtml[fragment.id] || '加载中...'"
-        ></div>
+        >        </div>
       </div>
     </div>
 
-    <!-- 设置对话框 -->
-    <div v-if="showSettingsDialog" class="dialog-overlay" @click="showSettingsDialog = false">
-      <div class="dialog" @click.stop>
-        <div class="dialog-header">
-          <h3>知识片段库设置</h3>
-          <button class="btn btn-icon" @click="showSettingsDialog = false">✕</button>
-        </div>
-        <div class="dialog-body">
-          <div class="settings-item">
-            <label>知识片段库存储位置（全局）：</label>
-            <div class="path-display">
-              <input type="text" :value="currentDataPath" readonly class="input path-input" />
-              <button class="btn btn-secondary" @click="selectStoragePath">选择位置</button>
-            </div>
-            <p class="settings-hint">当前知识片段库存储在：{{ currentDataPath }}</p>
-            <p class="settings-hint" style="color: #666; font-size: 12px; margin-top: 4px">
-              注意：知识片段库是全局共享的，不随项目切换而变化
-            </p>
-            <button
-              v-if="hasCustomPath"
-              class="btn btn-secondary"
-              @click="resetStoragePath"
-              style="margin-top: 8px"
-            >
-              重置为默认位置
-            </button>
-          </div>
-        </div>
-        <div class="dialog-footer">
-          <button class="btn btn-primary" @click="showSettingsDialog = false">关闭</button>
-        </div>
-      </div>
-    </div>
+    <Teleport to="body">
+      <ul
+        v-if="fragmentContextMenu.show && fragmentContextMenu.fragment"
+        class="fragment-context-menu"
+        role="menu"
+        :style="{ left: fragmentContextMenu.x + 'px', top: fragmentContextMenu.y + 'px' }"
+        @mousedown.stop
+      >
+        <li role="none">
+          <button
+            type="button"
+            class="fragment-context-menu-item"
+            role="menuitem"
+            @click="confirmOpenFragmentAssetsInFileManager"
+          >
+            打开片段资源目录（图片等）
+          </button>
+        </li>
+        <li role="none">
+          <button
+            type="button"
+            class="fragment-context-menu-item"
+            role="menuitem"
+            @click="confirmOpenFragmentsJsonDirInFileManager"
+          >
+            打开片段库数据目录（JSON）
+          </button>
+        </li>
+      </ul>
+    </Teleport>
 
     <!-- 创建对话框 -->
     <div
@@ -266,6 +263,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick, inject, type Ref } from 'vue'
+import { useFragmentContextMenu } from '../composables/useFragmentContextMenu'
 import { useKnowledgeFragments } from '../composables/useKnowledgeFragments'
 import { Application } from '../../core/application'
 import { NodeType } from '../../domain/types/knowledge-fragment.types'
@@ -294,6 +292,13 @@ const emit = defineEmits<{
   'fragment-updated': [fragmentId: string]
   insert: [fragment: KnowledgeFragmentResponse]
 }>()
+
+const {
+  fragmentContextMenu,
+  onFragmentContextMenu,
+  confirmOpenFragmentAssetsInFileManager,
+  confirmOpenFragmentsJsonDirInFileManager,
+} = useFragmentContextMenu({ getVaultId: () => vaultId.value })
 
 // 恢复编辑器焦点（通过父组件）
 const restoreEditorFocus = () => {
@@ -332,7 +337,7 @@ const {
   updateFragment,
   deleteFragment: deleteFragmentAction,
   searchFragments,
-} = useKnowledgeFragments(vaultId.value)
+} = useKnowledgeFragments(vaultId)
 
 const { renderMarkdown } = useDocuments()
 
@@ -341,7 +346,6 @@ const selectedTags = ref<string[]>([])
 const selectedFragmentId = ref<string | null>(null)
 const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
-const showSettingsDialog = ref(false)
 const newFragmentTitle = ref('')
 const newFragmentContent = ref('')
 const newFragmentTags = ref('')
@@ -351,8 +355,6 @@ const editingFragmentContent = ref('')
 const editingFragmentTags = ref('')
 const isDragging = ref(false)
 const fragmentPreviewHtml = ref<Record<string, string>>({})
-const currentDataPath = ref('')
-const hasCustomPath = ref(false)
 const draggedFragment = ref<KnowledgeFragmentResponse | null>(null)
 const previewImageUrls = ref<Record<string, string>>({})
 const previewImageUrl = ref<Record<string, string>>({})
@@ -376,7 +378,7 @@ const getPreviewImageUrl = async (imagePath: string): Promise<string> => {
   try {
     const electronAPI = (window as any).electronAPI
 
-    // 知识片段的图片路径应该使用 fragment API（全局路径）
+    // 知识片段图片相对当前知识库数据路径，使用 fragment.getFullPath
     if (imagePath.startsWith('fragments/')) {
       if (electronAPI && electronAPI.fragment && electronAPI.fragment.getFullPath) {
         console.log('调用 electronAPI.fragment.getFullPath，路径:', imagePath)
@@ -968,19 +970,6 @@ watch(
   { deep: true },
 )
 
-// 监听知识库变化，重新加载片段
-watch(
-  () => vaultId.value,
-  async (newVaultId, oldVaultId) => {
-    if (newVaultId !== oldVaultId) {
-      console.log(
-        `[KnowledgeFragmentSidebar] vaultId changed from ${oldVaultId} to ${newVaultId}, reloading fragments`,
-      )
-      await loadFragments()
-    }
-  },
-)
-
 // 创建片段
 const handleCreateFragment = async () => {
   if (!newFragmentTitle.value.trim()) {
@@ -1213,55 +1202,6 @@ const handleFragmentDragEnd = () => {
   draggedFragment.value = null
 }
 
-// 加载存储路径（知识片段库的全局路径）
-const loadStoragePath = async () => {
-  try {
-    const electronAPI = (window as any).electronAPI
-    // 使用 fragment API 获取全局知识片段库路径
-    if (electronAPI && electronAPI.fragment) {
-      currentDataPath.value = await electronAPI.fragment.getGlobalPath()
-      const customPath = await electronAPI.fragment.getCustomGlobalPath()
-      hasCustomPath.value = !!customPath
-    } else {
-      console.warn('知识片段库 API 不可用')
-      currentDataPath.value = '未知'
-      hasCustomPath.value = false
-    }
-  } catch (error) {
-    console.error('Error loading storage path:', error)
-    currentDataPath.value = '加载失败'
-    hasCustomPath.value = false
-  }
-}
-
-// 选择存储路径（知识片段库的全局路径）
-const selectStoragePath = async () => {
-  try {
-    const electronAPI = (window as any).electronAPI
-    if (electronAPI && electronAPI.dialog) {
-      // 使用 skipSaveLastFolder 选项，避免修改上次打开的文件夹
-      const selectedPath = await electronAPI.dialog.openFolder({ skipSaveLastFolder: true })
-      if (selectedPath) {
-        // 使用 fragment API 设置全局知识片段库路径（不会影响项目数据路径和上次打开的文件夹）
-        if (electronAPI.fragment && electronAPI.fragment.setGlobalPath) {
-          const result = await electronAPI.fragment.setGlobalPath(selectedPath)
-          if (result.success) {
-            await loadStoragePath()
-            alert('知识片段库存储位置已更新，请重启应用以使更改生效')
-          } else {
-            alert('设置存储位置失败：' + (result.error || '未知错误'))
-          }
-        } else {
-          alert('知识片段库 API 不可用，请确保应用已更新到最新版本')
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error selecting storage path:', error)
-    alert('选择存储位置失败：' + (error instanceof Error ? error.message : '未知错误'))
-  }
-}
-
 // 处理对话框 overlay 的 mousedown 事件（用于检测是否从对话框内拖动出来）
 let dialogMouseDownTarget: EventTarget | null = null
 const handleDialogOverlayMouseDown = (event: MouseEvent) => {
@@ -1309,35 +1249,8 @@ const handleDialogOverlayClick = (event: MouseEvent) => {
   dialogMouseDownTarget = null
 }
 
-// 重置存储路径（知识片段库的全局路径）
-const resetStoragePath = async () => {
-  if (!confirm('确定要重置为默认存储位置吗？')) {
-    return
-  }
-
-  try {
-    const electronAPI = (window as any).electronAPI
-    // 使用 fragment API 重置全局知识片段库路径（不会影响项目数据路径和上次打开的文件夹）
-    if (electronAPI && electronAPI.fragment && electronAPI.fragment.resetGlobalPath) {
-      const result = await electronAPI.fragment.resetGlobalPath()
-      if (result.success) {
-        await loadStoragePath()
-        alert('已重置为默认存储位置，请重启应用以使更改生效')
-      } else {
-        alert('重置存储位置失败：' + (result.error || '未知错误'))
-      }
-    } else {
-      alert('知识片段库 API 不可用，请确保应用已更新到最新版本')
-    }
-  } catch (error) {
-    console.error('Error resetting storage path:', error)
-    alert('重置存储位置失败：' + (error instanceof Error ? error.message : '未知错误'))
-  }
-}
-
 onMounted(async () => {
   await loadFragments()
-  await loadStoragePath()
 
   // 组件挂载后，主动请求父组件更新上下文
   // 通过emit事件或者等待父组件自动更新
@@ -1826,5 +1739,38 @@ defineExpose({
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin: 8px 0;
+}
+
+</style>
+
+<style>
+.fragment-context-menu {
+  position: fixed;
+  z-index: 10050;
+  margin: 0;
+  padding: 4px 0;
+  min-width: 200px;
+  list-style: none;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-primary, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
+.fragment-context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text-primary, #1e293b);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.fragment-context-menu-item:hover {
+  background: var(--bg-hover, #f1f5f9);
 }
 </style>

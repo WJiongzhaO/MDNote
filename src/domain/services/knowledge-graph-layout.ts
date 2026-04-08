@@ -1,4 +1,4 @@
-import type { KnowledgeGraph, KgNodePositions } from './knowledge-graph-extractor';
+import type { KnowledgeGraph, KgNodePositions, KgViewport } from './knowledge-graph-extractor';
 
 export function hasCompleteNodeLayout(graph: KnowledgeGraph): boolean {
   const pos = graph.nodePositions;
@@ -96,24 +96,67 @@ export function mergeNodePositionsIntoGraph(graph: KnowledgeGraph, stored: KgNod
   return { ...graph, nodePositions: next };
 }
 
+/** 将 localStorage 中的坐标与视角合并进图谱（编辑器弹窗用） */
+export function mergeKgStoragePayloadIntoGraph(
+  graph: KnowledgeGraph,
+  payload: KgLayoutStoragePayload | null
+): KnowledgeGraph {
+  let g = mergeNodePositionsIntoGraph(graph, payload?.nodePositions ?? null);
+  if (payload?.viewState) {
+    g = { ...g, viewState: payload.viewState };
+  }
+  return g;
+}
+
 const KG_LAYOUT_STORAGE_PREFIX = 'mdnote-kg-layout:';
 
+export interface KgLayoutStoragePayload {
+  nodePositions: KgNodePositions;
+  viewState?: KgViewport;
+}
+
 export function loadKgLayoutFromLocalStorage(docKey: string): KgNodePositions | null {
+  const full = loadKgLayoutPayloadFromLocalStorage(docKey);
+  return full?.nodePositions ?? null;
+}
+
+/** 同时读取节点坐标与画布视角（编辑器内知识图谱用） */
+export function loadKgLayoutPayloadFromLocalStorage(docKey: string): KgLayoutStoragePayload | null {
   if (typeof localStorage === 'undefined' || !docKey) return null;
   try {
     const raw = localStorage.getItem(KG_LAYOUT_STORAGE_PREFIX + docKey);
     if (!raw) return null;
-    const o = JSON.parse(raw) as { nodePositions?: KgNodePositions };
-    return o.nodePositions && typeof o.nodePositions === 'object' ? o.nodePositions : null;
+    const o = JSON.parse(raw) as { nodePositions?: KgNodePositions; viewState?: KgViewport };
+    const nodePositions =
+      o.nodePositions && typeof o.nodePositions === 'object' ? o.nodePositions : null;
+    if (!nodePositions || Object.keys(nodePositions).length === 0) return null;
+    let viewState: KgViewport | undefined;
+    const vs = o.viewState;
+    if (vs && typeof vs === 'object' && Number.isFinite(vs.zoom) && vs.zoom > 0 && vs.pan) {
+      const x = Number(vs.pan.x);
+      const y = Number(vs.pan.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        viewState = { zoom: vs.zoom, pan: { x, y } };
+      }
+    }
+    return { nodePositions, ...(viewState ? { viewState } : {}) };
   } catch {
     return null;
   }
 }
 
-export function saveKgLayoutToLocalStorage(docKey: string, positions: KgNodePositions): void {
+export function saveKgLayoutToLocalStorage(
+  docKey: string,
+  positions: KgNodePositions,
+  viewState?: KgViewport
+): void {
   if (typeof localStorage === 'undefined' || !docKey) return;
   try {
-    localStorage.setItem(KG_LAYOUT_STORAGE_PREFIX + docKey, JSON.stringify({ nodePositions: positions }));
+    const payload: Record<string, unknown> = { nodePositions: positions };
+    if (viewState && Number.isFinite(viewState.zoom) && viewState.zoom > 0 && viewState.pan) {
+      payload.viewState = viewState;
+    }
+    localStorage.setItem(KG_LAYOUT_STORAGE_PREFIX + docKey, JSON.stringify(payload));
   } catch {
     // 配额等错误忽略
   }

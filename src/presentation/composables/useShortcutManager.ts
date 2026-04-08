@@ -2,6 +2,7 @@ import { ref, onMounted, onUnmounted, type Ref } from 'vue';
 import { useInjection } from './useInjection';
 import { TYPES } from '@/core/container/container.types';
 import type { ShortcutManager } from '@/domain/services/ShortcutManager.service';
+import type { KeyboardEventProcessor } from '@/infrastructure/services/KeyboardEventProcessor.service';
 import type { Shortcut } from '@/domain/values/Shortcut.vo';
 import type { KeyBinding } from '@/domain/values/KeyBinding.vo';
 import type { ShortcutContext, ShortcutCategory } from '@/domain/values/Shortcut.vo';
@@ -13,6 +14,7 @@ import type { ShortcutContext, ShortcutCategory } from '@/domain/values/Shortcut
  */
 export function useShortcutManager() {
   const shortcutManager = useInjection<ShortcutManager>(TYPES.ShortcutManager);
+  const keyboardProcessor = useInjection<KeyboardEventProcessor>(TYPES.KeyboardEventProcessor);
 
   const shortcuts = ref<Shortcut[]>([]);
   const currentContext = ref<ShortcutContext>('global');
@@ -32,6 +34,7 @@ export function useShortcutManager() {
 
     try {
       await shortcutManager.initialize();
+      shortcutManager.setKeyboardProcessor(keyboardProcessor);
       initialized.value = true;
 
       // 加载快捷键列表

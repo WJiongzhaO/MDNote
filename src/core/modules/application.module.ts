@@ -24,6 +24,7 @@ import { FileSystemImageStorageService } from '../../infrastructure/services/ima
 import { FileSystemVaultRepository } from '../../infrastructure/repositories/file-system.vault.repository.impl'
 import { FileSystemVaultRegistryRepository } from '../../infrastructure/repositories/vault-registry.repository.impl'
 import type { VaultRegistryRepository } from '../../domain/repositories/vault-registry.repository.interface'
+import type { KnowledgeFragmentRepository } from '../../domain/repositories/knowledge-fragment.repository.interface'
 
 import { MermaidRendererService } from '../../domain/services/mermaid-renderer.service'
 import { MermaidMarkdownExtension } from '../../domain/services/mermaid-markdown-extension.service'
@@ -117,6 +118,12 @@ export class ApplicationModule {
     })
 
     container.bind<ApplicationService>(TYPES.ApplicationService).toSingleton(ApplicationService)
+
+    // 按当前知识库 vaultId 提供片段仓储（与 ApplicationService.initialize / switchVault 一致）
+    container.bind<KnowledgeFragmentRepository>(TYPES.KnowledgeFragmentRepository).toDynamicValue(ctx => {
+      const app = ctx.container.get<ApplicationService>(TYPES.ApplicationService)
+      return StorageAdapter.createKnowledgeFragmentRepository(app.getCurrentVaultId())
+    })
 
     container.bind<DocumentUseCases>(TYPES.DocumentUseCases).toSingleton(DocumentUseCases)
 

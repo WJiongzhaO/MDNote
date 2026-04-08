@@ -138,6 +138,7 @@
             class="fm-card"
             :class="{ selected: selectedId === f.id }"
             @click="select(f, $event)"
+            @contextmenu.prevent="onFragmentContextMenu($event, f)"
           >
             <div class="card-checkbox">
               <input
@@ -197,6 +198,37 @@
       </aside>
     </div>
 
+    <Teleport to="body">
+      <ul
+        v-if="fragmentContextMenu.show && fragmentContextMenu.fragment"
+        class="fragment-context-menu"
+        role="menu"
+        :style="{ left: fragmentContextMenu.x + 'px', top: fragmentContextMenu.y + 'px' }"
+        @mousedown.stop
+      >
+        <li role="none">
+          <button
+            type="button"
+            class="fragment-context-menu-item"
+            role="menuitem"
+            @click="confirmOpenFragmentAssetsInFileManager"
+          >
+            打开片段资源目录（图片等）
+          </button>
+        </li>
+        <li role="none">
+          <button
+            type="button"
+            class="fragment-context-menu-item"
+            role="menuitem"
+            @click="confirmOpenFragmentsJsonDirInFileManager"
+          >
+            打开片段库数据目录（JSON）
+          </button>
+        </li>
+      </ul>
+    </Teleport>
+
     <!-- 新建片段对话框 -->
     <div v-if="showCreateDialog" class="fm-modal-overlay" @click="showCreateDialog = false">
       <div class="fm-modal" @click.stop>
@@ -230,6 +262,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
+import { useFragmentContextMenu } from '../composables/useFragmentContextMenu'
 import { useRoute, useRouter } from 'vue-router'
 import { Application } from '../../core/application'
 import FragmentMetadataPanel from '../components/fragment/FragmentMetadataPanel.vue'
@@ -282,6 +315,13 @@ const filters = ref({
   recentUpdated: false,
   recentUsed: false,
 })
+
+const {
+  fragmentContextMenu,
+  onFragmentContextMenu,
+  confirmOpenFragmentAssetsInFileManager,
+  confirmOpenFragmentsJsonDirInFileManager,
+} = useFragmentContextMenu({ getVaultId: () => vaultId.value })
 
 const showCreateDialog = ref(false)
 const newFragment = ref({
@@ -1578,5 +1618,37 @@ onMounted(async () => {
     gap: 12px;
     align-items: flex-start;
   }
+}
+</style>
+
+<style>
+.fragment-context-menu {
+  position: fixed;
+  z-index: 10050;
+  margin: 0;
+  padding: 4px 0;
+  min-width: 200px;
+  list-style: none;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-primary, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
+.fragment-context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text-primary, #1e293b);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.fragment-context-menu-item:hover {
+  background: var(--bg-hover, #f1f5f9);
 }
 </style>

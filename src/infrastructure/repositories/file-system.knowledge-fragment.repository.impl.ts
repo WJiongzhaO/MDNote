@@ -32,6 +32,10 @@ export interface KnowledgeFragmentData {
 
 /**
  * 基于文件系统的知识片段仓储实现
+ *
+ * 与「片段资源（图片等）」均位于当前知识库数据路径下：
+ * - 本仓储读写：getDataPath()/.mdnote-fragments-{vaultId}/knowledge-fragments.json
+ * - 图片等资源：getDataPath()/fragments/assets/{fragmentId}/（主进程 fragment:* 与 FileSystemImageStorageService）
  */
 export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentRepository {
   private readonly FILE_NAME = 'knowledge-fragments.json'

@@ -220,7 +220,8 @@ import type {
   KnowledgeGraph,
   KgNode,
   KgNodeOccurrence,
-  KgNodePositions
+  KgNodePositions,
+  KgViewport
 } from '../../domain/services/knowledge-graph-extractor';
 import { fillMissingNodePositions, hasCompleteNodeLayout } from '../../domain/services/knowledge-graph-layout';
 import { useKnowledgeFragments } from '../composables/useKnowledgeFragments';
@@ -422,6 +423,24 @@ const containerRef = ref<HTMLDivElement | null>(null);
 let cy: cytoscape.Core | null = null;
 /** 每次 initGraph 递增；丢弃已过期的 layoutstop 与拖拽 emit，避免污染父级当前图谱 */
 let kgViewLayoutSession = 0;
+let viewportEmitTimer: ReturnType<typeof setTimeout> | null = null;
+const KG_VIEWPORT_EMIT_MS = 450;
+
+function clearViewportEmitTimer() {
+  if (viewportEmitTimer != null) {
+    clearTimeout(viewportEmitTimer);
+    viewportEmitTimer = null;
+  }
+}
+
+function scheduleEmitViewport() {
+  if (!props.graph?.nodes?.length || !cy) return;
+  clearViewportEmitTimer();
+  viewportEmitTimer = window.setTimeout(() => {
+    viewportEmitTimer = null;
+    emitGraphUpdateIfCyStateChanged();
+  }, KG_VIEWPORT_EMIT_MS);
+}
 /** 布局稳定后选中新建节点/边（由 runPostLayoutHookIfAny 消费） */
 let pendingPostLayoutAction: { type: 'node'; id: string } | { type: 'edge'; index: number } | null = null;
 
@@ -912,6 +931,29 @@ function collectPositions(): KgNodePositions {
   return out;
 }
 
+function collectViewState(): KgViewport | undefined {
+  if (!cy) return undefined;
+  try {
+    const destroyed = (cy as { destroyed?: () => boolean }).destroyed?.();
+    if (destroyed) return undefined;
+    const zoom = cy.zoom();
+    const pan = cy.pan();
+    if (!Number.isFinite(zoom) || zoom <= 0) return undefined;
+    if (!Number.isFinite(pan.x) || !Number.isFinite(pan.y)) return undefined;
+    return { zoom, pan: { x: pan.x, y: pan.y } };
+  } catch {
+    return undefined;
+  }
+}
+
+function viewportEqual(a: KgViewport | undefined, b: KgViewport | undefined): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (Math.abs(a.zoom - b.zoom) > 1e-4) return false;
+  if (Math.abs(a.pan.x - b.pan.x) > 0.5 || Math.abs(a.pan.y - b.pan.y) > 0.5) return false;
+  return true;
+}
+
 function positionsEqual(a: KgNodePositions | undefined, b: KgNodePositions): boolean {
   if (!a) return false;
   const keys = Object.keys(b);
@@ -931,18 +973,25 @@ function cyMatchesPropsPositions(): boolean {
   return positionsEqual(props.graph.nodePositions, collectPositions());
 }
 
-function graphPayloadWithPositions(next: KgNodePositions): KnowledgeGraph {
+function graphPayloadFromCy(next: KgNodePositions): KnowledgeGraph {
   const base = toRaw(props.graph) as KnowledgeGraph;
-  return { ...base, nodePositions: next };
+  const merged: KnowledgeGraph = { ...base, nodePositions: next };
+  const vs = collectViewState();
+  if (vs) merged.viewState = vs;
+  return merged;
 }
 
-function emitGraphUpdateIfChanged(expectedSession?: number) {
+/** 节点坐标或画布视角（缩放/平移）变化时同步父组件 */
+function emitGraphUpdateIfCyStateChanged(expectedSession?: number) {
   if (expectedSession != null && expectedSession !== kgViewLayoutSession) return;
-  if (!props.graph) return;
+  if (!props.graph || !cy) return;
   const next = collectPositions();
   if (Object.keys(next).length === 0) return;
-  if (positionsEqual(props.graph.nodePositions, next)) return;
-  emit('graph-update', graphPayloadWithPositions(next));
+  const vs = collectViewState();
+  const posEq = positionsEqual(props.graph.nodePositions, next);
+  const vsEq = viewportEqual(props.graph.viewState, vs);
+  if (posEq && vsEq) return;
+  emit('graph-update', graphPayloadFromCy(next));
 }
 
 /**
@@ -954,8 +1003,11 @@ function pushCyPositionsToParent(expectedSession: number): void {
   if (!props.graph || !cy) return;
   const next = collectPositions();
   if (Object.keys(next).length === 0) return;
-  if (positionsEqual(props.graph.nodePositions, next)) return;
-  emit('graph-update', graphPayloadWithPositions(next));
+  const vs = collectViewState();
+  const posEq = positionsEqual(props.graph.nodePositions, next);
+  const vsEq = viewportEqual(props.graph.viewState, vs);
+  if (posEq && vsEq) return;
+  emit('graph-update', graphPayloadFromCy(next));
 }
 
 function schedulePushCyPositionsToParent(layoutSession: number): void {
@@ -996,7 +1048,8 @@ function applyFixedLayoutWithRetries(
   cyInstance: cytoscape.Core,
   posPlain: KgNodePositions,
   layoutSession: number,
-  persistSyntheticFill: boolean
+  persistSyntheticFill: boolean,
+  viewportSource: KnowledgeGraph
 ): void {
   const run = () => {
     if (layoutSession !== kgViewLayoutSession) return;
@@ -1005,7 +1058,7 @@ function applyFixedLayoutWithRetries(
     ensureInteractive(cyInstance);
     applyNodePositionsToCy(cyInstance, posPlain);
     ensureInteractive(cyInstance);
-    resizeAndFit(cyInstance);
+    resizeAndFitOrViewport(cyInstance, viewportSource);
   };
   cyInstance.ready(run);
   run();
@@ -1021,11 +1074,35 @@ function applyFixedLayoutWithRetries(
 
 const KG_FIT_PADDING = 40;
 
+function applySavedViewport(cyInstance: cytoscape.Core, vs: KgViewport): boolean {
+  if (!vs || !Number.isFinite(vs.zoom) || vs.zoom <= 0) return false;
+  const x = vs.pan?.x;
+  const y = vs.pan?.y;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  try {
+    cyInstance.zoom(vs.zoom);
+    cyInstance.pan({ x, y });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * 侧栏 flex 首帧容器宽高常为 0，直接 fit 会得到错误缩放；先 resize 再 fit，并在下一帧再跑一次。
+ * 有已存 viewState 时恢复缩放/平移，否则 fit 全图。
+ * 侧栏 flex 首帧容器宽高常为 0，先 resize 再操作，并在下一帧再跑一次。
  */
-function resizeAndFit(cyInstance: cytoscape.Core, padding = KG_FIT_PADDING): void {
+function resizeAndFitOrViewport(cyInstance: cytoscape.Core, graph: KnowledgeGraph, padding = KG_FIT_PADDING): void {
   cyInstance.resize();
+  const vs = graph.viewState;
+  if (vs && applySavedViewport(cyInstance, vs)) {
+    requestAnimationFrame(() => {
+      if ((cyInstance as { destroyed?: () => boolean }).destroyed?.()) return;
+      cyInstance.resize();
+      applySavedViewport(cyInstance, vs);
+    });
+    return;
+  }
   cyInstance.fit(undefined, padding);
   requestAnimationFrame(() => {
     const destroyed = (cyInstance as { destroyed?: () => boolean }).destroyed?.();
@@ -1052,7 +1129,7 @@ function runLayoutAndBind(
 
   if (complete) {
     const posPlain = toRaw(graph.nodePositions) as KgNodePositions;
-    applyFixedLayoutWithRetries(cyInstance, posPlain, layoutSession, persistSyntheticFill);
+    applyFixedLayoutWithRetries(cyInstance, posPlain, layoutSession, persistSyntheticFill, graph);
     return;
   }
 
@@ -1069,9 +1146,9 @@ function runLayoutAndBind(
   layout.one('layoutstop', () => {
     if (layoutSession !== kgViewLayoutSession) return;
     ensureInteractive(cyInstance);
-    resizeAndFit(cyInstance);
+    resizeAndFitOrViewport(cyInstance, graph);
     if (persistAfterLayout || persistSyntheticFill) {
-      emitGraphUpdateIfChanged(layoutSession);
+      emitGraphUpdateIfCyStateChanged(layoutSession);
     }
     runPostLayoutHookIfAny(layoutSession);
   });
@@ -1167,7 +1244,7 @@ function bindGraphEvents(cyInstance: cytoscape.Core, layoutSession: number) {
   });
 
   cyInstance.on('dragfree', 'node', () => {
-    emitGraphUpdateIfChanged(layoutSession);
+    emitGraphUpdateIfCyStateChanged(layoutSession);
   });
 }
 
@@ -1313,6 +1390,7 @@ function initGraph() {
 
   ensureInteractive(cy);
   bindGraphEvents(cy, layoutSession);
+  cy.on('viewport', () => scheduleEmitViewport());
   nextTick(() => syncEdgeDraftVisual());
   const persistAfterLayout =
     !hasCompleteNodeLayout(graphForLayout) || persistSyntheticFill;
@@ -1327,7 +1405,7 @@ function applyPositionsFromPropsOnly() {
   const pos = toRaw(props.graph.nodePositions) as KgNodePositions;
   ensureInteractive(cy);
   applyNodePositionsToCy(cy, pos);
-  resizeAndFit(cy);
+  resizeAndFitOrViewport(cy, props.graph!);
 }
 
 function onNodePositionsOnlyChanged() {
@@ -1402,6 +1480,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  clearViewportEmitTimer();
   window.removeEventListener('keydown', onWindowKeyDown, true);
   window.removeEventListener('keyup', onWindowKeyUp, true);
   cancelHidePopover();

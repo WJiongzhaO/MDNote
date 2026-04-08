@@ -51,18 +51,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteDirectory: (dirPath) => ipcRenderer.invoke('vault:delete-directory', dirPath),
     directoryExists: (dirPath) => ipcRenderer.invoke('vault:directory-exists', dirPath)
   },
-  // 知识片段库 API（使用全局路径，不随项目切换）
+  // 知识片段资源 API（相对当前知识库数据路径，与 file.getDataPath 一致）
   fragment: {
-    read: (filename) => ipcRenderer.invoke('fragment:read', filename),
-    write: (filename, data) => ipcRenderer.invoke('fragment:write', filename, data),
     mkdir: (dirPath) => ipcRenderer.invoke('fragment:mkdir', dirPath),
-    getGlobalPath: () => ipcRenderer.invoke('fragment:get-global-path'),
-    getCustomGlobalPath: () => ipcRenderer.invoke('fragment:get-custom-global-path'),
-    setGlobalPath: (customPath) => ipcRenderer.invoke('fragment:set-global-path', customPath),
-    resetGlobalPath: () => ipcRenderer.invoke('fragment:reset-global-path'),
     copy: (sourcePath, destPath) => ipcRenderer.invoke('fragment:copy', sourcePath, destPath),
     deleteDir: (dirPath) => ipcRenderer.invoke('fragment:delete-dir', dirPath),
-    getFullPath: (relativePath) => ipcRenderer.invoke('fragment:get-full-path', relativePath)
+    getFullPath: (relativePath) => ipcRenderer.invoke('fragment:get-full-path', relativePath),
+    openStorageInExplorer: (fragmentId) =>
+      ipcRenderer.invoke('fragment:open-storage-in-explorer', fragmentId),
+    openFragmentsJsonDirInExplorer: (vaultId) =>
+      ipcRenderer.invoke('fragment:open-fragments-json-dir-in-explorer', vaultId)
   },
   // 知识库 API
   vault: {

@@ -31,11 +31,19 @@ export interface KgEdge {
 /** 画布上的节点坐标（Cytoscape），用于固定布局、避免每次打开随机变化 */
 export type KgNodePositions = Record<string, { x: number; y: number }>;
 
+/** 画布视角（Cytoscape zoom + pan），与 nodePositions 一并持久化 */
+export interface KgViewport {
+  zoom: number;
+  pan: { x: number; y: number };
+}
+
 export interface KnowledgeGraph {
   nodes: KgNode[];
   edges: KgEdge[];
   /** 存在且覆盖当前全部节点 id 时，按固定坐标展示，不再自动跑随机力导向 */
   nodePositions?: KgNodePositions;
+  /** 缩放与平移，打开图谱时恢复 */
+  viewState?: KgViewport;
 }
 
 /** 样例用假文档 id，仅用于演示跳转列表（实际跳转时不会加载） */

@@ -265,7 +265,7 @@ export class DocumentUseCases {
       try {
         console.log('[processImagePaths] Processing:', { originalSrc, relativePath, documentId });
         let fullPath: string;
-        // 知识片段使用全局路径
+        // 知识片段资源相对当前知识库数据路径（fragment.getFullPath）
         if (relativePath.startsWith('fragments/')) {
           // 优先使用 fragment API
           if (electronAPI.fragment && electronAPI.fragment.getFullPath) {

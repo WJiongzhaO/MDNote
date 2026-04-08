@@ -312,9 +312,10 @@ import { TYPES } from '../../core/container/container.types';
 import { extractKnowledgeGraph, sampleKnowledgeGraph, type KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
 import { NodeType } from '../../domain/types/knowledge-fragment.types';
 import {
-  mergeNodePositionsIntoGraph,
   mergeKgPositionSources,
   loadKgLayoutFromLocalStorage,
+  loadKgLayoutPayloadFromLocalStorage,
+  mergeKgStoragePayloadIntoGraph,
   saveKgLayoutToLocalStorage,
   clearKgLayoutLocalStorage
 } from '../../domain/services/knowledge-graph-layout';
@@ -2553,7 +2554,7 @@ const onKnowledgeGraphUpdate = (g: KnowledgeGraph) => {
   knowledgeGraphData.value = g;
   const key = getKnowledgeGraphDocKey();
   if (g.nodePositions && key) {
-    saveKgLayoutToLocalStorage(key, g.nodePositions);
+    saveKgLayoutToLocalStorage(key, g.nodePositions, g.viewState);
   }
 };
 
@@ -2598,7 +2599,7 @@ const onKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string }) =
 
 const randomizeKnowledgeGraphLayout = () => {
   if (!knowledgeGraphData.value) return;
-  const { nodePositions: _np, ...rest } = knowledgeGraphData.value;
+  const { nodePositions: _np, viewState: _vs, ...rest } = knowledgeGraphData.value;
   knowledgeGraphData.value = { ...rest };
   clearKgLayoutLocalStorage(getKnowledgeGraphDocKey());
   kgLayoutRandomizeKey.value += 1;
@@ -2609,7 +2610,10 @@ const openKnowledgeGraph = () => {
   showKnowledgeGraphModal.value = true;
   const fullContent = getContent();
   if (!fullContent || !fullContent.trim()) {
-    const merged = mergeNodePositionsIntoGraph(sampleKnowledgeGraph, loadKgLayoutFromLocalStorage('sample'));
+    const merged = mergeKgStoragePayloadIntoGraph(
+      sampleKnowledgeGraph,
+      loadKgLayoutPayloadFromLocalStorage('sample')
+    );
     knowledgeGraphData.value = merged;
     knowledgeGraphError.value = '';
     isSampleMode.value = true;
@@ -2623,7 +2627,10 @@ const openKnowledgeGraph = () => {
   try {
     const graph = extractKnowledgeGraph(fullContent);
     const docKey = props.document?.id || currentFilePath.value || 'untitled';
-    knowledgeGraphData.value = mergeNodePositionsIntoGraph(graph, loadKgLayoutFromLocalStorage(docKey));
+    knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(
+      graph,
+      loadKgLayoutPayloadFromLocalStorage(docKey)
+    );
   } catch (e) {
     knowledgeGraphError.value = e instanceof Error ? e.message : '生成知识图谱失败';
     knowledgeGraphData.value = null;
@@ -2633,7 +2640,10 @@ const openKnowledgeGraph = () => {
 };
 
 const showSampleGraph = () => {
-  knowledgeGraphData.value = mergeNodePositionsIntoGraph(sampleKnowledgeGraph, loadKgLayoutFromLocalStorage('sample'));
+  knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(
+    sampleKnowledgeGraph,
+    loadKgLayoutPayloadFromLocalStorage('sample')
+  );
   knowledgeGraphError.value = '';
   isSampleMode.value = true;
 };
@@ -2651,11 +2661,16 @@ const saveKnowledgeGraph = async () => {
       isSampleMode.value ? 'sample' : props.document?.id || currentFilePath.value || 'untitled';
 
     if (isSampleMode.value && knowledgeGraphData.value) {
-      const graphToSave = mergeKgPositionSources(
-        knowledgeGraphData.value,
-        knowledgeGraphData.value.nodePositions,
-        loadKgLayoutFromLocalStorage('sample')
-      );
+      const graphToSave = {
+        ...mergeKgPositionSources(
+          knowledgeGraphData.value,
+          knowledgeGraphData.value.nodePositions,
+          loadKgLayoutFromLocalStorage('sample')
+        ),
+        ...(knowledgeGraphData.value.viewState
+          ? { viewState: knowledgeGraphData.value.viewState }
+          : {})
+      };
       await knowledgeGraphService.saveGraph({
         title: '样例：数据结构知识图谱',
         documentId: null,
@@ -2677,11 +2692,16 @@ const saveKnowledgeGraph = async () => {
       documentId: documentId ?? undefined,
       documentTitle: documentTitle ?? undefined
     });
-    const graphToSave = mergeKgPositionSources(
-      graphWithOccurrences,
-      knowledgeGraphData.value?.nodePositions,
-      loadKgLayoutFromLocalStorage(docKeyForLayout())
-    );
+    const graphToSave = {
+      ...mergeKgPositionSources(
+        graphWithOccurrences,
+        knowledgeGraphData.value?.nodePositions,
+        loadKgLayoutFromLocalStorage(docKeyForLayout())
+      ),
+      ...(knowledgeGraphData.value?.viewState
+        ? { viewState: knowledgeGraphData.value.viewState }
+        : {})
+    };
     await knowledgeGraphService.saveGraph({
       title: titleToUse,
       documentId,
