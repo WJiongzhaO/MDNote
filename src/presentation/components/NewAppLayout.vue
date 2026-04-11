@@ -36,14 +36,6 @@
           @open-template="handleOpenTemplate"
         />
 
-        <!-- 变量管理侧边栏 -->
-        <VariableSidebar
-          v-if="activeSidebar === 'variables'"
-          ref="variableSidebarRef"
-          @variable-updated="handleVariableUpdated"
-          @variable-insert="handleInsertVariable"
-        />
-
         <!-- 知识图谱侧边栏 -->
         <KnowledgeGraphSidebar
           v-if="activeSidebar === 'knowledge-graphs'"
@@ -213,7 +205,6 @@ import MarkdownEditor from './MarkdownEditor.vue'
 import FileExplorer from './FileExplorer.vue'
 import KnowledgeFragmentSidebar from './KnowledgeFragmentSidebar.vue'
 import DocumentTemplateSidebar from './DocumentTemplateSidebar.vue'
-import VariableSidebar from './VariableSidebar.vue'
 import KnowledgeGraphSidebar from './KnowledgeGraphSidebar.vue'
 import KnowledgeGraphView from './KnowledgeGraphView.vue'
 import SidebarIconBar, { type SidebarType } from './SidebarIconBar.vue'
@@ -251,7 +242,6 @@ const selectedFolderId = ref<string | null>(null)
 const fileExplorerRef = ref<InstanceType<typeof FileExplorer> | null>(null)
 const markdownEditorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const knowledgeFragmentSidebarRef = ref<InstanceType<typeof KnowledgeFragmentSidebar> | null>(null)
-const variableSidebarRef = ref<InstanceType<typeof VariableSidebar> | null>(null)
 const currentFilePath = ref<string>('')
 const lastOpenedFolderPath = ref<string>('') // 保存最后打开的文件夹路径
 const dataPath = ref<string>('')
@@ -313,26 +303,16 @@ interface SearchMatch {
 
 let currentDocumentMatches: SearchMatch[] = []
 
-// 为VariableSidebar提供依赖
-const currentDocumentContent = ref('')
-const currentDocumentPath = ref<string>('')
-
-provide('currentDocumentPath', currentDocumentPath)
-provide('currentDocumentContent', currentDocumentContent)
-
 // 处理选择文件（从文件资源管理器）
 const handleSelectFile = async (filePath: string) => {
   // 如果 filePath 为空，说明是清空选中状态（例如文件被删除）
   if (!filePath) {
     currentFilePath.value = ''
-    currentDocumentPath.value = ''
     currentDocument.value = null
-    currentDocumentContent.value = ''
     return
   }
 
   currentFilePath.value = filePath
-  currentDocumentPath.value = filePath
 
   try {
     const electronAPI = (window as any).electronAPI
@@ -367,7 +347,6 @@ const handleSelectFile = async (filePath: string) => {
       }
 
       currentDocument.value = tempDocument
-      currentDocumentContent.value = result.content
 
       await nextTick()
       updateFragmentSidebarContext()
@@ -810,10 +789,6 @@ const handleUpdateDocument = async (id: string, title: string, content: string) 
     title,
     content,
   })
-
-  // 同步更新currentDocumentContent，供VariableSidebar使用
-  currentDocumentContent.value = content
-  currentDocumentPath.value = id
 }
 
 // 处理知识片段更新事件
@@ -1026,38 +1001,6 @@ const handleInsertFragment = async (fragmentId: string) => {
     const editor = markdownEditorRef.value as any
     if (editor && typeof editor.handleInsertFragment === 'function') {
       await editor.handleInsertFragment(fragmentId)
-    }
-  }
-}
-
-// 变量相关事件处理
-const handleVariableUpdated = async (updatedContent: string) => {
-  // 当变量更新时，更新编辑器内容
-  currentDocumentContent.value = updatedContent
-
-  if (markdownEditorRef.value) {
-    const editor = markdownEditorRef.value as any
-    // 更新编辑器内容
-    if (editor && editor.setContent) {
-      const currentDoc = currentDocument.value
-      if (currentDoc) {
-        // 如果是数据库文档，更新标题和内容
-        editor.setContent(currentDoc.title, updatedContent, currentDocumentPath.value)
-      } else if (currentFilePath.value) {
-        // 如果是外部文件，只更新内容
-        const fileName = currentFilePath.value.split(/[/\\]/).pop() || '未命名'
-        editor.setContent(fileName, updatedContent, currentFilePath.value)
-      }
-    }
-  }
-}
-
-const handleInsertVariable = async (variableName: string) => {
-  if (markdownEditorRef.value) {
-    const editor = markdownEditorRef.value as any
-    if (editor && editor.insertText) {
-      const variablePlaceholder = `{{${variableName}}}`
-      editor.insertText(variablePlaceholder)
     }
   }
 }

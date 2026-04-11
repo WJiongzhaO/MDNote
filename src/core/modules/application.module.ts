@@ -36,9 +36,6 @@ import { KatexMathRenderer } from '../../domain/services/katex-math-renderer.ser
 
 import { SimpleTemplateProcessor } from '../../domain/services/simple-template-processor.service'
 import { FrontmatterParser } from '../../domain/services/frontmatter-parser.service'
-import { FolderVariableResolver } from '../../domain/services/folder-variable-resolver.service'
-import { VariableMerger } from '../../domain/services/variable-merger.service'
-import { VariableUseCases } from '../../application/usecases/variable.usecases'
 
 import { ExportUseCases } from '../../application/usecases/export.usecases'
 import { ExportFactory } from '../../infrastructure/services/export-factory.service'
@@ -174,14 +171,6 @@ export class ApplicationModule {
       .toSingleton(SimpleTemplateProcessor)
 
     container.bind<FrontmatterParser>(TYPES.FrontmatterParser).toSingleton(FrontmatterParser)
-
-    container
-      .bind<FolderVariableResolver>(TYPES.FolderVariableResolver)
-      .toSingleton(FolderVariableResolver)
-
-    container.bind<VariableMerger>(TYPES.VariableMerger).toSingleton(VariableMerger)
-
-    container.bind<VariableUseCases>(TYPES.VariableUseCases).toSingleton(VariableUseCases)
 
     container.bind<PDFExporter>(PDFExporter as any).to(PDFExporter)
 

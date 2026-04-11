@@ -138,11 +138,6 @@
         <span class="menu-icon">S</span>
         <span>删除线</span>
       </div>
-      <div class="context-menu-divider"></div>
-      <div class="context-menu-item" @click="addSelectionAsFragment">
-        <span class="menu-icon">📝</span>
-        <span>添加为知识片段</span>
-      </div>
     </div>
 
 
@@ -1606,54 +1601,7 @@ const renderContent = async () => {
         docPath = currentFilePath.value;
       }
 
-      // 获取合并后的变量（document + folder + global）
-      let variables: Record<string, any> = {};
-      try {
-        const application = Application.getInstance();
-        const variableUseCases = application.getVariableUseCases();
-
-        // 获取完整内容（包含frontmatter）
-        const fullContent = content.value || '';
-
-        const result = await (variableUseCases as any).getVariables({
-          documentPath: docPath,
-          documentContent: fullContent
-        });
-
-        variables = result.variables;
-      } catch (error) {
-        console.error('[渲染] 获取变量失败:', error);
-        // 如果获取变量失败，使用空对象
-        variables = {};
-      }
-
-      // 在渲染前直接在文本层面替换变量
-      let processedContent = mainContent.value;
-
-      // 匹配 {{variableName}} 格式（但不匹配 {{ref:xxx}} 格式）
-      // 使用负向前瞻确保不匹配 {{ref: 开头的变量
-      // 变量名不能包含冒号，这样可以避免匹配 {{ref:xxx}} 格式
-      const variablePattern = /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g;
-
-      processedContent = processedContent.replace(variablePattern, (match, varName, offset) => {
-        // 检查是否是引用标志（{{ref:xxx}} 格式）
-        // 通过检查匹配位置前后的字符来判断
-        const beforeMatch = processedContent.substring(Math.max(0, offset - 10), offset);
-        const afterMatch = processedContent.substring(offset + match.length, offset + match.length + 10);
-
-        // 如果匹配的是 {{ref: 格式，跳过
-        if (beforeMatch.includes('{{ref:') || match.includes('ref:')) {
-          return match;
-        }
-
-        if (variables.hasOwnProperty(varName)) {
-          const value = variables[varName];
-          return String(value);
-        }
-        return match; // 变量不存在，保持原样
-      });
-
-      // 渲染已替换变量的内容（不传递变量给 markdown 处理器）
+      // 渲染内容（不进行变量替换）
       // renderMarkdown 会调用 resolveReferences 来解析引用标志
       // 尝试从文件缓存读取，传递给 renderMarkdown 以提高性能
       let fileCache = null;
@@ -1668,7 +1616,7 @@ const renderContent = async () => {
         }
       }
 
-      const newRenderedContent = await props.renderMarkdown(processedContent, docId, fileCache);
+      const newRenderedContent = await props.renderMarkdown(mainContent.value, docId, fileCache);
 
       // 获取编辑器的滚动百分比位置（这是我们要同步到预览的基准）
       const editor = editorElement.value;

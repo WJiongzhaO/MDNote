@@ -24,11 +24,8 @@ export const TYPES = {
   FragmentReferenceSyncService: Symbol.for('FragmentReferenceSyncService'),
   ImageStorageService: Symbol.for('ImageStorageService'),
 
-  // 变量系统领域服务
   SimpleTemplateProcessor: Symbol.for('SimpleTemplateProcessor'),
   FrontmatterParser: Symbol.for('FrontmatterParser'),
-  FolderVariableResolver: Symbol.for('FolderVariableResolver'),
-  VariableMerger: Symbol.for('VariableMerger'),
 
   // 应用服务
   ApplicationService: Symbol.for('ApplicationService'),
@@ -37,7 +34,6 @@ export const TYPES = {
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
   FragmentCategoryUseCases: Symbol.for('FragmentCategoryUseCases'),
   KnowledgeHealthService: Symbol.for('KnowledgeHealthService'),
-  VariableUseCases: Symbol.for('VariableUseCases'),
   ExportUseCases: Symbol.for('ExportUseCases'),
   VaultUseCases: Symbol.for('VaultUseCases'),
 

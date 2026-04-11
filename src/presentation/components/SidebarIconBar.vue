@@ -59,7 +59,6 @@ export type SidebarType =
   | 'folders'
   | 'fragments'
   | 'templates'
-  | 'variables'
   | 'knowledge-graphs'
   | null;
 
@@ -93,7 +92,6 @@ const sidebarItems: SidebarItem[] = [
   { id: 'folders', icon: '/icon/folder.svg', title: '文件夹' },
   { id: 'fragments', icon: '/icon/fragment.svg', title: '知识片段库' },
   { id: 'templates', icon: '/icon/paper.svg', title: '文档模板' },
-  { id: 'variables', icon: '📑', title: '变量管理' },
   { id: 'knowledge-graphs', icon: '/icon/net.svg', title: '知识图谱' }
 ];
 
