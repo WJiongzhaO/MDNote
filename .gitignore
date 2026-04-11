@@ -38,6 +38,10 @@ __screenshots__/
 test-results/
 playwright-report/
 data/
+.aiden/
+.omc/*
+!.omc/skills/
+!.omc/skills/**
 
 # Electron build artifacts
 release/
