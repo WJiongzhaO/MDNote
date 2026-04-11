@@ -63,7 +63,10 @@ export class FragmentReferenceResolver {
     let resolvedContent = content
 
     // 从后往前替换，避免索引偏移问题
-    for (const ref of references) {
+    // 按降序排序（从大到小），确保从后往前替换
+    const sortedReferences = [...references].sort((a, b) => b.startIndex - a.startIndex)
+
+    for (const ref of sortedReferences) {
       if (!ref) continue
 
       // 根据形态处理
