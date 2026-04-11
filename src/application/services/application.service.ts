@@ -31,10 +31,30 @@ export class ApplicationService {
     private markdownProcessorInitializer: MarkdownProcessorInitializer,
   ) {}
 
-  async initialize(vaultId: string = 'default'): Promise<void> {
-    // 每次调用都强制使用新的 vaultId 重新创建实例
-    // 这样可以确保每个知识库使用独立的数据存储
-    this.currentVaultId = vaultId
+  async initialize(vaultId?: string): Promise<void> {
+    // 如果已经初始化过：
+    // - 没有传入 vaultId：保持当前实例，跳过
+    // - 传入的 vaultId 与当前相同：跳过
+    // - 传入的 vaultId 与当前不同：切换到新的 vaultId
+    if (this.isInitialized) {
+      if (vaultId === undefined) {
+        // 没有传入 vaultId，保持当前实例
+        return
+      }
+      if (this.currentVaultId === vaultId) {
+        // vaultId 相同，跳过
+        return
+      }
+      // vaultId 不同，需要切换
+      this.currentVaultId = vaultId
+      this.knowledgeFragmentUseCases = new KnowledgeFragmentUseCases(vaultId)
+      this.knowledgeHealthService = new KnowledgeHealthService(vaultId)
+      return
+    }
+
+    // 首次初始化
+    const effectiveVaultId = vaultId ?? 'default'
+    this.currentVaultId = effectiveVaultId
 
     try {
       const container = await import('../../core/container/inversify.container')
@@ -45,13 +65,9 @@ export class ApplicationService {
         await mermaidRenderer.initialize()
       }
 
-      // 每次都创建新的 KnowledgeFragmentUseCases 实例，传入当前 vaultId
-      this.knowledgeFragmentUseCases = new KnowledgeFragmentUseCases(vaultId)
+      this.knowledgeFragmentUseCases = new KnowledgeFragmentUseCases(effectiveVaultId)
+      this.knowledgeHealthService = new KnowledgeHealthService(effectiveVaultId)
 
-      // 每次都创建新的 KnowledgeHealthService 实例，传入当前 vaultId
-      this.knowledgeHealthService = new KnowledgeHealthService(vaultId)
-
-      // 初始化Markdown处理器（包括Mermaid扩展）
       await this.markdownProcessorInitializer.initialize()
       this.isInitialized = true
     } catch (error) {

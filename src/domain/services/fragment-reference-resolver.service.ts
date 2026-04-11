@@ -18,8 +18,6 @@ export class FragmentReferenceResolver {
   private readonly parser: FragmentReferenceParser
 
   constructor(
-    @inject(TYPES.KnowledgeFragmentRepository)
-    private readonly fragmentRepository: KnowledgeFragmentRepository,
     @inject(TYPES.ImageStorageService)
     private readonly imageStorage: ImageStorageService,
   ) {
@@ -28,13 +26,24 @@ export class FragmentReferenceResolver {
 
   /**
    * 获取片段仓储（根据 vaultId）
+   * 如果没有指定 vaultId，则获取当前知识库的仓储
    */
-  private async getFragmentRepository(vaultId?: string) {
+  private async getFragmentRepository(vaultId?: string): Promise<KnowledgeFragmentRepository> {
+    const { StorageAdapter } = await import('../../infrastructure/storage.adapter')
+    const { InversifyContainer } = await import('../../core/container/inversify.container')
+    const { TYPES } = await import('../../core/container/container.types')
+    const { ApplicationService } = await import('../../application/services/application.service')
+
     if (vaultId) {
-      const { StorageAdapter } = await import('../../infrastructure/storage.adapter')
       return StorageAdapter.createKnowledgeFragmentRepository(vaultId)
     }
-    return this.fragmentRepository
+
+    // 获取当前知识库的 vaultId
+    const container = InversifyContainer.getInstance()
+    const app = container.get<ApplicationService>(TYPES.ApplicationService)
+    const currentVaultId = app.getCurrentVaultId()
+
+    return StorageAdapter.createKnowledgeFragmentRepository(currentVaultId)
   }
 
   /**
@@ -180,7 +189,8 @@ export class FragmentReferenceResolver {
    * 解析单个引用
    */
   async resolveReference(fragmentId: string, documentId: string): Promise<string> {
-    const fragment = await this.fragmentRepository.findById({ value: fragmentId })
+    const repository = await this.getFragmentRepository()
+    const fragment = await repository.findById({ value: fragmentId })
     if (!fragment) {
       throw new Error(`Fragment ${fragmentId} not found`)
     }
