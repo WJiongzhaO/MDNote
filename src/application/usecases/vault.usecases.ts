@@ -43,6 +43,15 @@ export class VaultUseCases {
       } else {
         throw new Error('无法获取知识库存储路径');
       }
+    } else {
+      const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+      if (electronAPI && electronAPI.vault && electronAPI.vault.directoryExists) {
+        const exists = await electronAPI.vault.directoryExists(vaultPath);
+        if (exists) {
+          const sanitizedName = request.name.replace(/[<>:"/\\|?*]/g, '_');
+          vaultPath = `${vaultPath}/${sanitizedName}`;
+        }
+      }
     }
 
     const pathValidation = this.pathValidator.validate({ value: vaultPath });
@@ -167,7 +176,7 @@ export class VaultUseCases {
   async getRegisteredVaults(): Promise<VaultRegistryItemDTO[]> {
     const registry = await this.vaultRegistryRepository.getRegistry();
     const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
-    
+
     const vaultsWithStatus = await Promise.all(
       registry.vaults.map(async (vault) => {
         let pathExists = false;
@@ -184,15 +193,15 @@ export class VaultUseCases {
         };
       })
     );
-    
-    return vaultsWithStatus.sort((a, b) => 
+
+    return vaultsWithStatus.sort((a, b) =>
       new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime()
     );
   }
 
   async openVault(vaultId: string): Promise<OpenVaultResponse> {
     const vaultItem = await this.vaultRegistryRepository.getVaultById(vaultId);
-    
+
     if (!vaultItem) {
       return {
         success: false,
@@ -240,7 +249,7 @@ export class VaultUseCases {
 
   async createAndRegisterVault(request: CreateVaultRequest): Promise<VaultResponse> {
     const response = await this.createVault(request);
-    
+
     await this.vaultRegistryRepository.addVault({
       id: response.id,
       name: response.name,
@@ -248,15 +257,15 @@ export class VaultUseCases {
       lastAccessedAt: new Date().toISOString(),
       createdAt: response.createdAt
     });
-    
+
     await this.vaultRegistryRepository.setLastOpenedVault(response.id);
-    
+
     return response;
   }
 
   async getLastOpenedVault(): Promise<VaultRegistryItemDTO | null> {
     const vaultItem = await this.vaultRegistryRepository.getLastOpenedVault();
-    
+
     if (!vaultItem) {
       return null;
     }
@@ -279,7 +288,7 @@ export class VaultUseCases {
 
   async importFolderAsVault(folderPath: string, name?: string): Promise<VaultResponse> {
     const existingVault = await this.vaultRegistryRepository.getVaultByPath(folderPath);
-    
+
     if (existingVault) {
       const openResult = await this.openVault(existingVault.id);
       if (openResult.success) {
@@ -322,7 +331,7 @@ export class VaultUseCases {
 
   async deleteVaultFromRegistryAndDisk(vaultId: string): Promise<void> {
     const vaultItem = await this.vaultRegistryRepository.getVaultById(vaultId);
-    
+
     if (!vaultItem) {
       throw new Error('知识库不存在');
     }

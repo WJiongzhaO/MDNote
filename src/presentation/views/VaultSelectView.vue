@@ -102,11 +102,13 @@ const handleSelectVault = async (vaultId: string) => {
   }
 }
 
-const handleCreateVault = async (data: { name: string }) => {
+const handleCreateVault = async (data: { name: string; path?: string; description?: string }) => {
   try {
     const useCases = getVaultUseCases()
     const result = await useCases.createAndRegisterVault({
       name: data.name,
+      path: data.path,
+      description: data.description,
     })
 
     showNewVaultDialog.value = false

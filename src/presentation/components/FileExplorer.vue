@@ -574,21 +574,10 @@ let menuHandlers: Array<() => void> = [];
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside);
 
-  // 尝试加载上次打开的文件夹
-  try {
-    const electronAPI = (window as any).electronAPI;
-    if (electronAPI && electronAPI.file && electronAPI.file.getLastOpenedFolder) {
-      const lastFolder = await electronAPI.file.getLastOpenedFolder();
-      if (lastFolder) {
-        // 延迟加载，确保组件完全初始化
-        await nextTick();
-        await loadFolder(lastFolder);
-        emit('open-folder', lastFolder);
-      }
-    }
-  } catch (error) {
-    console.error('Error loading last opened folder:', error);
-  }
+  // 注意：不再从全局配置加载 lastOpenedFolder
+  // 因为 NewAppLayout.vue 已经负责管理当前知识库的路径
+  // 当切换侧边栏时，NewAppLayout 会通过 watcher 调用 loadFolder
+  // 如果在这里加载全局的 lastOpenedFolder，会导致切换到错误的知识库
 
   // 监听主进程发送的恢复文件夹事件
   // 注意：恢复文件夹时不应该触发 open-folder 事件，因为这会修改工作目录

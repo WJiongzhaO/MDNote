@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="handleClose">
     <div class="modal">
       <h3>新建知识库</h3>
-      
+
       <div class="form-group">
         <label>知识库名称</label>
         <input
@@ -12,19 +12,36 @@
           @keyup.enter="handleCreate"
         />
       </div>
-      
+
       <div class="form-group">
         <label>存储位置</label>
-        <div class="path-display">
-          <span class="path-text">{{ vaultsPath || '正在获取...' }}</span>
+        <div class="path-selector">
+          <input
+            type="text"
+            v-model="vaultPath"
+            placeholder="选择知识库存储位置"
+            readonly
+          />
+          <button class="btn-browse" @click="selectFolder">
+            浏览...
+          </button>
         </div>
-        <p class="hint">知识库将存储在应用数据目录下的 vaults 文件夹中</p>
+        <p class="hint">点击"浏览"选择知识库存储位置，或使用默认路径</p>
       </div>
-      
+
+      <div class="form-group">
+        <label>描述（可选）</label>
+        <textarea
+          v-model="vaultDescription"
+          placeholder="输入知识库描述"
+          rows="2"
+        ></textarea>
+      </div>
+
       <div class="modal-actions">
         <button class="btn btn-secondary" @click="handleClose">取消</button>
-        <button 
-          class="btn btn-primary" 
+        <button
+          class="btn btn-primary"
           :disabled="!canCreate"
           @click="handleCreate"
         >
@@ -40,11 +57,12 @@ import { ref, computed, onMounted } from 'vue';
 
 const emit = defineEmits<{
   close: [];
-  create: [data: { name: string }];
+  create: [data: { name: string; path?: string; description?: string }];
 }>();
 
 const vaultName = ref('');
-const vaultsPath = ref('');
+const vaultPath = ref('');
+const vaultDescription = ref('');
 
 const canCreate = computed(() => {
   return vaultName.value.trim();
@@ -54,12 +72,29 @@ onMounted(async () => {
   try {
     const electronAPI = (window as any).electronAPI;
     if (electronAPI && electronAPI.vault && electronAPI.vault.getVaultsPath) {
-      vaultsPath.value = await electronAPI.vault.getVaultsPath();
+      vaultPath.value = await electronAPI.vault.getVaultsPath();
     }
   } catch (error) {
     console.error('获取知识库存储路径失败:', error);
   }
 });
+
+const selectFolder = async () => {
+  try {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI || !electronAPI.dialog || !electronAPI.dialog.openFolder) {
+      alert('文件对话框不可用');
+      return;
+    }
+
+    const selectedPath = await electronAPI.dialog.openFolder({ skipSaveLastFolder: true });
+    if (selectedPath) {
+      vaultPath.value = selectedPath;
+    }
+  } catch (error) {
+    console.error('选择文件夹失败:', error);
+  }
+};
 
 const handleClose = () => {
   emit('close');
@@ -67,10 +102,20 @@ const handleClose = () => {
 
 const handleCreate = () => {
   if (!canCreate.value) return;
-  
-  emit('create', {
+
+  const data: { name: string; path?: string; description?: string } = {
     name: vaultName.value.trim()
-  });
+  };
+
+  if (vaultPath.value) {
+    data.path = vaultPath.value;
+  }
+
+  if (vaultDescription.value.trim()) {
+    data.description = vaultDescription.value.trim();
+  }
+
+  emit('create', data);
 };
 </script>
 
@@ -116,7 +161,8 @@ const handleCreate = () => {
   margin-bottom: 8px;
 }
 
-.form-group input {
+.form-group input[type="text"],
+.form-group textarea {
   width: 100%;
   padding: 10px 14px;
   border: 1px solid var(--border-primary);
@@ -125,28 +171,51 @@ const handleCreate = () => {
   background: var(--bg-primary);
   color: var(--text-primary);
   transition: border-color 0.2s ease;
+  box-sizing: border-box;
 }
 
-.form-group input:focus {
+.form-group input[type="text"]:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
 }
 
-.form-group input::placeholder {
+.form-group input[type="text"]::placeholder,
+.form-group textarea::placeholder {
   color: var(--text-tertiary);
 }
 
-.path-display {
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
 }
 
-.path-text {
+.path-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.path-selector input {
+  flex: 1;
+  cursor: pointer;
+  background: var(--bg-secondary);
+}
+
+.btn-browse {
+  padding: 10px 16px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   font-size: 0.9rem;
-  color: var(--text-secondary);
-  word-break: break-all;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-browse:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
 }
 
 .hint {

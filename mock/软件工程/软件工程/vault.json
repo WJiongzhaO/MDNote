@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "id": "vault-20260411-jt8m7s",
+  "name": "软件工程",
+  "description": "",
+  "owner": "",
+  "createdAt": "2026-04-11T10:49:26.492Z",
+  "updatedAt": "2026-04-11T10:49:26.492Z",
+  "statistics": {
+    "totalDocuments": 0,
+    "totalFragments": 0,
+    "activeFragments": 0,
+    "archivedFragments": 0,
+    "deprecatedFragments": 0,
+    "totalReferences": 0,
+    "averageHealthScore": 0
+  },
+  "schemaVersion": "1.0.0",
+  "compatibility": {
+    "minAppVersion": "2.0.0",
+    "features": [
+      "lineage",
+      "health",
+      "confidence"
+    ]
+  }
+}
