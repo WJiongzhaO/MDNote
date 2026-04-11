@@ -1,12 +1,16 @@
 <template>
-  <div class="vault-select-view">
+  <div class="vault-select-view" data-testid="vault-select-page">
     <div class="vault-select-header">
-      <h1 class="title">MD Note</h1>
-      <p class="subtitle">选择或创建知识库</p>
+      <h1 class="title" data-testid="vault-select-title">MD Note</h1>
+      <p class="subtitle" data-testid="vault-select-subtitle">选择或创建知识库</p>
     </div>
 
     <div class="vault-actions">
-      <button class="btn btn-primary" @click="showNewVaultDialog = true">
+      <button
+        class="btn btn-primary"
+        data-testid="open-new-vault-dialog"
+        @click="showNewVaultDialog = true"
+      >
         <span class="icon">+</span>
         新建知识库
       </button>

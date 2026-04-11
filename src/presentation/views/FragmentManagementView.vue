@@ -1,5 +1,5 @@
 <template>
-  <div class="fragment-management">
+  <div class="fragment-management" data-testid="fragment-management-page">
     <!-- 顶部导航栏 -->
     <header class="fm-header">
       <div class="fm-header-left">
@@ -9,15 +9,25 @@
             首页
           </button>
           <span class="breadcrumb-sep">/</span>
-          <span class="breadcrumb-current">片段管理</span>
+          <span class="breadcrumb-current" data-testid="fragment-management-breadcrumb-current">
+            片段管理
+          </span>
         </div>
       </div>
       <div class="fm-header-right">
-        <router-link class="fm-nav-link" to="/fragments/health">
+        <router-link
+          class="fm-nav-link"
+          data-testid="fragment-management-health-link"
+          to="/fragments/health"
+        >
           <span class="nav-icon">📊</span>
           健康度
         </router-link>
-        <button class="fm-btn fm-btn-primary" @click="showCreateDialog = true">
+        <button
+          class="fm-btn fm-btn-primary"
+          data-testid="create-fragment-button"
+          @click="showCreateDialog = true"
+        >
           <span>+</span> 新建片段
         </button>
       </div>
@@ -136,6 +146,7 @@
             v-for="f in fragments"
             :key="f.id"
             class="fm-card"
+            data-testid="fragment-card"
             :class="{ selected: selectedId === f.id }"
             @click="select(f, $event)"
             @contextmenu.prevent="onFragmentContextMenu($event, f)"

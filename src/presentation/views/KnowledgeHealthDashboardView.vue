@@ -1,5 +1,5 @@
 <template>
-  <div class="health-dashboard">
+  <div class="health-dashboard" data-testid="knowledge-health-dashboard">
     <!-- 顶部导航 -->
     <header class="hd-header">
       <div class="hd-header-left">
@@ -87,7 +87,7 @@
       </div>
 
       <!-- 最近活跃片段 -->
-      <section class="hd-section">
+      <section class="hd-section" data-testid="health-dashboard-recent-active">
         <div class="section-header">
           <h2 class="section-title">
             <span class="title-icon">📈</span>

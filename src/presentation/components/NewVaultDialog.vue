@@ -1,5 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="handleClose">
+  <div class="modal-overlay" data-testid="new-vault-dialog" @click.self="handleClose">
     <div class="modal">
       <h3>新建知识库</h3>
       
@@ -8,6 +8,7 @@
         <input
           type="text"
           v-model="vaultName"
+          data-testid="new-vault-name-input"
           placeholder="输入知识库名称"
           @keyup.enter="handleCreate"
         />
@@ -22,9 +23,12 @@
       </div>
       
       <div class="modal-actions">
-        <button class="btn btn-secondary" @click="handleClose">取消</button>
+        <button class="btn btn-secondary" data-testid="cancel-create-vault" @click="handleClose">
+          取消
+        </button>
         <button 
           class="btn btn-primary" 
+          data-testid="confirm-create-vault"
           :disabled="!canCreate"
           @click="handleCreate"
         >

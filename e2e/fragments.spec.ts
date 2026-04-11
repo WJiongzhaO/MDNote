@@ -7,11 +7,25 @@ import { test, expect } from '@playwright/test';
 test.describe('Fragments & health', () => {
   test('fragment management page loads', async ({ page }) => {
     await page.goto('/fragments');
-    await expect(page.getByRole('heading', { name: '片段管理' })).toBeVisible();
+
+    await expect(page.getByTestId('fragment-management-page')).toBeVisible();
+    await expect(page.getByTestId('fragment-management-breadcrumb-current')).toHaveText('片段管理');
+    await expect(page.getByTestId('create-fragment-button')).toBeVisible();
+
+    const fragmentCards = page.getByTestId('fragment-card');
+    if (await fragmentCards.count()) {
+      await expect(fragmentCards.first()).toBeVisible();
+    } else {
+      await expect(page.getByRole('heading', { name: '暂无片段' })).toBeVisible();
+    }
   });
 
-  test('health dashboard loads', async ({ page }) => {
-    await page.goto('/fragments/health');
-    await expect(page.getByRole('heading', { name: '知识健康度仪表盘' })).toBeVisible();
+  test('health dashboard opens from fragment management', async ({ page }) => {
+    await page.goto('/fragments');
+    await page.getByTestId('fragment-management-health-link').click();
+
+    await expect(page).toHaveURL(/\/fragments\/health$/);
+    await expect(page.getByTestId('knowledge-health-dashboard')).toBeVisible();
+    await expect(page.getByTestId('health-dashboard-recent-active')).toBeVisible();
   });
 });
