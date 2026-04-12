@@ -1,0 +1,285 @@
+[
+  {
+    "id": "frag-001-usecase",
+    "title": "用例图绘制规范",
+    "tags": [
+      "UML",
+      "需求分析",
+      "用例图"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "用例图是描述系统功能的重要工具，用于展示系统与外部实体的交互。\n\n基本元素：\n- 参与者 (Actor)：与系统交互的外部实体\n- 用例 (Use Case)：系统提供的功能单元\n- 系统边界：定义系统范围",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-11T10:00:00.000Z",
+    "updatedAt": "2026-04-11T10:30:00.000Z",
+    "referencedDocuments": [],
+    "source": "软件工程教材",
+    "trustScore": 4,
+    "lastVerifiedAt": "2026-04-10T00:00:00.000Z",
+    "verifiedBy": "张工程师",
+    "categoryPathIds": [
+      "cat-uml",
+      "cat-requirement"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "frag-002-class",
+    "title": "类图设计原则",
+    "tags": [
+      "UML",
+      "设计模式",
+      "类图",
+      "SOLID"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "类图是面向对象设计的核心图表，遵循 SOLID 原则可提高代码质量。\n\nSOLID 原则：\n1. 单一职责原则 (SRP)：一个类只负责一项职责\n2. 开闭原则 (OCP)：对扩展开放，对修改关闭\n3. 里氏替换原则 (LSP)：子类可以替换父类\n4. 接口隔离原则 (ISP)：接口职责单一\n5. 依赖倒置原则 (DIP)：依赖抽象而非具体",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-11T10:30:00.000Z",
+    "updatedAt": "2026-04-11T11:00:00.000Z",
+    "referencedDocuments": [],
+    "source": "设计模式书籍",
+    "trustScore": 5,
+    "lastVerifiedAt": "2026-04-09T00:00:00.000Z",
+    "verifiedBy": "李架构师",
+    "categoryPathIds": [
+      "cat-uml",
+      "cat-design"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "frag-003-state",
+    "title": "状态图绘制规范",
+    "tags": [
+      "UML",
+      "状态机",
+      "行为建模"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "状态图用于描述对象在其生命周期内的状态变化。\n\n基本符号：\n- 初始状态：实心圆点\n- 终止状态：圆圈内实心圆\n- 状态：圆角矩形\n- 转换：带箭头的线，标注事件/条件",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-11T10:45:00.000Z",
+    "updatedAt": "2026-04-11T11:15:00.000Z",
+    "referencedDocuments": [],
+    "source": "UML标准规范",
+    "trustScore": 4,
+    "lastVerifiedAt": "2026-04-08T00:00:00.000Z",
+    "verifiedBy": "王设计师",
+    "categoryPathIds": [
+      "cat-uml",
+      "cat-behavior"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "frag-004-testcase",
+    "title": "测试用例编写规范",
+    "tags": [
+      "测试",
+      "测试用例",
+      "质量保障"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "测试用例是软件测试的核心产出物，规范的编写有助于提高测试效率。\n\n用例结构：\n- 用例ID：唯一标识符\n- 用例名称：简洁描述测试目的\n- 前置条件：执行测试前必须满足的条件\n- 测试步骤：详细的操作步骤\n- 预期结果：期望的系统行为\n\n优先级定义：\n- P0：核心功能，必须测试\n- P1：重要功能，应该测试\n- P2：一般功能，建议测试",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-11T11:00:00.000Z",
+    "updatedAt": "2026-04-11T11:30:00.000Z",
+    "referencedDocuments": [],
+    "source": "测试最佳实践",
+    "trustScore": 4,
+    "lastVerifiedAt": "2026-04-10T00:00:00.000Z",
+    "verifiedBy": "赵测试工程师",
+    "categoryPathIds": [
+      "cat-testing"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "frag-005-agile",
+    "title": "敏捷开发流程",
+    "tags": [
+      "敏捷",
+      "Scrum",
+      "项目管理"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "敏捷开发是一种以人为核心、迭代、循序渐进的开发方法。\n\nScrum 核心角色：\n- 产品负责人 (PO)：负责产品待办列表\n- Scrum Master：流程引导者，消除障碍\n- 开发团队：跨职能的自组织团队\n\nScrum 事件：\n- Sprint 计划会：确定本次迭代目标\n- 每日站会：15分钟同步进度\n- Sprint 评审：展示完成的工作\n- Sprint 回顾：总结改进点",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-11T11:30:00.000Z",
+    "updatedAt": "2026-04-11T12:00:00.000Z",
+    "referencedDocuments": [],
+    "source": "Scrum指南",
+    "trustScore": 5,
+    "lastVerifiedAt": "2026-04-09T00:00:00.000Z",
+    "verifiedBy": "孙项目经理",
+    "categoryPathIds": [
+      "cat-agile",
+      "cat-management"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "frag-006-git",
+    "title": "Git 分支管理策略",
+    "tags": [
+      "Git",
+      "版本控制",
+      "分支策略"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "合理的分支策略是团队协作的基础，Git Flow 是最常用的分支模型之一。\n\n主要分支：\n- main/master：生产环境代码\n- develop：开发主分支\n\n辅助分支：\n- feature/*：功能开发分支\n- release/*：发布准备分支\n- hotfix/*：紧急修复分支",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-11T11:45:00.000Z",
+    "updatedAt": "2026-04-11T12:00:00.000Z",
+    "referencedDocuments": [],
+    "source": "Git官方文档",
+    "trustScore": 5,
+    "lastVerifiedAt": "2026-04-10T00:00:00.000Z",
+    "verifiedBy": "周开发工程师",
+    "categoryPathIds": [
+      "cat-vcs"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "frag-007-codereview",
+    "title": "代码审查清单",
+    "tags": [
+      "代码审查",
+      "质量保障",
+      "最佳实践"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "代码审查是保证代码质量的重要环节，以下清单可作为审查参考。\n\n功能性检查：\n- 代码是否实现了预期功能？\n- 边界条件是否处理正确？\n- 错误处理是否完善？\n\n代码质量检查：\n- 代码是否易于阅读和理解？\n- 命名是否清晰、有意义？\n- 是否有重复代码可以抽取？\n- 是否有足够的注释和文档？",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-11T12:00:00.000Z",
+    "updatedAt": "2026-04-11T12:15:00.000Z",
+    "referencedDocuments": [],
+    "source": "团队编码规范",
+    "trustScore": 3,
+    "lastVerifiedAt": "2026-04-05T00:00:00.000Z",
+    "verifiedBy": "吴工程师",
+    "categoryPathIds": [
+      "cat-quality"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "frag-008-archived",
+    "title": "旧版需求分析模板",
+    "tags": [
+      "需求",
+      "模板",
+      "已归档"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "此模板已被新版需求规格说明书模板替代，保留作为参考。",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2025-06-01T00:00:00.000Z",
+    "updatedAt": "2026-01-15T00:00:00.000Z",
+    "referencedDocuments": [],
+    "source": "历史文档",
+    "trustScore": 2,
+    "lastVerifiedAt": "2025-12-01T00:00:00.000Z",
+    "verifiedBy": "历史记录",
+    "categoryPathIds": [
+      "cat-legacy"
+    ],
+    "status": "archived"
+  },
+  {
+    "id": "frag-009-deprecated",
+    "title": "瀑布模型开发流程",
+    "tags": [
+      "瀑布模型",
+      "已废弃"
+    ],
+    "nodes": [
+      {
+        "type": "text",
+        "content": "瀑布模型已不再适用于当前项目，团队已全面转向敏捷开发。",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2025-06-01T00:00:00.000Z",
+    "referencedDocuments": [],
+    "source": "历史文档",
+    "trustScore": 1,
+    "lastVerifiedAt": "2024-06-01T00:00:00.000Z",
+    "verifiedBy": "历史记录",
+    "categoryPathIds": [
+      "cat-legacy"
+    ],
+    "status": "deprecated"
+  },
+  {
+    "id": "167d6ed5-0f84-44a6-b8ac-cdfcf68c0c08",
+    "title": "### 1.1 目的  本文档描述知识管理系统的测试策略、测试范围和测试计划。",
+    "tags": [],
+    "nodes": [
+      {
+        "type": "heading",
+        "level": 3,
+        "text": "1.1 目的"
+      },
+      {
+        "type": "text",
+        "content": "本文档描述知识管理系统的测试策略、测试范围和测试计划。",
+        "marks": []
+      }
+    ],
+    "assetDependencies": [],
+    "createdAt": "2026-04-12T07:42:59.032Z",
+    "updatedAt": "2026-04-12T07:42:59.036Z",
+    "referencedDocuments": [],
+    "source": "",
+    "trustScore": 3,
+    "lastVerifiedAt": null,
+    "verifiedBy": "",
+    "categoryPathIds": [],
+    "status": "active"
+  }
+]

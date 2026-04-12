@@ -1,6 +1,43 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-04-11T10:49:26.492Z",
-  "documents": [],
+  "updatedAt": "2026-04-11T12:00:00.000Z",
+  "documents": [
+    {
+      "id": "doc-001-srs",
+      "title": "软件需求规格说明书",
+      "fileName": "软件需求规格说明书.md",
+      "folderId": null,
+      "createdAt": "2026-04-11T10:00:00.000Z",
+      "updatedAt": "2026-04-11T11:30:00.000Z",
+      "fragmentReferences": []
+    },
+    {
+      "id": "doc-002-sdd",
+      "title": "软件设计文档",
+      "fileName": "软件设计文档.md",
+      "folderId": null,
+      "createdAt": "2026-04-11T10:30:00.000Z",
+      "updatedAt": "2026-04-11T11:45:00.000Z",
+      "fragmentReferences": []
+    },
+    {
+      "id": "doc-003-tp",
+      "title": "测试计划文档",
+      "fileName": "测试计划文档.md",
+      "folderId": null,
+      "createdAt": "2026-04-11T11:00:00.000Z",
+      "updatedAt": "2026-04-11T12:00:00.000Z",
+      "fragmentReferences": []
+    },
+    {
+      "id": "doc-004-pp",
+      "title": "项目计划文档",
+      "fileName": "项目计划文档.md",
+      "folderId": null,
+      "createdAt": "2026-04-11T11:30:00.000Z",
+      "updatedAt": "2026-04-11T12:15:00.000Z",
+      "fragmentReferences": []
+    }
+  ],
   "folders": []
 }

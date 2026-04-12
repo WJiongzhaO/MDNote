@@ -56,10 +56,8 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
   private readonly instanceId: number;
 
   constructor() {
-    // 分配实例ID用于调试
     ExtensibleMarkdownProcessor.instanceCounter++;
     this.instanceId = ExtensibleMarkdownProcessor.instanceCounter;
-    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId} created`);
 
     this.configureMarked();
     this.registerDefaultExtensions();
@@ -249,17 +247,14 @@ export class ExtensibleMarkdownProcessor implements MarkdownProcessor, DocumentP
 
   setTemplateProcessor(processor: TemplateProcessor): void {
     this.templateProcessor = processor;
-    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId}: Template processor configured`);
   }
 
   setMathRenderer(renderer: MathRenderer): void {
     this.mathRenderer = renderer;
-    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId}: Math renderer configured`);
   }
 
   setMermaidRenderer(renderer: MermaidRenderer): void {
     this.mermaidRenderer = renderer;
-    console.log(`[ExtensibleMarkdownProcessor] Instance #${this.instanceId}: Mermaid renderer configured`);
   }
 
   private getExtensionsByPriority(): MarkdownExtension[] {

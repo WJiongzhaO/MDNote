@@ -808,15 +808,12 @@ const handleFragmentUpdated = async (fragmentId: string) => {
 
 // 监听菜单事件
 onMounted(async () => {
-  console.log('[NewAppLayout] onMounted - Initializing...')
-
   const electronAPI = (window as any).electronAPI
 
   const vaultPath = route.query.vaultPath as string | undefined
   const vaultId = route.query.vaultId as string | undefined
 
   if (vaultPath) {
-    console.log('[NewAppLayout] Loading vault from route params:', vaultPath)
     dataPath.value = vaultPath
     lastOpenedFolderPath.value = vaultPath
 

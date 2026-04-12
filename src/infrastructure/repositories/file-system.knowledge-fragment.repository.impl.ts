@@ -54,34 +54,21 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
     try {
       const electronAPI = (window as any).electronAPI
       if (!electronAPI || !electronAPI.file) {
-        console.warn(
-          '[FileSystemKnowledgeFragmentRepository] 文件 API 不可用，使用 LocalStorage fallback',
-        )
         return this.getLocalStorageFallback()
       }
 
-      // 获取当前知识库的路径（而不是全局数据路径）
       let basePath: string
       if (electronAPI.file.getDataPath) {
         basePath = await electronAPI.file.getDataPath()
       } else if (electronAPI.file.getCustomDataPath) {
         basePath = await electronAPI.file.getCustomDataPath()
       } else {
-        // 回退到 LocalStorage
         return this.getLocalStorageFallback()
       }
 
-      console.log(
-        `[FileSystemKnowledgeFragmentRepository] Loading from path: ${basePath}, vaultId: ${this.vaultId}`,
-      )
-
-      // 使用 vaultId 区分不同知识库的片段存储
       const fragmentDir = `${basePath}/${this.getFragmentDirName()}`
       const filePath = `${fragmentDir}/${this.FILE_NAME}`
 
-      console.log(`[FileSystemKnowledgeFragmentRepository] Full file path: ${filePath}`)
-
-      // 确保目录存在
       try {
         const dirExists = await electronAPI.file.exists(fragmentDir)
         if (!dirExists) {

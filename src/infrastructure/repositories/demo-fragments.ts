@@ -187,12 +187,10 @@ export function seedDemoFragments(): void {
   try {
     const existing = localStorage.getItem(STORAGE_KEY)
     if (existing && existing !== '[]') {
-      console.log('[Demo] 知识片段已存在，跳过种子数据')
       return
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleFragments))
-    console.log('[Demo] 已添加 7 个示例知识片段')
   } catch (error) {
     console.error('[Demo] 种子数据添加失败:', error)
   }
@@ -203,12 +201,10 @@ export function seedDemoCategories(vaultId: string = 'default'): void {
     const key = `${CATEGORY_KEY_PREFIX}${vaultId}`
     const existing = localStorage.getItem(key)
     if (existing && existing !== '[]') {
-      console.log('[Demo] 分类已存在，跳过种子数据')
       return
     }
 
     localStorage.setItem(key, JSON.stringify(sampleCategories))
-    console.log('[Demo] 已添加 7 个示例分类')
   } catch (error) {
     console.error('[Demo] 分类种子数据添加失败:', error)
   }

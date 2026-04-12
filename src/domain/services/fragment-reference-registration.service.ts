@@ -31,17 +31,23 @@ export class FragmentReferenceRegistrationService {
     position: number,
     length: number
   ): Promise<void> {
+    console.log('[FragmentReferenceRegistrationService] registerReference 开始:', { documentId, fragmentId, position, length });
+    
     // 获取文档
     const document = await this.documentRepository.findById({ value: documentId });
     if (!document) {
+      console.error('[FragmentReferenceRegistrationService] Document not found:', documentId);
       throw new Error(`Document ${documentId} not found`);
     }
+    console.log('[FragmentReferenceRegistrationService] 找到文档:', document.getTitle().value);
 
     // 获取知识片段
     const fragment = await this.fragmentRepository.findById({ value: fragmentId });
     if (!fragment) {
+      console.error('[FragmentReferenceRegistrationService] Fragment not found:', fragmentId);
       throw new Error(`Fragment ${fragmentId} not found`);
     }
+    console.log('[FragmentReferenceRegistrationService] 找到片段:', fragment.getTitle().value);
 
     // 在文档中添加引用信息
     document.addFragmentReference(
@@ -50,13 +56,20 @@ export class FragmentReferenceRegistrationService {
       position,
       length
     );
+    console.log('[FragmentReferenceRegistrationService] 已在文档中添加引用信息');
 
     // 在片段中添加反向引用
     fragment.addReferencedDocument(documentId, document.getTitle().value);
+    console.log('[FragmentReferenceRegistrationService] 已在片段中添加反向引用，当前引用数:', fragment.getReferencedDocuments().length);
 
     // 保存
+    console.log('[FragmentReferenceRegistrationService] 开始保存文档...');
     await this.documentRepository.save(document);
+    console.log('[FragmentReferenceRegistrationService] 文档保存成功');
+    
+    console.log('[FragmentReferenceRegistrationService] 开始保存片段...');
     await this.fragmentRepository.save(fragment);
+    console.log('[FragmentReferenceRegistrationService] 片段保存成功，引用注册完成');
   }
 
   /**
@@ -70,17 +83,24 @@ export class FragmentReferenceRegistrationService {
     position: number,
     length: number
   ): Promise<void> {
+    console.log('[FragmentReferenceRegistrationService] registerExternalFileReference 开始:', { fileDocumentId, fileName, fragmentId, position, length });
+    
     // 获取知识片段
     const fragment = await this.fragmentRepository.findById({ value: fragmentId });
     if (!fragment) {
+      console.error('[FragmentReferenceRegistrationService] Fragment not found:', fragmentId);
       throw new Error(`Fragment ${fragmentId} not found`);
     }
+    console.log('[FragmentReferenceRegistrationService] 找到片段:', fragment.getTitle().value);
 
     // 在片段中添加反向引用（使用 file: 前缀标识外部文件）
     fragment.addReferencedDocument(fileDocumentId, fileName);
+    console.log('[FragmentReferenceRegistrationService] 已在片段中添加反向引用，当前引用数:', fragment.getReferencedDocuments().length);
 
     // 保存片段
+    console.log('[FragmentReferenceRegistrationService] 开始保存片段...');
     await this.fragmentRepository.save(fragment);
+    console.log('[FragmentReferenceRegistrationService] 片段保存成功，外部文件引用注册完成');
   }
 
   /**

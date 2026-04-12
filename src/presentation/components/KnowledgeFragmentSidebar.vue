@@ -1135,7 +1135,6 @@ const currentDocumentContext = ref<{ documentId?: string; filePath?: string }>({
 
 // 设置文档上下文（由父组件调用）
 const setDocumentContext = (context: { documentId?: string; filePath?: string }) => {
-  console.log('知识片段侧边栏收到文档上下文:', context)
   currentDocumentContext.value = context
 }
 

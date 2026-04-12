@@ -4855,6 +4855,30 @@ defineExpose({
   color: var(--preview-link);
 }
 
+/* 表格样式 */
+.markdown-preview :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+  font-size: 0.9em;
+}
+
+.markdown-preview :deep(table th),
+.markdown-preview :deep(table td) {
+  border: 1px solid var(--border-primary);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-preview :deep(table th) {
+  background-color: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.markdown-preview :deep(table tr:nth-child(even)) {
+  background-color: var(--bg-tertiary);
+}
+
 /* 编辑器内容样式 */
 .markdown-editor-content {
   flex: 1;

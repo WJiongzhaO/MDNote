@@ -389,6 +389,25 @@ onMounted(load)
   min-height: 200px;
   line-height: 1.55;
 }
+.markdown-preview :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0;
+  font-size: 0.9em;
+}
+.markdown-preview :deep(table th),
+.markdown-preview :deep(table td) {
+  border: 1px solid var(--border-primary, #e0e0e0);
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-preview :deep(table th) {
+  background-color: var(--bg-secondary, #f8f9fa);
+  font-weight: 600;
+}
+.markdown-preview :deep(table tr:nth-child(even)) {
+  background-color: var(--bg-tertiary, #e9ecef);
+}
 .health-card {
   padding: 14px;
 }

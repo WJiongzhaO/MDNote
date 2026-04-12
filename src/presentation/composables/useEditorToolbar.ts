@@ -192,14 +192,6 @@ export function useEditorToolbar(
       text: range.toString()
     };
 
-    // 调试日志：显示选区信息
-    console.log('[选区更新]', {
-      text: range.toString(),
-      start: position.start,
-      end: position.end,
-      collapsed: range.collapsed
-    });
-
     // 检测格式状态
     detectFormats(range);
 

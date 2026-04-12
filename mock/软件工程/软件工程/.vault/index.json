@@ -1,9 +1,66 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-04-11T10:49:26.492Z",
-  "idMap": {},
-  "referenceGraph": {},
+  "updatedAt": "2026-04-11T12:15:00.000Z",
+  "idMap": {
+    "doc-001-srs": "软件需求规格说明书.md",
+    "doc-002-sdd": "软件设计文档.md",
+    "doc-003-tp": "测试计划文档.md",
+    "doc-004-pp": "项目计划文档.md"
+  },
+  "referenceGraph": {
+    "doc-001-srs": {
+      "outgoing": ["frag-001-usecase"],
+      "incoming": []
+    },
+    "doc-002-sdd": {
+      "outgoing": ["frag-002-class", "frag-003-state"],
+      "incoming": []
+    },
+    "doc-003-tp": {
+      "outgoing": ["frag-004-testcase"],
+      "incoming": []
+    },
+    "doc-004-pp": {
+      "outgoing": ["frag-005-agile"],
+      "incoming": []
+    },
+    "frag-001-usecase": {
+      "outgoing": [],
+      "incoming": ["doc-001-srs"]
+    },
+    "frag-002-class": {
+      "outgoing": [],
+      "incoming": ["doc-002-sdd"]
+    },
+    "frag-003-state": {
+      "outgoing": [],
+      "incoming": ["doc-002-sdd"]
+    },
+    "frag-004-testcase": {
+      "outgoing": [],
+      "incoming": ["doc-003-tp"]
+    },
+    "frag-005-agile": {
+      "outgoing": [],
+      "incoming": ["doc-004-pp"]
+    }
+  },
   "searchIndex": {
-    "invertedIndex": {}
+    "invertedIndex": {
+      "需求": ["doc-001-srs", "frag-001-usecase", "frag-008-archived"],
+      "设计": ["doc-002-sdd", "frag-002-class"],
+      "测试": ["doc-003-tp", "frag-004-testcase"],
+      "项目": ["doc-004-pp", "frag-005-agile"],
+      "UML": ["frag-001-usecase", "frag-002-class", "frag-003-state"],
+      "用例图": ["frag-001-usecase"],
+      "类图": ["frag-002-class"],
+      "状态图": ["frag-003-state"],
+      "敏捷": ["frag-005-agile"],
+      "Scrum": ["frag-005-agile"],
+      "Git": ["frag-006-git"],
+      "代码审查": ["frag-007-codereview"],
+      "SOLID": ["frag-002-class"],
+      "测试用例": ["frag-004-testcase"]
+    }
   }
 }

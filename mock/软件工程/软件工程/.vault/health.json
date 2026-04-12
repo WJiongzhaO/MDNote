@@ -1,5 +1,40 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-04-11T10:49:26.492Z",
-  "snapshots": []
+  "updatedAt": "2026-04-11T12:15:00.000Z",
+  "snapshots": [
+    {
+      "id": "snapshot-001",
+      "timestamp": "2026-04-11T12:00:00.000Z",
+      "summary": "初始健康度评估",
+      "metrics": {
+        "totalFragments": 9,
+        "activeFragments": 7,
+        "averageHealthScore": 74.78,
+        "averageTrustScore": 3.67,
+        "referenceCoverage": 55.56
+      },
+      "breakdown": {
+        "byStatus": {
+          "active": 7,
+          "archived": 1,
+          "deprecated": 1
+        },
+        "byTrustLevel": {
+          "level1": 1,
+          "level2": 1,
+          "level3": 1,
+          "level4": 3,
+          "level5": 3
+        },
+        "byCategory": {
+          "cat-uml": 3,
+          "cat-testing": 1,
+          "cat-agile": 1,
+          "cat-vcs": 1,
+          "cat-quality": 1,
+          "cat-legacy": 2
+        }
+      }
+    }
+  ]
 }

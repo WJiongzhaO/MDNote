@@ -1,12 +1,962 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-04-11T10:49:26.492Z",
-  "fragments": [],
-  "tagIndex": {},
-  "categoryIndex": {},
+  "updatedAt": "2026-04-11T12:00:00.000Z",
+  "fragments": [
+    {
+      "id": "frag-001-usecase",
+      "title": "用例图绘制规范",
+      "tags": ["UML", "需求分析", "用例图"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "用例图绘制规范"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "用例图是描述系统功能的重要工具，用于展示系统与外部实体的交互。"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "基本元素"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "参与者 (Actor)：与系统交互的外部实体"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "用例 (Use Case)：系统提供的功能单元"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "系统边界：定义系统范围"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": "doc-001-srs",
+      "referencedDocuments": [
+        {
+          "documentId": "doc-001-srs",
+          "documentTitle": "软件需求规格说明书",
+          "referencedAt": "2026-04-11T10:30:00.000Z",
+          "isConnected": true
+        }
+      ],
+      "createdAt": "2026-04-11T10:00:00.000Z",
+      "updatedAt": "2026-04-11T10:30:00.000Z",
+      "source": "软件工程教材",
+      "trustScore": 4,
+      "lastVerifiedAt": "2026-04-10T00:00:00.000Z",
+      "verifiedBy": "张工程师",
+      "categoryPathIds": ["cat-uml", "cat-requirement"],
+      "status": "active",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-002-class",
+      "title": "类图设计原则",
+      "tags": ["UML", "设计模式", "类图", "SOLID"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "类图设计原则"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "类图是面向对象设计的核心图表，遵循 SOLID 原则可提高代码质量。"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "SOLID 原则"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "单一职责原则 (SRP)：一个类只负责一项职责"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "开闭原则 (OCP)：对扩展开放，对修改关闭"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "里氏替换原则 (LSP)：子类可以替换父类"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "接口隔离原则 (ISP)：接口职责单一"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "依赖倒置原则 (DIP)：依赖抽象而非具体"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": "doc-002-sdd",
+      "referencedDocuments": [
+        {
+          "documentId": "doc-002-sdd",
+          "documentTitle": "软件设计文档",
+          "referencedAt": "2026-04-11T11:00:00.000Z",
+          "isConnected": true
+        }
+      ],
+      "createdAt": "2026-04-11T10:30:00.000Z",
+      "updatedAt": "2026-04-11T11:00:00.000Z",
+      "source": "设计模式书籍",
+      "trustScore": 5,
+      "lastVerifiedAt": "2026-04-09T00:00:00.000Z",
+      "verifiedBy": "李架构师",
+      "categoryPathIds": ["cat-uml", "cat-design"],
+      "status": "active",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-003-state",
+      "title": "状态图绘制规范",
+      "tags": ["UML", "状态机", "行为建模"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "状态图绘制规范"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "状态图用于描述对象在其生命周期内的状态变化。"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "基本符号"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "初始状态：实心圆点"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "终止状态：圆圈内实心圆"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "状态：圆角矩形"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "转换：带箭头的线，标注事件/条件"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": "doc-002-sdd",
+      "referencedDocuments": [
+        {
+          "documentId": "doc-002-sdd",
+          "documentTitle": "软件设计文档",
+          "referencedAt": "2026-04-11T11:15:00.000Z",
+          "isConnected": true
+        }
+      ],
+      "createdAt": "2026-04-11T10:45:00.000Z",
+      "updatedAt": "2026-04-11T11:15:00.000Z",
+      "source": "UML标准规范",
+      "trustScore": 4,
+      "lastVerifiedAt": "2026-04-08T00:00:00.000Z",
+      "verifiedBy": "王设计师",
+      "categoryPathIds": ["cat-uml", "cat-behavior"],
+      "status": "active",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-004-testcase",
+      "title": "测试用例编写规范",
+      "tags": ["测试", "测试用例", "质量保障"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "测试用例编写规范"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "测试用例是软件测试的核心产出物，规范的编写有助于提高测试效率。"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "用例结构"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "用例ID：唯一标识符"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "用例名称：简洁描述测试目的"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "前置条件：执行测试前必须满足的条件"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "测试步骤：详细的操作步骤"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "预期结果：期望的系统行为"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "优先级定义"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "P0：核心功能，必须测试"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "P1：重要功能，应该测试"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "P2：一般功能，建议测试"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": "doc-003-tp",
+      "referencedDocuments": [
+        {
+          "documentId": "doc-003-tp",
+          "documentTitle": "测试计划文档",
+          "referencedAt": "2026-04-11T11:30:00.000Z",
+          "isConnected": true
+        }
+      ],
+      "createdAt": "2026-04-11T11:00:00.000Z",
+      "updatedAt": "2026-04-11T11:30:00.000Z",
+      "source": "测试最佳实践",
+      "trustScore": 4,
+      "lastVerifiedAt": "2026-04-10T00:00:00.000Z",
+      "verifiedBy": "赵测试工程师",
+      "categoryPathIds": ["cat-testing"],
+      "status": "active",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-005-agile",
+      "title": "敏捷开发流程",
+      "tags": ["敏捷", "Scrum", "项目管理"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "敏捷开发流程"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "敏捷开发是一种以人为核心、迭代、循序渐进的开发方法。"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "Scrum 核心角色"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "产品负责人 (PO)：负责产品待办列表"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "Scrum Master：流程引导者，消除障碍"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "开发团队：跨职能的自组织团队"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "Scrum 事件"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "Sprint 计划会：确定本次迭代目标"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "每日站会：15分钟同步进度"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "Sprint 评审：展示完成的工作"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "Sprint 回顾：总结改进点"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": "doc-004-pp",
+      "referencedDocuments": [
+        {
+          "documentId": "doc-004-pp",
+          "documentTitle": "项目计划文档",
+          "referencedAt": "2026-04-11T12:00:00.000Z",
+          "isConnected": true
+        }
+      ],
+      "createdAt": "2026-04-11T11:30:00.000Z",
+      "updatedAt": "2026-04-11T12:00:00.000Z",
+      "source": "Scrum指南",
+      "trustScore": 5,
+      "lastVerifiedAt": "2026-04-09T00:00:00.000Z",
+      "verifiedBy": "孙项目经理",
+      "categoryPathIds": ["cat-agile", "cat-management"],
+      "status": "active",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-006-git",
+      "title": "Git 分支管理策略",
+      "tags": ["Git", "版本控制", "分支策略"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "Git 分支管理策略"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "合理的分支策略是团队协作的基础，Git Flow 是最常用的分支模型之一。"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "主要分支"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "main/master：生产环境代码"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "develop：开发主分支"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "辅助分支"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "feature/*：功能开发分支"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "release/*：发布准备分支"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "hotfix/*：紧急修复分支"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": null,
+      "referencedDocuments": [],
+      "createdAt": "2026-04-11T11:45:00.000Z",
+      "updatedAt": "2026-04-11T12:00:00.000Z",
+      "source": "Git官方文档",
+      "trustScore": 5,
+      "lastVerifiedAt": "2026-04-10T00:00:00.000Z",
+      "verifiedBy": "周开发工程师",
+      "categoryPathIds": ["cat-vcs"],
+      "status": "active",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-007-codereview",
+      "title": "代码审查清单",
+      "tags": ["代码审查", "质量保障", "最佳实践"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "代码审查清单"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "代码审查是保证代码质量的重要环节，以下清单可作为审查参考。"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "功能性检查"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "代码是否实现了预期功能？"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "边界条件是否处理正确？"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "错误处理是否完善？"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "children": [
+            {
+              "type": "text",
+              "content": "代码质量检查"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "代码是否易于阅读和理解？"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "命名是否清晰、有意义？"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "是否有重复代码可以抽取？"
+                }
+              ]
+            },
+            {
+              "type": "list_item",
+              "children": [
+                {
+                  "type": "text",
+                  "content": "是否有足够的注释和文档？"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": null,
+      "referencedDocuments": [],
+      "createdAt": "2026-04-11T12:00:00.000Z",
+      "updatedAt": "2026-04-11T12:15:00.000Z",
+      "source": "团队编码规范",
+      "trustScore": 3,
+      "lastVerifiedAt": "2026-04-05T00:00:00.000Z",
+      "verifiedBy": "吴工程师",
+      "categoryPathIds": ["cat-quality"],
+      "status": "active",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-008-archived",
+      "title": "旧版需求分析模板",
+      "tags": ["需求", "模板", "已归档"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "旧版需求分析模板"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "此模板已被新版需求规格说明书模板替代，保留作为参考。"
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": null,
+      "referencedDocuments": [],
+      "createdAt": "2025-06-01T00:00:00.000Z",
+      "updatedAt": "2026-01-15T00:00:00.000Z",
+      "source": "历史文档",
+      "trustScore": 2,
+      "lastVerifiedAt": "2025-12-01T00:00:00.000Z",
+      "verifiedBy": "历史记录",
+      "categoryPathIds": ["cat-legacy"],
+      "status": "archived",
+      "derivedFromId": null,
+      "versionHistory": []
+    },
+    {
+      "id": "frag-009-deprecated",
+      "title": "瀑布模型开发流程",
+      "tags": ["瀑布模型", "已废弃"],
+      "nodes": [
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "content": "瀑布模型开发流程"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "content": "瀑布模型已不再适用于当前项目，团队已全面转向敏捷开发。"
+            }
+          ]
+        }
+      ],
+      "assetDependencies": [],
+      "sourceDocumentId": null,
+      "referencedDocuments": [],
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2025-06-01T00:00:00.000Z",
+      "source": "历史文档",
+      "trustScore": 1,
+      "lastVerifiedAt": "2024-06-01T00:00:00.000Z",
+      "verifiedBy": "历史记录",
+      "categoryPathIds": ["cat-legacy"],
+      "status": "deprecated",
+      "derivedFromId": null,
+      "versionHistory": []
+    }
+  ],
+  "tagIndex": {
+    "UML": ["frag-001-usecase", "frag-002-class", "frag-003-state"],
+    "需求分析": ["frag-001-usecase"],
+    "用例图": ["frag-001-usecase"],
+    "设计模式": ["frag-002-class"],
+    "类图": ["frag-002-class"],
+    "SOLID": ["frag-002-class"],
+    "状态机": ["frag-003-state"],
+    "行为建模": ["frag-003-state"],
+    "测试": ["frag-004-testcase"],
+    "测试用例": ["frag-004-testcase"],
+    "质量保障": ["frag-004-testcase", "frag-007-codereview"],
+    "敏捷": ["frag-005-agile"],
+    "Scrum": ["frag-005-agile"],
+    "项目管理": ["frag-005-agile"],
+    "Git": ["frag-006-git"],
+    "版本控制": ["frag-006-git"],
+    "分支策略": ["frag-006-git"],
+    "代码审查": ["frag-007-codereview"],
+    "最佳实践": ["frag-007-codereview"],
+    "需求": ["frag-008-archived"],
+    "模板": ["frag-008-archived"],
+    "已归档": ["frag-008-archived"],
+    "瀑布模型": ["frag-009-deprecated"],
+    "已废弃": ["frag-009-deprecated"]
+  },
+  "categoryIndex": {
+    "cat-uml": ["frag-001-usecase", "frag-002-class", "frag-003-state"],
+    "cat-requirement": ["frag-001-usecase"],
+    "cat-design": ["frag-002-class"],
+    "cat-behavior": ["frag-003-state"],
+    "cat-testing": ["frag-004-testcase"],
+    "cat-agile": ["frag-005-agile"],
+    "cat-management": ["frag-005-agile"],
+    "cat-vcs": ["frag-006-git"],
+    "cat-quality": ["frag-007-codereview"],
+    "cat-legacy": ["frag-008-archived", "frag-009-deprecated"]
+  },
   "statusIndex": {
-    "active": [],
-    "archived": [],
-    "deprecated": []
+    "active": ["frag-001-usecase", "frag-002-class", "frag-003-state", "frag-004-testcase", "frag-005-agile", "frag-006-git", "frag-007-codereview"],
+    "archived": ["frag-008-archived"],
+    "deprecated": ["frag-009-deprecated"]
   }
 }

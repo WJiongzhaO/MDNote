@@ -1,6 +1,156 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-04-11T10:49:26.492Z",
-  "nodes": [],
-  "edges": []
+  "updatedAt": "2026-04-11T12:15:00.000Z",
+  "nodes": [
+    {
+      "id": "doc-001-srs",
+      "type": "document",
+      "label": "软件需求规格说明书",
+      "healthScore": 85,
+      "status": "active"
+    },
+    {
+      "id": "doc-002-sdd",
+      "type": "document",
+      "label": "软件设计文档",
+      "healthScore": 90,
+      "status": "active"
+    },
+    {
+      "id": "doc-003-tp",
+      "type": "document",
+      "label": "测试计划文档",
+      "healthScore": 80,
+      "status": "active"
+    },
+    {
+      "id": "doc-004-pp",
+      "type": "document",
+      "label": "项目计划文档",
+      "healthScore": 88,
+      "status": "active"
+    },
+    {
+      "id": "frag-001-usecase",
+      "type": "fragment",
+      "label": "用例图绘制规范",
+      "healthScore": 92,
+      "status": "active",
+      "trustScore": 4
+    },
+    {
+      "id": "frag-002-class",
+      "type": "fragment",
+      "label": "类图设计原则",
+      "healthScore": 95,
+      "status": "active",
+      "trustScore": 5
+    },
+    {
+      "id": "frag-003-state",
+      "type": "fragment",
+      "label": "状态图绘制规范",
+      "healthScore": 88,
+      "status": "active",
+      "trustScore": 4
+    },
+    {
+      "id": "frag-004-testcase",
+      "type": "fragment",
+      "label": "测试用例编写规范",
+      "healthScore": 85,
+      "status": "active",
+      "trustScore": 4
+    },
+    {
+      "id": "frag-005-agile",
+      "type": "fragment",
+      "label": "敏捷开发流程",
+      "healthScore": 90,
+      "status": "active",
+      "trustScore": 5
+    },
+    {
+      "id": "frag-006-git",
+      "type": "fragment",
+      "label": "Git 分支管理策略",
+      "healthScore": 88,
+      "status": "active",
+      "trustScore": 5
+    },
+    {
+      "id": "frag-007-codereview",
+      "type": "fragment",
+      "label": "代码审查清单",
+      "healthScore": 75,
+      "status": "active",
+      "trustScore": 3
+    },
+    {
+      "id": "frag-008-archived",
+      "type": "fragment",
+      "label": "旧版需求分析模板",
+      "healthScore": 40,
+      "status": "archived",
+      "trustScore": 2
+    },
+    {
+      "id": "frag-009-deprecated",
+      "type": "fragment",
+      "label": "瀑布模型开发流程",
+      "healthScore": 20,
+      "status": "deprecated",
+      "trustScore": 1
+    }
+  ],
+  "edges": [
+    {
+      "source": "doc-001-srs",
+      "target": "frag-001-usecase",
+      "type": "references",
+      "weight": 1
+    },
+    {
+      "source": "doc-002-sdd",
+      "target": "frag-002-class",
+      "type": "references",
+      "weight": 1
+    },
+    {
+      "source": "doc-002-sdd",
+      "target": "frag-003-state",
+      "type": "references",
+      "weight": 1
+    },
+    {
+      "source": "doc-003-tp",
+      "target": "frag-004-testcase",
+      "type": "references",
+      "weight": 1
+    },
+    {
+      "source": "doc-004-pp",
+      "target": "frag-005-agile",
+      "type": "references",
+      "weight": 1
+    },
+    {
+      "source": "frag-001-usecase",
+      "target": "frag-002-class",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "frag-002-class",
+      "target": "frag-003-state",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "frag-004-testcase",
+      "target": "frag-007-codereview",
+      "type": "related",
+      "weight": 0.3
+    }
+  ]
 }

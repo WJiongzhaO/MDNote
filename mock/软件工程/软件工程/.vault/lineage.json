@@ -1,5 +1,59 @@
 {
   "version": "1.0.0",
-  "updatedAt": "2026-04-11T10:49:26.492Z",
-  "lineages": []
+  "updatedAt": "2026-04-11T12:15:00.000Z",
+  "lineages": [
+    {
+      "id": "lineage-001",
+      "fragmentId": "frag-001-usecase",
+      "history": [
+        {
+          "version": "1.0.0",
+          "timestamp": "2026-04-11T10:00:00.000Z",
+          "title": "用例图绘制规范",
+          "summary": "初始创建",
+          "changedBy": "张工程师"
+        },
+        {
+          "version": "1.1.0",
+          "timestamp": "2026-04-11T10:30:00.000Z",
+          "title": "用例图绘制规范",
+          "summary": "补充基本元素说明",
+          "changedBy": "张工程师"
+        }
+      ]
+    },
+    {
+      "id": "lineage-002",
+      "fragmentId": "frag-002-class",
+      "history": [
+        {
+          "version": "1.0.0",
+          "timestamp": "2026-04-11T10:30:00.000Z",
+          "title": "类图设计原则",
+          "summary": "初始创建，包含 SOLID 原则",
+          "changedBy": "李架构师"
+        }
+      ]
+    },
+    {
+      "id": "lineage-003",
+      "fragmentId": "frag-008-archived",
+      "history": [
+        {
+          "version": "1.0.0",
+          "timestamp": "2025-06-01T00:00:00.000Z",
+          "title": "需求分析模板",
+          "summary": "初始创建",
+          "changedBy": "历史记录"
+        },
+        {
+          "version": "2.0.0",
+          "timestamp": "2026-01-15T00:00:00.000Z",
+          "title": "旧版需求分析模板",
+          "summary": "归档处理，由新模板替代",
+          "changedBy": "系统管理员"
+        }
+      ]
+    }
+  ]
 }

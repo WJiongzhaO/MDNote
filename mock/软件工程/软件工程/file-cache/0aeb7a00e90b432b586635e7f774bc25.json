@@ -1,0 +1,60 @@
+{
+  "references": [
+    {
+      "fragmentId": "frag-001-usecase",
+      "position": 1305,
+      "length": 31,
+      "content": "用例图是描述系统功能的重要工具，用于展示系统与外部实体的交互。\n\n基本元素：\n- 参与者 (Actor)：与系统交互的外部实体\n- 用例 (Use Case)：系统提供的功能单元\n- 系统边界：定义系统范围",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775903400000
+    },
+    {
+      "fragmentId": "frag-002-class",
+      "position": 1367,
+      "length": 29,
+      "content": "类图是面向对象设计的核心图表，遵循 SOLID 原则可提高代码质量。\n\nSOLID 原则：\n1. 单一职责原则 (SRP)：一个类只负责一项职责\n2. 开闭原则 (OCP)：对扩展开放，对修改关闭\n3. 里氏替换原则 (LSP)：子类可以替换父类\n4. 接口隔离原则 (ISP)：接口职责单一\n5. 依赖倒置原则 (DIP)：依赖抽象而非具体",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775905200000
+    },
+    {
+      "fragmentId": "frag-004-testcase",
+      "position": 1391,
+      "length": 32,
+      "content": "测试用例是软件测试的核心产出物，规范的编写有助于提高测试效率。\n\n用例结构：\n- 用例ID：唯一标识符\n- 用例名称：简洁描述测试目的\n- 前置条件：执行测试前必须满足的条件\n- 测试步骤：详细的操作步骤\n- 预期结果：期望的系统行为\n\n优先级定义：\n- P0：核心功能，必须测试\n- P1：重要功能，应该测试\n- P2：一般功能，建议测试",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775907000000
+    },
+    {
+      "fragmentId": "frag-006-git",
+      "position": 1393,
+      "length": 27,
+      "content": "合理的分支策略是团队协作的基础，Git Flow 是最常用的分支模型之一。\n\n主要分支：\n- main/master：生产环境代码\n- develop：开发主分支\n\n辅助分支：\n- feature/*：功能开发分支\n- release/*：发布准备分支\n- hotfix/*：紧急修复分支",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775908800000
+    },
+    {
+      "fragmentId": "frag-005-agile",
+      "position": 1393,
+      "length": 29,
+      "content": "敏捷开发是一种以人为核心、迭代、循序渐进的开发方法。\n\nScrum 核心角色：\n- 产品负责人 (PO)：负责产品待办列表\n- Scrum Master：流程引导者，消除障碍\n- 开发团队：跨职能的自组织团队\n\nScrum 事件：\n- Sprint 计划会：确定本次迭代目标\n- 每日站会：15分钟同步进度\n- Sprint 评审：展示完成的工作\n- Sprint 回顾：总结改进点",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775908800000
+    },
+    {
+      "fragmentId": "frag-003-state",
+      "position": 1395,
+      "length": 29,
+      "content": "状态图用于描述对象在其生命周期内的状态变化。\n\n基本符号：\n- 初始状态：实心圆点\n- 终止状态：圆圈内实心圆\n- 状态：圆角矩形\n- 转换：带箭头的线，标注事件/条件",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775906100000
+    },
+    {
+      "fragmentId": "167d6ed5-0f84-44a6-b8ac-cdfcf68c0c08",
+      "position": 1427,
+      "length": 51,
+      "content": "### 1.1 目的\n\n本文档描述知识管理系统的测试策略、测试范围和测试计划。",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775979779036
+    }
+  ]
+}
