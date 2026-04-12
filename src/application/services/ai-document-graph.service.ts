@@ -2,10 +2,12 @@ import type { AiGraphMetadataRepository } from '../../domain/repositories/ai-gra
 import type { AiDocumentGraphContribution, AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface';
 import type { AiGraphProviderGateway } from '../../domain/services/ai-graph-provider.service';
 import type {
+  AiGlobalGraphQuery,
   AiGraphBuildRecord,
   AiGraphBuildState,
   AiGraphProviderConfig,
-  AiKnowledgeGraph
+  AiKnowledgeGraph,
+  AiNodeEvidence
 } from '../../domain/types/ai-knowledge-graph.types';
 
 const GRAPH_VERSION = 'p0';
@@ -82,6 +84,14 @@ export class AiDocumentGraphService {
 
   async getDocumentKnowledgeGraph(docId: string): Promise<AiKnowledgeGraph | null> {
     return this.deps.graphRepo.getDocumentGraph(docId);
+  }
+
+  async getGlobalGraph(query: AiGlobalGraphQuery): Promise<AiKnowledgeGraph> {
+    return this.deps.graphRepo.getGlobalGraph(query);
+  }
+
+  async getNodeEvidence(nodeId: string): Promise<AiNodeEvidence | null> {
+    return this.deps.graphRepo.getNodeEvidence(nodeId);
   }
 
   async getBuildRecord(docId: string): Promise<AiGraphBuildRecord | null> {

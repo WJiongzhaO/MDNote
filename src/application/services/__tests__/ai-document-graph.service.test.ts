@@ -220,4 +220,94 @@ describe('AiDocumentGraphService', () => {
       errorMessage: undefined
     });
   });
+
+  it('forwards global graph queries to repository', async () => {
+    const globalGraph = {
+      nodes: [
+        {
+          id: 'global-node-1',
+          label: 'Global Node 1',
+          entityType: 'concept',
+          evidenceCount: 2,
+          evidencePreview: []
+        }
+      ],
+      edges: []
+    } satisfies AiKnowledgeGraph;
+    const graphRepo = {
+      replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+      getDocumentGraph: vi.fn().mockResolvedValue(null),
+      getGlobalGraph: vi.fn().mockResolvedValue(globalGraph),
+      getNodeEvidence: vi.fn().mockResolvedValue(null)
+    };
+    const service = new AiDocumentGraphService({
+      metadataRepo: {
+        saveRecord: vi.fn().mockResolvedValue(undefined),
+        getRecord: vi.fn().mockResolvedValue(null)
+      },
+      graphRepo,
+      settingsGateway: {
+        load: vi.fn().mockResolvedValue(null)
+      },
+      extractor: {
+        buildForDocument: vi.fn()
+      }
+    });
+
+    await expect(
+      service.getGlobalGraph({
+        seedDocId: 'doc-seed',
+        seedNodeId: 'node-seed',
+        keyword: 'global',
+        maxHops: 2,
+        limit: 20
+      })
+    ).resolves.toEqual(globalGraph);
+
+    expect(graphRepo.getGlobalGraph).toHaveBeenCalledWith({
+      seedDocId: 'doc-seed',
+      seedNodeId: 'node-seed',
+      keyword: 'global',
+      maxHops: 2,
+      limit: 20
+    });
+  });
+
+  it('forwards node evidence lookups to repository', async () => {
+    const nodeEvidence = {
+      nodeId: 'node-1',
+      label: 'Node 1',
+      anchors: [
+        {
+          anchorId: 'anchor-1',
+          docId,
+          chunkId: 'chunk-1',
+          excerpt: 'Node 1 evidence',
+          anchorType: 'range'
+        }
+      ]
+    };
+    const graphRepo = {
+      replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+      getDocumentGraph: vi.fn().mockResolvedValue(null),
+      getGlobalGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+      getNodeEvidence: vi.fn().mockResolvedValue(nodeEvidence)
+    };
+    const service = new AiDocumentGraphService({
+      metadataRepo: {
+        saveRecord: vi.fn().mockResolvedValue(undefined),
+        getRecord: vi.fn().mockResolvedValue(null)
+      },
+      graphRepo,
+      settingsGateway: {
+        load: vi.fn().mockResolvedValue(null)
+      },
+      extractor: {
+        buildForDocument: vi.fn()
+      }
+    });
+
+    await expect(service.getNodeEvidence('node-1')).resolves.toEqual(nodeEvidence);
+    expect(graphRepo.getNodeEvidence).toHaveBeenCalledWith('node-1');
+  });
 });
