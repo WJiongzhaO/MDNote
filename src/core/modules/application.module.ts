@@ -61,9 +61,53 @@ import { TextFileOpenerStrategy } from '../../domain/services/text-file-opener.s
 import { JsonFileOpenerStrategy } from '../../domain/services/json-file-opener.strategy'
 import { ImageFileOpenerStrategy } from '../../domain/services/image-file-opener.strategy'
 import { FileOpenerManager } from '../../domain/services/file-opener-manager.service'
+import { InMemoryAiGraphRepository } from '../../infrastructure/ai-graph/in-memory-ai-graph.repository'
+import { LocalStorageAiGraphMetadataRepository } from '../../infrastructure/ai-graph/local-storage-ai-graph-metadata.repository'
+import { AiGraphSettingsService } from '../../application/services/ai-graph-settings.service'
+import { AiDocumentGraphService } from '../../application/services/ai-document-graph.service'
+import type { AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface'
+import type { AiGraphMetadataRepository } from '../../domain/repositories/ai-graph-metadata.repository.interface'
+import type {
+  AiGraphProviderConnectionResult,
+  AiGraphProviderGateway,
+} from '../../domain/services/ai-graph-provider.service'
+import type { AiGraphProviderConfig, AiKnowledgeGraph } from '../../domain/types/ai-knowledge-graph.types'
+
+class InMemoryAiGraphProviderGateway implements AiGraphProviderGateway {
+  private config: AiGraphProviderConfig | null = null
+
+  async load(): Promise<Partial<AiGraphProviderConfig> | null> {
+    return this.config
+  }
+
+  async save(config: AiGraphProviderConfig): Promise<void> {
+    this.config = config
+  }
+
+  async testConnection(): Promise<AiGraphProviderConnectionResult> {
+    return { success: true }
+  }
+}
+
+class MockDocumentGraphExtractor {
+  async buildForDocument(
+    docId: string,
+    config: AiGraphProviderConfig,
+  ): Promise<{ graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
+    return {
+      graph: { nodes: [], edges: [] },
+      contentHash: `mock-${docId}`,
+      provider: config.providerName,
+      model: config.model,
+    }
+  }
+}
 
 export class ApplicationModule {
   static configure(container: ServiceContainer): void {
+    const aiGraphProviderGateway = new InMemoryAiGraphProviderGateway()
+    const mockDocumentGraphExtractor = new MockDocumentGraphExtractor()
+
     container
       .bind<DocumentRepository>(TYPES.DocumentRepository)
       .toConstantValue(StorageAdapter.createDocumentRepository())
@@ -147,6 +191,25 @@ export class ApplicationModule {
       .toSingleton(FileSystemVaultRegistryRepository)
 
     container.bind<VaultUseCases>(TYPES.VaultUseCases).toSingleton(VaultUseCases)
+
+    container.bind<AiGraphRepository>(TYPES.AiGraphRepository).toSingleton(InMemoryAiGraphRepository)
+
+    container
+      .bind<AiGraphMetadataRepository>(TYPES.AiGraphMetadataRepository)
+      .toSingleton(LocalStorageAiGraphMetadataRepository)
+
+    container
+      .bind<AiGraphSettingsService>(TYPES.AiGraphSettingsService)
+      .toDynamicValue(() => new AiGraphSettingsService(aiGraphProviderGateway))
+
+    container
+      .bind<AiDocumentGraphService>(TYPES.AiDocumentGraphService)
+      .toDynamicValue(ctx => new AiDocumentGraphService({
+        metadataRepo: ctx.container.get<AiGraphMetadataRepository>(TYPES.AiGraphMetadataRepository),
+        graphRepo: ctx.container.get<AiGraphRepository>(TYPES.AiGraphRepository),
+        settingsGateway: aiGraphProviderGateway,
+        extractor: mockDocumentGraphExtractor,
+      }))
 
     container
       .bind<FragmentReferenceParser>(TYPES.FragmentReferenceParser)

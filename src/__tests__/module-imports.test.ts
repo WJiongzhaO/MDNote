@@ -13,6 +13,8 @@ import type {
 
 // Test application module exports
 import { ApplicationService } from '../application';
+import { AiDocumentGraphService } from '../application/services/ai-document-graph.service';
+import { AiGraphSettingsService } from '../application/services/ai-graph-settings.service';
 import type {
   CreateDocumentRequest,
   UpdateDocumentRequest,
@@ -56,6 +58,13 @@ describe('Module Import Tests', () => {
     it('should export all application types correctly', () => {
       // These are type-only exports, so we just verify they can be imported
       expect(true).toBe(true); // If the imports above work, this passes
+    });
+
+    it('should expose ai graph services from ApplicationService', () => {
+      expect(typeof ApplicationService.prototype.getAiDocumentGraphService).toBe('function');
+      expect(typeof ApplicationService.prototype.getAiGraphSettingsService).toBe('function');
+      expect(AiDocumentGraphService).toBeDefined();
+      expect(AiGraphSettingsService).toBeDefined();
     });
   });
 
