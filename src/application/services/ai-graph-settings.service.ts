@@ -32,7 +32,17 @@ export class AiGraphSettingsService {
   withProviderDefaults(config: Partial<AiGraphProviderConfig> = {}): AiGraphProviderConfig {
     const providerName = config.providerName ?? DEFAULT_PROVIDER_CONFIG.providerName;
     const preset = getPreset(providerName);
+    const resolvedApiKey = trimToUndefined(config.apiKey) ?? DEFAULT_PROVIDER_CONFIG.apiKey;
+    const resolvedBaseUrl = trimToUndefined(config.baseUrl) ?? preset?.defaultBaseUrl ?? DEFAULT_PROVIDER_CONFIG.baseUrl;
     const model = trimToUndefined(config.model) ?? preset?.defaultModel;
+
+    if (providerName !== 'ollama' && providerName !== 'custom' && !resolvedApiKey) {
+      throw new Error(`API key is required for provider "${providerName}".`);
+    }
+
+    if (providerName === 'custom' && !resolvedBaseUrl) {
+      throw new Error('Base URL is required for provider "custom".');
+    }
 
     if (!model) {
       throw new Error(`Model is required for provider "${providerName}".`);
@@ -40,8 +50,8 @@ export class AiGraphSettingsService {
 
     return {
       providerName,
-      apiKey: trimToUndefined(config.apiKey) ?? DEFAULT_PROVIDER_CONFIG.apiKey,
-      baseUrl: trimToUndefined(config.baseUrl) ?? preset?.defaultBaseUrl ?? DEFAULT_PROVIDER_CONFIG.baseUrl,
+      apiKey: resolvedApiKey,
+      baseUrl: resolvedBaseUrl,
       model,
       temperature: config.temperature ?? DEFAULT_PROVIDER_CONFIG.temperature,
       maxTokens: config.maxTokens ?? DEFAULT_PROVIDER_CONFIG.maxTokens
