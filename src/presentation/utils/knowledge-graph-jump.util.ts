@@ -1,4 +1,11 @@
 import { Application } from '../../core/application';
+import type { KgNodeOccurrence } from '../../domain/services/knowledge-graph-extractor';
+
+type AiAnchorLike = {
+  docId?: string;
+  startOffset?: number;
+  endOffset?: number;
+};
 
 /**
  * 读取文档全文，供知识图谱「按片段跳转」在文中查找 {{ref:...}}。
@@ -27,4 +34,20 @@ export async function readDocumentTextForKnowledgeJump(documentId: string): Prom
 
 export async function readDocumentTextForAiAnchorJump(documentId: string): Promise<string | null> {
   return readDocumentTextForKnowledgeJump(documentId);
+}
+
+export function getAiAnchorOccurrence(anchor?: AiAnchorLike): KgNodeOccurrence | null {
+  if (
+    !anchor?.docId ||
+    !Number.isFinite(anchor.startOffset) ||
+    !Number.isFinite(anchor.endOffset)
+  ) {
+    return null;
+  }
+
+  return {
+    documentId: anchor.docId,
+    start: Number(anchor.startOffset),
+    end: Number(anchor.endOffset)
+  };
 }

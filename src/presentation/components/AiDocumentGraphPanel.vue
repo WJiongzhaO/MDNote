@@ -11,7 +11,7 @@
 
     <KnowledgeGraphView
       v-else-if="state.status === 'ready'"
-      :graph="state.graph ?? emptyGraph"
+      :graph="normalizedGraph"
     />
 
     <div v-else-if="state.status === 'ready_empty'" class="ai-document-graph-panel__state">
@@ -27,9 +27,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import KnowledgeGraphView from './KnowledgeGraphView.vue';
 import { useAiDocumentGraph, type AiDocumentGraphService } from '../composables/useAiDocumentGraph';
+import { getAiAnchorOccurrence } from '../utils/knowledge-graph-jump.util';
 
 const props = defineProps<{
   documentId: string;
@@ -38,6 +39,30 @@ const props = defineProps<{
 
 const emptyGraph = { nodes: [], edges: [] };
 const { state, refresh, build } = useAiDocumentGraph(props.graphService);
+
+const normalizedGraph = computed(() => {
+  const graph = state.value.graph;
+  if (!graph) return emptyGraph;
+
+  return {
+    ...graph,
+    nodes: (graph.nodes || []).map((node) => {
+      const existingOccurrences = (node as { occurrences?: unknown[] }).occurrences;
+      if (Array.isArray(existingOccurrences) && existingOccurrences.length > 0) {
+        return node;
+      }
+
+      const aiOccurrence = getAiAnchorOccurrence(
+        (node as { primaryAnchor?: Parameters<typeof getAiAnchorOccurrence>[0] }).primaryAnchor
+      );
+
+      return {
+        ...node,
+        ...(aiOccurrence ? { occurrences: [aiOccurrence] } : {})
+      };
+    })
+  };
+});
 
 onMounted(() => {
   void refresh(props.documentId);

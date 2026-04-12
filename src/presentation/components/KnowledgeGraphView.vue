@@ -226,6 +226,25 @@ import type {
 import { fillMissingNodePositions, hasCompleteNodeLayout } from '../../domain/services/knowledge-graph-layout';
 import { useKnowledgeFragments } from '../composables/useKnowledgeFragments';
 import type { KnowledgeFragmentResponse } from '../../application/dto/knowledge-fragment.dto';
+import { getAiAnchorOccurrence } from '../utils/knowledge-graph-jump.util';
+
+type AiEvidencePreviewLike = {
+  excerpt?: string;
+};
+
+type AiAnchorLike = {
+  docId?: string;
+  startOffset?: number;
+  endOffset?: number;
+  excerpt?: string;
+};
+
+type ExtendedKgNode = KgNode & {
+  entityType?: string;
+  evidenceCount?: number;
+  evidencePreview?: AiEvidencePreviewLike[];
+  primaryAnchor?: AiAnchorLike;
+};
 
 interface Props {
   graph: KnowledgeGraph | null;
@@ -468,7 +487,7 @@ function fragmentTitleForId(id: string | undefined): string {
   return f?.title || id;
 }
 
-function buildFragmentLine(n: KgNode): string {
+function buildFragmentLine(n: ExtendedKgNode): string {
   if (!n.fragmentId) return '知识片段：未绑定';
   return `知识片段：${fragmentTitleForId(n.fragmentId)}`;
 }
@@ -508,10 +527,32 @@ function nodeTypeLabel(t: KgNode['type']): string {
   return '标签';
 }
 
-function buildNodeMeta(n: KgNode): string {
+function getNodeOccurrences(node: ExtendedKgNode): KgNodeOccurrence[] {
+  if (Array.isArray(node.occurrences) && node.occurrences.length > 0) {
+    return node.occurrences;
+  }
+  const aiOccurrence = getAiAnchorOccurrence(node.primaryAnchor);
+  return aiOccurrence ? [aiOccurrence] : [];
+}
+
+function getNodeEvidenceSummary(node: ExtendedKgNode): string {
+  const preview = node.evidencePreview?.find((item) => typeof item?.excerpt === 'string' && item.excerpt.trim());
+  if (preview?.excerpt?.trim()) {
+    return `证据：${preview.excerpt.trim()}`;
+  }
+  return '证据：暂无摘要';
+}
+
+function buildNodeMeta(n: ExtendedKgNode): string {
   const parts = [`类型：${nodeTypeLabel(n.type)}`];
   if (n.type === 'section' && n.level != null) {
     parts.push(`H${n.level}`);
+  }
+  if (n.entityType) {
+    parts.push(`实体：${n.entityType}`);
+  }
+  if (typeof n.evidenceCount === 'number') {
+    parts.push(`证据 ${n.evidenceCount}`);
   }
   return parts.join(' · ');
 }
@@ -851,7 +892,7 @@ watch(
   }
 );
 
-function showNodePopoverAtEvent(evt: cytoscape.EventObject, kgNode: KgNode) {
+function showNodePopoverAtEvent(evt: cytoscape.EventObject, kgNode: ExtendedKgNode) {
   const pos = (evt as any).renderedPosition || (evt as any).position || { x: 0, y: 0 };
   const container = containerRef.value;
   if (!container) return;
@@ -864,8 +905,8 @@ function showNodePopoverAtEvent(evt: cytoscape.EventObject, kgNode: KgNode) {
     y: Math.min(y, window.innerHeight - 240),
     label: kgNode.label,
     meta: buildNodeMeta(kgNode),
-    fragmentLine: buildFragmentLine(kgNode),
-    occurrences: kgNode.occurrences || []
+    fragmentLine: `${buildFragmentLine(kgNode)} · ${getNodeEvidenceSummary(kgNode)}`,
+    occurrences: getNodeOccurrences(kgNode)
   };
 }
 
@@ -1159,7 +1200,7 @@ function bindGraphEvents(cyInstance: cytoscape.Core, layoutSession: number) {
   cyInstance.on('mouseover', 'node', (evt) => {
     const node = evt.target;
     const id = node.id();
-    const kgNode = props.graph!.nodes!.find((n) => n.id === id);
+    const kgNode = props.graph!.nodes!.find((n) => n.id === id) as ExtendedKgNode | undefined;
     if (!kgNode) return;
     cancelHidePopover();
     showNodePopoverAtEvent(evt, kgNode);
@@ -1284,6 +1325,10 @@ function buildElements(graph: KnowledgeGraph) {
 
   return elements;
 }
+
+defineExpose({
+  getNodeOccurrences
+});
 
 function initGraph() {
   if (!containerRef.value || !props.graph) return;
