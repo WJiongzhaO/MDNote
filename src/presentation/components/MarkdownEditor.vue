@@ -246,43 +246,18 @@
         min-width: 640px;
       ">
         <div class="knowledge-graph-header">
-          <h3>🕸️ 知识图谱</h3>
+          <h3>🕸️ AI 知识图谱</h3>
           <div class="knowledge-graph-actions">
-            <button
-              type="button"
-              class="toolbar-btn sample-btn"
-              @click="saveKnowledgeGraph"
-              title="将当前知识图谱保存为独立文件"
-              v-if="knowledgeGraphData"
-            >
-              保存为知识图谱
-            </button>
-            <button type="button" class="toolbar-btn sample-btn" @click="showSampleGraph" title="查看样例效果">查看样例</button>
-            <button
-              type="button"
-              class="toolbar-btn sample-btn"
-              v-if="knowledgeGraphData"
-              @click="randomizeKnowledgeGraphLayout"
-              title="重新随机排列节点（会丢弃当前坐标，直到再次自动保存）"
-            >
-              随机重新布局
-            </button>
             <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">✕</button>
           </div>
         </div>
-        <div v-if="isSampleMode" class="knowledge-graph-sample-hint">（样例展示，实际数据将由 RAG 等方式提取）</div>
-        <div v-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">正在生成图谱…</div>
-        <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">{{ knowledgeGraphError }}</div>
-        <KnowledgeGraphView
-          v-else-if="knowledgeGraphData"
-          :graph="knowledgeGraphData"
-          :graph-load-key="getKnowledgeGraphDocKey()"
-          :layout-randomize-key="kgLayoutRandomizeKey"
+        <AiDocumentGraphPanel
+          v-if="activeDocumentId"
           class="knowledge-graph-body"
-          :render-markdown="renderMarkdown"
-          @graph-update="onKnowledgeGraphUpdate"
-          @jump-to-fragment="onKnowledgeGraphJumpToFragment"
+          :document-id="activeDocumentId"
+          :graph-service="aiDocumentGraphService"
         />
+        <div v-else class="knowledge-graph-error">当前文档不可用，无法构建 AI 知识图谱</div>
       </div>
     </div>
   </div>
@@ -293,6 +268,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import MermaidEditor from './MermaidEditor.vue';
 import FormulaEditor from './FormulaEditor.vue';
 import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
+import AiDocumentGraphPanel from './AiDocumentGraphPanel.vue';
 import ExportConfigModal from './ExportConfigModal.vue';
 import ExportProgressModal from './ExportProgressModal.vue';
 import KnowledgeGraphView from './KnowledgeGraphView.vue';
@@ -405,6 +381,8 @@ const isKnowledgeGraphRendering = ref(false);
 const isSampleMode = ref(false);
 const kgLayoutRandomizeKey = ref(0);
 const knowledgeGraphService = new FileSystemKnowledgeGraphService();
+const aiDocumentGraphService = Application.getInstance().getApplicationService().getAiDocumentGraphService();
+const activeDocumentId = computed(() => props.document?.id || currentFilePath.value || '');
 
 /** 工作3：文档编辑区右侧「推荐片段」面板 */
 const showRecommendationPanel = ref(true);
@@ -2556,35 +2534,10 @@ const randomizeKnowledgeGraphLayout = () => {
 // 知识图谱相关方法
 const openKnowledgeGraph = () => {
   showKnowledgeGraphModal.value = true;
-  const fullContent = getContent();
-  if (!fullContent || !fullContent.trim()) {
-    const merged = mergeKgStoragePayloadIntoGraph(
-      sampleKnowledgeGraph,
-      loadKgLayoutPayloadFromLocalStorage('sample')
-    );
-    knowledgeGraphData.value = merged;
-    knowledgeGraphError.value = '';
-    isSampleMode.value = true;
-    isKnowledgeGraphRendering.value = false;
-    return;
-  }
-  isSampleMode.value = false;
   knowledgeGraphError.value = '';
-  isKnowledgeGraphRendering.value = true;
+  isSampleMode.value = false;
+  isKnowledgeGraphRendering.value = false;
   knowledgeGraphData.value = null;
-  try {
-    const graph = extractKnowledgeGraph(fullContent);
-    const docKey = props.document?.id || currentFilePath.value || 'untitled';
-    knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(
-      graph,
-      loadKgLayoutPayloadFromLocalStorage(docKey)
-    );
-  } catch (e) {
-    knowledgeGraphError.value = e instanceof Error ? e.message : '生成知识图谱失败';
-    knowledgeGraphData.value = null;
-  } finally {
-    isKnowledgeGraphRendering.value = false;
-  }
 };
 
 const showSampleGraph = () => {
