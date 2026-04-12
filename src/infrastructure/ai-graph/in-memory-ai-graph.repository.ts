@@ -1,14 +1,22 @@
-import type { AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface';
-import type { AiKnowledgeGraph } from '../../domain/types/ai-knowledge-graph.types';
+import type { AiDocumentGraphContribution, AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface';
+import type { AiGlobalGraphQuery, AiKnowledgeGraph, AiNodeEvidence } from '../../domain/types/ai-knowledge-graph.types';
 
 export class InMemoryAiGraphRepository implements AiGraphRepository {
   private readonly graphs = new Map<string, AiKnowledgeGraph>();
 
-  async replaceDocumentGraph(docId: string, graph: AiKnowledgeGraph): Promise<void> {
-    this.graphs.set(docId, graph);
+  async replaceDocumentContribution(contribution: AiDocumentGraphContribution): Promise<void> {
+    this.graphs.set(contribution.docId, { nodes: [], edges: [] });
   }
 
   async getDocumentGraph(docId: string): Promise<AiKnowledgeGraph | null> {
     return this.graphs.get(docId) ?? null;
+  }
+
+  async getGlobalGraph(_query: AiGlobalGraphQuery): Promise<AiKnowledgeGraph> {
+    return { nodes: [], edges: [] };
+  }
+
+  async getNodeEvidence(_nodeId: string): Promise<AiNodeEvidence | null> {
+    return null;
   }
 }

@@ -1,8 +1,9 @@
 import type { AiGraphMetadataRepository } from '../../domain/repositories/ai-graph-metadata.repository.interface';
-import type { AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface';
+import type { AiDocumentGraphContribution, AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface';
 import type { AiGraphProviderGateway } from '../../domain/services/ai-graph-provider.service';
 import type {
   AiGraphBuildRecord,
+  AiGraphBuildState,
   AiGraphProviderConfig,
   AiKnowledgeGraph
 } from '../../domain/types/ai-knowledge-graph.types';
@@ -10,6 +11,9 @@ import type {
 const GRAPH_VERSION = 'p0';
 
 interface BuildForDocumentResult {
+  title: string;
+  entities: AiDocumentGraphContribution['entities'];
+  relations: AiDocumentGraphContribution['relations'];
   graph: AiKnowledgeGraph;
   contentHash: string;
   provider: string;
@@ -51,7 +55,13 @@ export class AiDocumentGraphService {
     await this.deps.metadataRepo.saveRecord(buildingRecord);
 
     const result = await this.deps.extractor.buildForDocument(docId, config as AiGraphProviderConfig);
-    await this.deps.graphRepo.replaceDocumentGraph(docId, result.graph);
+    await this.deps.graphRepo.replaceDocumentContribution({
+      docId,
+      title: result.title,
+      contentHash: result.contentHash,
+      entities: result.entities,
+      relations: result.relations
+    });
 
     const finishedAt = new Date().toISOString();
     const status = result.graph.nodes.length > 0 ? 'ready' : 'ready_empty';
@@ -76,5 +86,30 @@ export class AiDocumentGraphService {
 
   async getBuildRecord(docId: string): Promise<AiGraphBuildRecord | null> {
     return this.deps.metadataRepo.getRecord(docId);
+  }
+
+  async getDocumentGraphState(docId: string): Promise<AiGraphBuildState> {
+    const [record, graph] = await Promise.all([
+      this.deps.metadataRepo.getRecord(docId),
+      this.deps.graphRepo.getDocumentGraph(docId)
+    ]);
+
+    if (!record) {
+      return {
+        docId,
+        contentHash: '',
+        status: 'not_built',
+        provider: '',
+        model: '',
+        graphVersion: GRAPH_VERSION,
+        graph: null
+      };
+    }
+
+    return {
+      ...record,
+      graph: graph ?? null,
+      errorMessage: record.errorMessage
+    };
   }
 }

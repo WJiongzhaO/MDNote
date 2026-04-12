@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiDocumentGraphService } from '../ai-document-graph.service';
-import type { AiKnowledgeGraph } from '../../../domain/types/ai-knowledge-graph.types';
+import type { AiGraphEntity, AiGraphRelation, AiKnowledgeGraph } from '../../../domain/types/ai-knowledge-graph.types';
 
 describe('AiDocumentGraphService', () => {
   const docId = 'doc-1';
@@ -16,6 +16,19 @@ describe('AiDocumentGraphService', () => {
     ],
     edges: []
   };
+  const entities: AiGraphEntity[] = [
+    {
+      entityId: 'entity-1',
+      name: 'Node 1',
+      normalizedName: 'node 1',
+      type: 'concept',
+      sourceDocId: docId,
+      sourceChunkId: 'chunk-1',
+      metadata: {},
+      anchors: []
+    }
+  ];
+  const relations: AiGraphRelation[] = [];
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -28,8 +41,10 @@ describe('AiDocumentGraphService', () => {
       getRecord: vi.fn().mockResolvedValue(null)
     };
     const graphRepo = {
-      replaceDocumentGraph: vi.fn().mockResolvedValue(undefined),
-      getDocumentGraph: vi.fn().mockResolvedValue(null)
+      replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+      getDocumentGraph: vi.fn().mockResolvedValue(null),
+      getGlobalGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+      getNodeEvidence: vi.fn().mockResolvedValue(null)
     };
     const settingsGateway = {
       load: vi.fn().mockResolvedValue({
@@ -53,6 +68,9 @@ describe('AiDocumentGraphService', () => {
         });
 
         return {
+          title: 'Doc 1',
+          entities,
+          relations,
           graph,
           contentHash: 'hash-1',
           provider: 'dashscope',
@@ -70,7 +88,13 @@ describe('AiDocumentGraphService', () => {
 
     await service.buildDocumentKnowledgeGraph(docId);
 
-    expect(graphRepo.replaceDocumentGraph).toHaveBeenCalledWith(docId, graph);
+    expect(graphRepo.replaceDocumentContribution).toHaveBeenCalledWith({
+      docId,
+      title: 'Doc 1',
+      contentHash: 'hash-1',
+      entities,
+      relations
+    });
     expect(metadataRepo.saveRecord).toHaveBeenNthCalledWith(2, {
       docId,
       contentHash: 'hash-1',
@@ -89,8 +113,10 @@ describe('AiDocumentGraphService', () => {
       getRecord: vi.fn().mockResolvedValue(null)
     };
     const graphRepo = {
-      replaceDocumentGraph: vi.fn().mockResolvedValue(undefined),
-      getDocumentGraph: vi.fn().mockResolvedValue(null)
+      replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+      getDocumentGraph: vi.fn().mockResolvedValue(null),
+      getGlobalGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+      getNodeEvidence: vi.fn().mockResolvedValue(null)
     };
     const settingsGateway = {
       load: vi.fn().mockResolvedValue({
@@ -102,6 +128,9 @@ describe('AiDocumentGraphService', () => {
     };
     const extractor = {
       buildForDocument: vi.fn().mockResolvedValue({
+        title: 'Doc 1',
+        entities: [],
+        relations: [],
         graph: { nodes: [], edges: [] },
         contentHash: 'hash-empty',
         provider: 'dashscope',
@@ -137,8 +166,10 @@ describe('AiDocumentGraphService', () => {
         getRecord: vi.fn().mockResolvedValue(null)
       },
       graphRepo: {
-        replaceDocumentGraph: vi.fn().mockResolvedValue(undefined),
-        getDocumentGraph: vi.fn().mockResolvedValue(null)
+        replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+        getDocumentGraph: vi.fn().mockResolvedValue(null),
+        getGlobalGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+        getNodeEvidence: vi.fn().mockResolvedValue(null)
       },
       settingsGateway: {
         load: vi.fn().mockResolvedValue(null)
@@ -149,5 +180,44 @@ describe('AiDocumentGraphService', () => {
     });
 
     await expect(service.buildDocumentKnowledgeGraph(docId)).rejects.toThrow(/provider config/i);
+  });
+
+  it('exposes document graph state from build record and stored graph', async () => {
+    const service = new AiDocumentGraphService({
+      metadataRepo: {
+        saveRecord: vi.fn().mockResolvedValue(undefined),
+        getRecord: vi.fn().mockResolvedValue({
+          docId,
+          contentHash: 'hash-1',
+          status: 'ready',
+          provider: 'dashscope',
+          model: 'test-model',
+          graphVersion: 'p0'
+        })
+      },
+      graphRepo: {
+        replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+        getDocumentGraph: vi.fn().mockResolvedValue(graph),
+        getGlobalGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+        getNodeEvidence: vi.fn().mockResolvedValue(null)
+      },
+      settingsGateway: {
+        load: vi.fn().mockResolvedValue(null)
+      },
+      extractor: {
+        buildForDocument: vi.fn()
+      }
+    });
+
+    await expect(service.getDocumentGraphState(docId)).resolves.toEqual({
+      docId,
+      contentHash: 'hash-1',
+      status: 'ready',
+      provider: 'dashscope',
+      model: 'test-model',
+      graphVersion: 'p0',
+      graph,
+      errorMessage: undefined
+    });
   });
 });
