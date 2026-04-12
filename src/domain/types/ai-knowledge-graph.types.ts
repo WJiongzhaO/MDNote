@@ -71,11 +71,28 @@ export interface AiGraphBuildRecord {
   graphVersion: string;
 }
 
+export type AiGraphProviderName =
+  | 'dashscope'
+  | 'openai'
+  | 'deepseek'
+  | 'volcengine'
+  | 'ollama'
+  | 'custom';
+
 export interface AiGraphProviderConfig {
-  providerType: 'openai' | 'volcengine' | 'dashscope' | 'deepseek' | 'ollama' | 'custom';
-  baseURL?: string;
-  apiKey?: string;
+  providerName: AiGraphProviderName;
+  apiKey: string;
+  baseUrl: string;
   model: string;
-  extraHeaders?: Record<string, string>;
-  timeoutMs?: number;
+  temperature?: number;
+  maxTokens?: number;
 }
+
+export const DEFAULT_PROVIDER_CONFIG: AiGraphProviderConfig = {
+  providerName: 'dashscope',
+  apiKey: '',
+  baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  model: 'qwen3.6-plus',
+  temperature: 0.1,
+  maxTokens: 4096
+};
