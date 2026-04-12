@@ -6,6 +6,7 @@ import type {
   AiGraphProviderGateway
 } from '../../../domain/services/ai-graph-provider.service';
 import { PROVIDER_PRESETS } from '../../../infrastructure/ai-graph/provider-presets';
+import { normalizeProviderConnectionError } from '../../../infrastructure/ai-graph/openai-compatible-provider.factory';
 
 function createGateway(): AiGraphProviderGateway {
   return {
@@ -22,6 +23,18 @@ function createGateway(): AiGraphProviderGateway {
 }
 
 describe('AiGraphSettingsService', () => {
+  it('rejects save when a required API key is missing', async () => {
+    const service = new AiGraphSettingsService({
+      load: async () => null,
+      save: async () => undefined,
+      testConnection: async () => ({ success: true })
+    });
+
+    await expect(
+      service.save({ providerName: 'openai', apiKey: '', model: 'gpt-4o-mini' })
+    ).rejects.toThrow('API key is required for provider "openai".');
+  });
+
   it('exposes the default DashScope provider config', () => {
     expect(DEFAULT_PROVIDER_CONFIG).toEqual({
       providerName: 'dashscope',
@@ -67,5 +80,23 @@ describe('AiGraphSettingsService', () => {
         baseUrl: 'https://example.com/v1'
       })
     ).toThrow(/model/i);
+  });
+
+  it('maps invalid api key provider errors to a readable message', () => {
+    const error = {
+      status: 401,
+      message: 'Incorrect API key provided: sk-test'
+    };
+
+    expect(normalizeProviderConnectionError(error)).toBe('API Key 无效，请检查后重试。');
+  });
+
+  it('maps rate limit provider errors to a readable message', () => {
+    const error = {
+      status: 429,
+      message: 'Rate limit exceeded'
+    };
+
+    expect(normalizeProviderConnectionError(error)).toBe('请求过于频繁，请稍后再试。');
   });
 });
