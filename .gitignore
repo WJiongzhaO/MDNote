@@ -44,3 +44,5 @@ release/
 
 # Documentation
 docs/
+
+.worktrees/
