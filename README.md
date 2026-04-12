@@ -120,6 +120,9 @@ npm run electron:build
 ```bash
 # 运行单元测试
 npm run test:unit
+
+# 运行 Kuzu repository 定向验证（固定单线程，避免 Vitest worker crash）
+npm run test:unit:kuzu
 ```
 
 ### 端到端测试
