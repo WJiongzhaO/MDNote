@@ -19,6 +19,15 @@ export interface AiGraphExtractionResult {
   relations: AiGraphExtractedRelation[];
 }
 
+export interface AiGraphExtractionChunk {
+  chunkId: string;
+  docId: string;
+  markdown: string;
+  headingPath: string[];
+  startOffset: number;
+  endOffset: number;
+}
+
 export interface AiGraphExtractor {
-  extractEntitiesAndRelations(markdown: string): Promise<AiGraphExtractionResult>;
+  extractChunk(chunk: AiGraphExtractionChunk): Promise<AiGraphExtractionResult>;
 }
