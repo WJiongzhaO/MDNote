@@ -14,6 +14,7 @@ import type { FragmentCategoryUseCases } from '../usecases/fragment-category.use
 import { KnowledgeHealthService } from './knowledge-health.service'
 import type { RecommendationService } from './recommendation.service'
 import { AiDocumentGraphService } from './ai-document-graph.service'
+import { AiGlobalGraphService } from './ai-global-graph.service'
 import { AiGraphSettingsService } from './ai-graph-settings.service'
 
 @injectable()
@@ -128,6 +129,10 @@ export class ApplicationService {
 
   getAiDocumentGraphService(): AiDocumentGraphService {
     return InversifyContainer.getInstance().get<AiDocumentGraphService>(TYPES.AiDocumentGraphService)
+  }
+
+  getAiGlobalGraphService(): AiGlobalGraphService {
+    return InversifyContainer.getInstance().get<AiGlobalGraphService>(TYPES.AiGlobalGraphService as never)
   }
 
   getAiGraphSettingsService(): AiGraphSettingsService {
