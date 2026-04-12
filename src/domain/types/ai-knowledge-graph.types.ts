@@ -71,6 +71,42 @@ export interface AiGraphBuildRecord {
   graphVersion: string;
 }
 
+export interface AiGraphBuildState extends AiGraphBuildRecord {
+  graph?: AiKnowledgeGraph | null;
+  partialFailure?: {
+    stage: 'global_merge';
+    message: string;
+  };
+}
+
+export interface AiGlobalGraphQuery {
+  seedDocId?: string;
+  seedNodeId?: string;
+  keyword?: string;
+  maxHops: number;
+  limit: number;
+}
+
+export interface AiNodeEvidence {
+  nodeId: string;
+  label: string;
+  anchors: AiEvidenceAnchor[];
+}
+
+export type AiNodeJumpResolution =
+  | {
+      mode: 'direct';
+      anchor: AiEvidenceAnchor;
+    }
+  | {
+      mode: 'select';
+      anchors: AiEvidenceAnchor[];
+    }
+  | {
+      mode: 'unavailable';
+      reason: string;
+    };
+
 export type AiGraphProviderName =
   | 'dashscope'
   | 'openai'

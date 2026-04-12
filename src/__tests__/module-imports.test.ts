@@ -23,9 +23,13 @@ import type {
 } from '../application';
 import type {
   AiGraphBuildStatus,
+  AiGlobalGraphQuery,
+  AiGraphBuildState,
   AiKnowledgeGraph,
   AiKnowledgeGraphNode,
-  AiGraphProviderConfig
+  AiGraphProviderConfig,
+  AiNodeEvidence,
+  AiNodeJumpResolution
 } from '../domain/types/ai-knowledge-graph.types';
 
 // Test infrastructure module exports
@@ -77,6 +81,10 @@ describe('Module Import Tests', () => {
 
   describe('AI Knowledge Graph Contract', () => {
     it('should expose AI knowledge graph contract types', () => {
+      expect(true).toBe(true);
+    });
+
+    it('should expose P1 AI graph query and jump contracts', () => {
       expect(true).toBe(true);
     });
   });
