@@ -26,6 +26,14 @@ vi.mock('../../composables/useShortcutManager', () => ({
   }))
 }));
 
+vi.mock('../KnowledgeGraphView.vue', () => ({
+  default: {
+    name: 'KnowledgeGraphView',
+    props: ['graph'],
+    template: '<div class="knowledge-graph-view-stub"></div>'
+  }
+}));
+
 function createMarkdownEditorMountOptions() {
   return {
     props: {
@@ -187,5 +195,51 @@ describe('AiDocumentGraphPanel', () => {
     await nextTick();
 
     expect(wrapper.text()).toContain('No meaningful graph was extracted');
+  });
+
+  it('re-emits jump events from KnowledgeGraphView', async () => {
+    const wrapper = mount(AiDocumentGraphPanel, {
+      props: {
+        documentId: 'doc-1',
+        graphService: {
+          getDocumentGraphState: vi.fn().mockResolvedValue({
+            status: 'ready',
+            graph: {
+              nodes: [
+                {
+                  id: 'node-1',
+                  label: 'Atlas',
+                  entityType: 'PROJECT',
+                  evidenceCount: 1,
+                  evidencePreview: [],
+                  primaryAnchor: {
+                    anchorId: 'anchor-1',
+                    docId: 'doc-1',
+                    chunkId: 'chunk-1',
+                    startOffset: 1,
+                    endOffset: 5,
+                    anchorType: 'range'
+                  }
+                }
+              ],
+              edges: []
+            }
+          }),
+          buildDocumentKnowledgeGraph: vi.fn()
+        }
+      }
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await nextTick();
+
+    const graphView = wrapper.getComponent({ name: 'KnowledgeGraphView' });
+
+    graphView.vm.$emit('jump-to', { documentId: 'doc-2', start: 3, end: 9 });
+    graphView.vm.$emit('jump-to-fragment', { fragmentId: 'frag-1' });
+
+    expect(wrapper.emitted('jump-to')).toEqual([[{ documentId: 'doc-2', start: 3, end: 9 }]]);
+    expect(wrapper.emitted('jump-to-fragment')).toEqual([[{ fragmentId: 'frag-1' }]]);
   });
 });

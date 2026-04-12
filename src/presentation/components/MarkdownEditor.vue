@@ -256,6 +256,8 @@
           class="knowledge-graph-body"
           :document-id="activeDocumentId"
           :graph-service="aiDocumentGraphService"
+          @jump-to="onAiKnowledgeGraphJump"
+          @jump-to-fragment="onKnowledgeGraphJumpToFragment"
         />
         <div v-else class="knowledge-graph-error">当前文档不可用，无法构建 AI 知识图谱</div>
       </div>
@@ -2521,6 +2523,10 @@ const onKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string }) =
   } catch (e) {
     console.error('[知识图谱] 按片段跳转失败', e);
   }
+};
+
+const onAiKnowledgeGraphJump = (payload: { documentId: string; start: number; end: number }) => {
+  emit('navigate-knowledge-jump', payload);
 };
 
 const randomizeKnowledgeGraphLayout = () => {

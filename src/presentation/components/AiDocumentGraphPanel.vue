@@ -12,6 +12,8 @@
     <KnowledgeGraphView
       v-else-if="state.status === 'ready'"
       :graph="normalizedGraph"
+      @jump-to="handleJumpTo"
+      @jump-to-fragment="handleJumpToFragment"
     />
 
     <div v-else-if="state.status === 'ready_empty'" class="ai-document-graph-panel__state">
@@ -35,6 +37,11 @@ import { getAiAnchorOccurrence } from '../utils/knowledge-graph-jump.util';
 const props = defineProps<{
   documentId: string;
   graphService: AiDocumentGraphService;
+}>();
+
+const emit = defineEmits<{
+  (e: 'jump-to', payload: { documentId: string; documentTitle?: string; start: number; end: number }): void;
+  (e: 'jump-to-fragment', payload: { fragmentId: string }): void;
 }>();
 
 const emptyGraph = { nodes: [], edges: [] };
@@ -70,6 +77,14 @@ onMounted(() => {
 
 function handleBuild() {
   void build(props.documentId);
+}
+
+function handleJumpTo(payload: { documentId: string; documentTitle?: string; start: number; end: number }) {
+  emit('jump-to', payload);
+}
+
+function handleJumpToFragment(payload: { fragmentId: string }) {
+  emit('jump-to-fragment', payload);
 }
 </script>
 
