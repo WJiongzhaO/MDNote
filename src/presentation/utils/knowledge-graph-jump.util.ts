@@ -24,3 +24,7 @@ export async function readDocumentTextForKnowledgeJump(documentId: string): Prom
     return null;
   }
 }
+
+export async function readDocumentTextForAiAnchorJump(documentId: string): Promise<string | null> {
+  return readDocumentTextForKnowledgeJump(documentId);
+}
