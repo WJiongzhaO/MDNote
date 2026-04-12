@@ -1,3 +1,5 @@
+import { mergeDocumentGraphContribution } from './ai-graph-merge.service';
+
 function normalizeName(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -77,5 +79,5 @@ export function normalizeAiGraphExtraction(input: {
     }];
   });
 
-  return { entities, relations };
+  return mergeDocumentGraphContribution({ entities, relations });
 }
