@@ -62,16 +62,23 @@ import { JsonFileOpenerStrategy } from '../../domain/services/json-file-opener.s
 import { ImageFileOpenerStrategy } from '../../domain/services/image-file-opener.strategy'
 import { FileOpenerManager } from '../../domain/services/file-opener-manager.service'
 import { InMemoryAiGraphRepository } from '../../infrastructure/ai-graph/in-memory-ai-graph.repository'
+import { KuzuAiGraphRepository } from '../../infrastructure/ai-graph/kuzu-ai-graph.repository'
 import { LocalStorageAiGraphMetadataRepository } from '../../infrastructure/ai-graph/local-storage-ai-graph-metadata.repository'
 import { AiGraphSettingsService } from '../../application/services/ai-graph-settings.service'
 import { AiDocumentGraphService } from '../../application/services/ai-document-graph.service'
+import { LangChainLlmGraphTransformerExtractor } from '../../infrastructure/ai-graph/langchain-llm-graph-transformer-extractor'
 import type { AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface'
 import type { AiGraphMetadataRepository } from '../../domain/repositories/ai-graph-metadata.repository.interface'
 import type {
   AiGraphProviderConnectionResult,
   AiGraphProviderGateway,
 } from '../../domain/services/ai-graph-provider.service'
-import type { AiGraphProviderConfig, AiKnowledgeGraph } from '../../domain/types/ai-knowledge-graph.types'
+import type { AiGraphEntity, AiGraphProviderConfig, AiGraphRelation, AiKnowledgeGraph } from '../../domain/types/ai-knowledge-graph.types'
+import { normalizeAiGraphExtraction } from '../../domain/services/ai-graph-normalizer.service'
+import { OpenAI } from '@langchain/openai'
+import { LLMGraphTransformer } from '@langchain/community/experimental/graph_transformers/llm'
+import { existsSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 
 class InMemoryAiGraphProviderGateway implements AiGraphProviderGateway {
   private config: AiGraphProviderConfig | null = null
@@ -93,8 +100,11 @@ class MockDocumentGraphExtractor {
   async buildForDocument(
     docId: string,
     config: AiGraphProviderConfig,
-  ): Promise<{ graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
+  ): Promise<{ title: string; entities: AiGraphEntity[]; relations: AiGraphRelation[]; graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
     return {
+      title: docId,
+      entities: [],
+      relations: [],
       graph: { nodes: [], edges: [] },
       contentHash: `mock-${docId}`,
       provider: config.providerName,
@@ -103,10 +113,71 @@ class MockDocumentGraphExtractor {
   }
 }
 
+class RealDocumentGraphExtractor {
+  async buildForDocument(
+    docId: string,
+    config: AiGraphProviderConfig,
+  ): Promise<{ title: string; entities: AiGraphEntity[]; relations: AiGraphRelation[]; graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
+    const model = new OpenAI({
+      apiKey: config.apiKey,
+      configuration: { baseURL: config.baseUrl },
+      model: config.model,
+      temperature: config.temperature ?? 0.1
+    });
+    const transformer = new LLMGraphTransformer({ llm: model as never });
+    const extractor = new LangChainLlmGraphTransformerExtractor(transformer as never);
+    const markdown = `# ${docId}\n${docId}`;
+    const extracted = await extractor.extractChunk({
+      chunkId: `${docId}:chunk:0`,
+      docId,
+      markdown,
+      headingPath: [docId],
+      startOffset: 0,
+      endOffset: markdown.length
+    });
+    const normalized = normalizeAiGraphExtraction({
+      docId,
+      chunkId: `${docId}:chunk:0`,
+      entities: extracted.entities,
+      relations: extracted.relations
+    });
+    return {
+      title: docId,
+      entities: normalized.entities,
+      relations: normalized.relations,
+      graph: {
+        nodes: normalized.entities.map(entity => ({
+          id: entity.entityId,
+          label: entity.name,
+          entityType: entity.type,
+          description: entity.description,
+          primaryAnchor: entity.anchors[0],
+          evidenceCount: entity.anchors.length,
+          evidencePreview: entity.anchors.slice(0, 3)
+        })),
+        edges: normalized.relations.map(relation => ({
+          id: relation.relationId,
+          source: relation.sourceEntityId,
+          target: relation.targetEntityId,
+          relationType: relation.type,
+          description: relation.description
+        }))
+      },
+      contentHash: `real-${docId}`,
+      provider: config.providerName,
+      model: config.model
+    }
+  }
+}
+
 export class ApplicationModule {
   static configure(container: ServiceContainer): void {
     const aiGraphProviderGateway = new InMemoryAiGraphProviderGateway()
-    const mockDocumentGraphExtractor = new MockDocumentGraphExtractor()
+    const documentGraphExtractor = new RealDocumentGraphExtractor()
+    const kuzuDbDir = join(process.cwd(), '.mdnote-ai-graph')
+    if (!existsSync(kuzuDbDir)) {
+      mkdirSync(kuzuDbDir, { recursive: true })
+    }
 
     container
       .bind<DocumentRepository>(TYPES.DocumentRepository)
@@ -192,7 +263,9 @@ export class ApplicationModule {
 
     container.bind<VaultUseCases>(TYPES.VaultUseCases).toSingleton(VaultUseCases)
 
-    container.bind<AiGraphRepository>(TYPES.AiGraphRepository).toSingleton(InMemoryAiGraphRepository)
+    container.bind<AiGraphRepository>(TYPES.AiGraphRepository).toDynamicValue(() => new KuzuAiGraphRepository({
+      dbPath: join(kuzuDbDir, 'graph.kuzu')
+    }))
 
     container
       .bind<AiGraphMetadataRepository>(TYPES.AiGraphMetadataRepository)
@@ -208,7 +281,7 @@ export class ApplicationModule {
         metadataRepo: ctx.container.get<AiGraphMetadataRepository>(TYPES.AiGraphMetadataRepository),
         graphRepo: ctx.container.get<AiGraphRepository>(TYPES.AiGraphRepository),
         settingsGateway: aiGraphProviderGateway,
-        extractor: mockDocumentGraphExtractor,
+        extractor: documentGraphExtractor,
       }))
 
     container
