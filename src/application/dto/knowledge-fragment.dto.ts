@@ -93,6 +93,7 @@ export interface KnowledgeFragmentResponse {
     documentTitle: string
     referencedAt: string // ISO字符串格式
     isConnected: boolean
+    referenceCount?: number // 引用次数
   }> // 引用该片段的文档列表
   createdAt: string
   updatedAt: string

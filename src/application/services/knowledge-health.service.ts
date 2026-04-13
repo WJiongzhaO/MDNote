@@ -1,6 +1,7 @@
 import { inject, injectable } from 'inversify'
 import { TYPES } from '../../core/container/container.types'
 import type { KnowledgeFragmentRepository } from '../../domain/repositories/knowledge-fragment.repository.interface'
+import { KnowledgeFragment } from '../../domain/entities/knowledge-fragment.entity'
 import type {
   ReferenceGraph,
   FragmentHealthResult,
@@ -29,10 +30,33 @@ export class KnowledgeHealthService {
     this.repository = StorageAdapter.createKnowledgeFragmentRepository(vaultId)
   }
 
-  private buildReferenceGraph(): ReferenceGraph {
+  private buildReferenceGraph(allFragments: KnowledgeFragment[]): ReferenceGraph {
     const fragmentToDocuments = new Map<string, string[]>()
     const documentToFragments = new Map<string, string[]>()
     const fragmentToChildren = new Map<string, string[]>()
+
+    for (const fragment of allFragments) {
+      const fragmentId = fragment.getId().value
+      const refs = fragment.getReferencedDocuments()
+
+      fragmentToDocuments.set(
+        fragmentId,
+        refs.map((ref) => ref.documentId),
+      )
+
+      for (const ref of refs) {
+        const existing = documentToFragments.get(ref.documentId) ?? []
+        existing.push(fragmentId)
+        documentToFragments.set(ref.documentId, existing)
+      }
+
+      const derivedFromId = fragment.getDerivedFromId()
+      if (derivedFromId) {
+        const existing = fragmentToChildren.get(derivedFromId) ?? []
+        existing.push(fragmentId)
+        fragmentToChildren.set(derivedFromId, existing)
+      }
+    }
 
     return {
       fragmentToDocuments,
@@ -50,7 +74,8 @@ export class KnowledgeHealthService {
       }
     }
 
-    const graph = this.buildReferenceGraph()
+    const allFragments = await this.repository.findAll()
+    const graph = this.buildReferenceGraph(allFragments)
     return computeFragmentHealth(fragment, graph)
   }
 
@@ -94,8 +119,14 @@ export class KnowledgeHealthService {
   }
 
   async getVaultHealthSummary(vaultId: string): Promise<VaultHealthSummary> {
+    // 如果传入的 vaultId 与当前不同，需要使用正确的 repository
+    if (vaultId !== this.vaultId) {
+      this.vaultId = vaultId
+      this.repository = StorageAdapter.createKnowledgeFragmentRepository(vaultId)
+    }
+
     const allFragments = await this.repository.findAll()
-    const graph = this.buildReferenceGraph()
+    const graph = this.buildReferenceGraph(allFragments)
 
     let activeCount = 0
     let isolatedCount = 0

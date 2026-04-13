@@ -128,7 +128,7 @@
           v-if="!fragment.previewType"
           class="fragment-preview"
           v-html="fragmentPreviewHtml[fragment.id] || '加载中...'"
-        >        </div>
+        ></div>
       </div>
     </div>
 
@@ -1188,11 +1188,17 @@ const handleDrop = async (event: DragEvent) => {
 
 // 处理知识片段拖拽开始
 const handleFragmentDragStart = (event: DragEvent, fragment: KnowledgeFragmentResponse) => {
+  console.log(
+    '[KnowledgeFragmentSidebar] handleFragmentDragStart, fragment:',
+    fragment.id,
+    fragment.title,
+  )
   draggedFragment.value = fragment
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'copy'
     event.dataTransfer.setData('text/plain', fragment.markdown)
     event.dataTransfer.setData('application/x-knowledge-fragment', fragment.id)
+    console.log('[KnowledgeFragmentSidebar] setData application/x-knowledge-fragment:', fragment.id)
   }
 }
 
@@ -1739,7 +1745,6 @@ defineExpose({
   color: var(--text-secondary);
   margin: 8px 0;
 }
-
 </style>
 
 <style>

@@ -135,6 +135,17 @@ export class KnowledgeFragmentUseCases {
    */
   async getAllFragments(): Promise<KnowledgeFragmentResponse[]> {
     const fragments = await this.repository.findAll()
+    console.log(
+      '[KnowledgeFragmentUseCases] getAllFragments, count:',
+      fragments.length,
+      'references:',
+      JSON.stringify(
+        fragments.map((f) => ({
+          id: f.getId().value,
+          refCount: f.getReferencedDocuments().length,
+        })),
+      ),
+    )
     return fragments.map((f) => this.mapToResponse(f))
   }
 
@@ -165,6 +176,7 @@ export class KnowledgeFragmentUseCases {
   /**
    * 删除知识片段
    * 同时删除对应的存储目录（fragments/assets/{fragmentId}）
+   * 删除片段时，清除所有引用该片段的计数
    */
   async deleteFragment(id: string): Promise<void> {
     // 删除知识片段数据
@@ -191,6 +203,19 @@ export class KnowledgeFragmentUseCases {
     } catch (error) {
       console.error('删除知识片段存储目录失败:', error)
       // 不抛出错误，因为数据已经删除，目录删除失败不影响主要功能
+    }
+
+    // 删除片段时，清除引用计数
+    try {
+      const { FragmentReferenceCounterService } = await import(
+        '../services/fragment-reference-counter.service'
+      )
+      const counterService = new FragmentReferenceCounterService(this.vaultId)
+      await counterService.initialize(this.vaultId)
+      await counterService.clear(id)
+      console.log('已清除片段引用计数:', id)
+    } catch (error) {
+      console.error('清除引用计数失败:', error)
     }
   }
 
@@ -476,6 +501,7 @@ export class KnowledgeFragmentUseCases {
         documentTitle: ref.documentTitle,
         referencedAt: ref.referencedAt.toISOString(),
         isConnected: ref.isConnected,
+        referenceCount: (ref as any).referenceCount || 1,
       })),
       createdAt: fragment.getCreatedAt().toISOString(),
       updatedAt: fragment.getUpdatedAt().toISOString(),
@@ -495,6 +521,21 @@ export class KnowledgeFragmentUseCases {
   /** 工作2：资产视角列表（筛选、排序） */
   async listFragments(params: ListFragmentsParams): Promise<KnowledgeFragmentResponse[]> {
     let list = await this.repository.findAll()
+    console.log(
+      '[KnowledgeFragmentUseCases] listFragments raw, count:',
+      list.length,
+      'references:',
+      JSON.stringify(
+        list.map((f) => ({
+          id: f.getId().value,
+          refCount: f.getReferencedDocuments().length,
+          refs: f.getReferencedDocuments().map((r) => ({
+            documentId: r.documentId,
+            documentTitle: r.documentTitle,
+          })),
+        })),
+      ),
+    )
 
     if (params.keyword?.trim()) {
       const q = params.keyword.toLowerCase()

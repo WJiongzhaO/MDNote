@@ -34,6 +34,7 @@ export class LocalStorageKnowledgeFragmentRepository implements KnowledgeFragmen
         documentTitle: ref.documentTitle,
         referencedAt: ref.referencedAt.toISOString(),
         isConnected: ref.isConnected,
+        referenceCount: (ref as any).referenceCount || 1,
       })),
       source: fragment.getSource(),
       trustScore: fragment.getTrustScore(),

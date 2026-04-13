@@ -13,7 +13,7 @@
         </div>
       </div>
       <div class="fm-header-right">
-        <router-link class="fm-nav-link" to="/fragments/health">
+        <router-link class="fm-nav-link" :to="`/fragments/health?vaultId=${vaultId}`">
           <span class="nav-icon">📊</span>
           健康度
         </router-link>
@@ -159,7 +159,8 @@
               <div class="card-meta">
                 <span class="meta-item">
                   <span class="meta-icon">📎</span>
-                  {{ f.referencedDocuments?.length ?? 0 }} 次引用
+                  <!-- 使用引用计数服务获取引用次数 -->
+                  {{ referenceCounters[f.id]?.totalCount || 0 }}次引用
                 </span>
                 <span v-if="f.tags?.length" class="meta-item">
                   <span class="meta-icon">🏷️</span>
@@ -287,17 +288,17 @@ function goHome() {
 
 // 使用 computed 响应式获取 vaultId，确保路由参数变化时能正确更新
 const vaultId = computed(() => {
-  return (
-    (props.vaultId as string | undefined) ??
-    (route.query.vaultId as string | undefined) ??
-    'default'
-  )
+  // 优先从查询参数获取
+  if (props.vaultId) return props.vaultId
+  if (route.query.vaultId) return route.query.vaultId as string
+  return 'default'
 })
 const categoryTree = ref<FragmentCategoryTreeNode[]>([])
 const selectedCategoryId = ref<string | null>(null)
 const dragOverCategoryId = ref<string | null>(null)
 
 const fragments = ref<KnowledgeFragmentResponse[]>([])
+const referenceCounters = ref<Record<string, { totalCount: number; references: any[] }>>({})
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const metadataSaving = ref(false)
@@ -407,6 +408,8 @@ const categoriesFlat = computed(() => flattenCategories(categoryTree.value))
 
 async function loadCategoryTree() {
   const app = Application.getInstance()
+  // 先切换到当前知识库
+  app.switchVault(vaultId.value)
   await app.getApplicationService().initialize(vaultId.value)
   const catUC = app.getFragmentCategoryUseCases()
   categoryTree.value = await catUC.getCategoryTree(vaultId.value)
@@ -417,8 +420,51 @@ async function load() {
   loadError.value = null
   try {
     const app = Application.getInstance()
+    // 先切换到当前知识库
+    app.switchVault(vaultId.value)
     await app.getApplicationService().initialize(vaultId.value)
+
+    // 使用引用计数服务获取引用次数（而不是从片段数据中获取）
+    try {
+      const { StorageAdapter } = await import('../../infrastructure/storage.adapter')
+      const { FragmentReferenceCounterService } = await import(
+        '../../application/services/fragment-reference-counter.service'
+      )
+      const fragmentRepo = StorageAdapter.createKnowledgeFragmentRepository(vaultId.value)
+      const docRepo = StorageAdapter.createDocumentRepository()
+      const counterService = new FragmentReferenceCounterService(vaultId.value)
+      // 重建引用计数（从数据库文档和外部文件重新统计）
+      await counterService.rebuild(docRepo, fragmentRepo)
+
+      // 将引用计数数据保存到 Vue 响应式变量中，供模板使用
+      const countersMap = counterService.getAllCounters()
+      referenceCounters.value = Object.fromEntries(countersMap)
+
+      // 详细打印每个片段的引用信息
+      for (const [fragId, record] of countersMap) {
+        console.log(
+          '[FragmentManagementView] Fragment:',
+          fragId,
+          'totalCount:',
+          record.totalCount,
+          'references:',
+          JSON.stringify(record.references),
+        )
+      }
+
+      console.log(
+        '[FragmentManagementView] Reference counters loaded:',
+        Object.keys(referenceCounters.value).length,
+        'raw data:',
+        JSON.stringify(referenceCounters.value),
+      )
+    } catch (counterError) {
+      console.warn('[FragmentManagementView] Counter service failed:', counterError)
+    }
+
     const useCases = app.getKnowledgeFragmentUseCases()
+    // 延迟一小段时间确保数据已保存
+    await new Promise((resolve) => setTimeout(resolve, 100))
     const list = await useCases.listFragments({
       keyword: filters.value.keyword || undefined,
       statuses: filters.value.status
@@ -431,6 +477,24 @@ async function load() {
       sortBy: filters.value.recentUsed ? 'referencedAt' : 'updatedAt',
       sortOrder: 'desc',
     })
+    console.log(
+      '[FragmentManagementView] 加载片段列表, vaultId:',
+      vaultId.value,
+      '片段数:',
+      list.length,
+      '引用数据:',
+      JSON.stringify(
+        list.map((f) => ({
+          id: f.id,
+          title: f.title,
+          refCount: f.referencedDocuments?.length ?? 0,
+          refs: (f.referencedDocuments || []).map((r) => ({
+            documentId: r.documentId,
+            documentTitle: r.documentTitle,
+          })),
+        })),
+      ),
+    )
     fragments.value = list
   } catch (e) {
     console.error(e)

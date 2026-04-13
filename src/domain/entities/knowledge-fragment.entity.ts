@@ -242,6 +242,7 @@ export class KnowledgeFragment {
         documentTitle: ref.documentTitle,
         referencedAt: ref.referencedAt.toISOString(),
         isConnected: ref.isConnected,
+        referenceCount: (ref as any).referenceCount || 1,
       })),
       createdAt: this.createdAt.toISOString(),
       updatedAt: this.updatedAt.toISOString(),
@@ -267,6 +268,7 @@ export class KnowledgeFragment {
       documentTitle: ref.documentTitle,
       referencedAt: new Date(ref.referencedAt),
       isConnected: ref.isConnected !== undefined ? ref.isConnected : true,
+      referenceCount: ref.referenceCount || 1,
     }))
 
     const fragment = new KnowledgeFragment(
@@ -338,27 +340,48 @@ export class KnowledgeFragment {
 
   /**
    * 添加引用文档
+   * 如果文档已存在，增加引用次数；否则添加新引用（从1开始）
    */
   addReferencedDocument(documentId: string, documentTitle: string): void {
-    const existingIndex = this.referencedDocuments.findIndex((ref) => ref.documentId === documentId)
-    if (existingIndex === -1) {
+    const existingRef = this.referencedDocuments.find((ref) => ref.documentId === documentId)
+    if (existingRef) {
+      // 文档已存在，增加引用次数
+      const currentCount = (existingRef as any).referenceCount || 1
+      ;(existingRef as any).referenceCount = currentCount + 1
+      existingRef.referencedAt = new Date()
+      existingRef.isConnected = true
+    } else {
+      // 第一次引用，从1开始
       this.referencedDocuments.push({
         documentId,
         documentTitle,
         referencedAt: new Date(),
         isConnected: true,
-      })
-      this.updatedAt = new Date()
+        referenceCount: 1,
+      } as any)
     }
+    this.updatedAt = new Date()
   }
 
   /**
    * 移除引用文档
+   * 如果引用次数大于1，减少引用次数；否则完全移除引用
    */
   removeReferencedDocument(documentId: string): void {
-    const index = this.referencedDocuments.findIndex((ref) => ref.documentId === documentId)
-    if (index !== -1) {
-      this.referencedDocuments.splice(index, 1)
+    const ref = this.referencedDocuments.find((ref) => ref.documentId === documentId)
+    if (ref) {
+      const count = (ref as any).referenceCount || 1
+      if (count > 1) {
+        // 引用次数大于1，只减少次数
+        ;(ref as any).referenceCount = count - 1
+        ref.referencedAt = new Date()
+      } else {
+        // 引用次数为1，完全移除引用
+        const index = this.referencedDocuments.findIndex((r) => r.documentId === documentId)
+        if (index !== -1) {
+          this.referencedDocuments.splice(index, 1)
+        }
+      }
       this.updatedAt = new Date()
     }
   }

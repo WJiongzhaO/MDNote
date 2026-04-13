@@ -117,10 +117,12 @@ export class ApplicationModule {
     container.bind<ApplicationService>(TYPES.ApplicationService).toSingleton(ApplicationService)
 
     // 按当前知识库 vaultId 提供片段仓储（与 ApplicationService.initialize / switchVault 一致）
-    container.bind<KnowledgeFragmentRepository>(TYPES.KnowledgeFragmentRepository).toDynamicValue(ctx => {
-      const app = ctx.container.get<ApplicationService>(TYPES.ApplicationService)
-      return StorageAdapter.createKnowledgeFragmentRepository(app.getCurrentVaultId())
-    })
+    container
+      .bind<KnowledgeFragmentRepository>(TYPES.KnowledgeFragmentRepository)
+      .toDynamicValue((ctx) => {
+        const app = ctx.container.get<ApplicationService>(TYPES.ApplicationService)
+        return StorageAdapter.createKnowledgeFragmentRepository(app.getCurrentVaultId())
+      })
 
     container.bind<DocumentUseCases>(TYPES.DocumentUseCases).toSingleton(DocumentUseCases)
 
@@ -130,15 +132,18 @@ export class ApplicationModule {
       .bind<KnowledgeFragmentUseCases>(TYPES.KnowledgeFragmentUseCases)
       .to(KnowledgeFragmentUseCases)
 
-    container.bind<FragmentCategoryUseCases>(TYPES.FragmentCategoryUseCases)
-      .to(FragmentCategoryUseCases);
+    container
+      .bind<FragmentCategoryUseCases>(TYPES.FragmentCategoryUseCases)
+      .to(FragmentCategoryUseCases)
 
-    container.bind<ReferenceGraphService>(TYPES.ReferenceGraphService)
-      .to(ReferenceGraphService);
-    container.bind<KnowledgeHealthService>(TYPES.KnowledgeHealthService)
-      .to(KnowledgeHealthService);
-    container.bind<RecommendationService>(TYPES.RecommendationService)
-      .to(RecommendationService);
+    // 按当前知识库 vaultId 提供健康度服务
+    container.bind<KnowledgeHealthService>(TYPES.KnowledgeHealthService).toDynamicValue((ctx) => {
+      const app = ctx.container.get<ApplicationService>(TYPES.ApplicationService)
+      return new KnowledgeHealthService(app.getCurrentVaultId())
+    })
+
+    container.bind<ReferenceGraphService>(TYPES.ReferenceGraphService).to(ReferenceGraphService)
+    container.bind<RecommendationService>(TYPES.RecommendationService).to(RecommendationService)
 
     container.bind<VaultRepository>(TYPES.VaultRepository).toSingleton(FileSystemVaultRepository)
 

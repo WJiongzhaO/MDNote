@@ -102,6 +102,7 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
         documentTitle: ref.documentTitle,
         referencedAt: ref.referencedAt.toISOString(),
         isConnected: ref.isConnected,
+        referenceCount: (ref as any).referenceCount || 1,
       })),
       source: fragment.getSource(),
       trustScore: fragment.getTrustScore(),
@@ -120,6 +121,12 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
     }
 
     await this.saveFragmentsToFile(fragments)
+    console.log(
+      '[FileSystemFragmentRepo] 保存片段, id:',
+      fragmentData.id,
+      '引用数:',
+      fragmentData.referencedDocuments?.length ?? 0,
+    )
   }
 
   async findById(id: KnowledgeFragmentId): Promise<KnowledgeFragment | null> {
@@ -130,11 +137,23 @@ export class FileSystemKnowledgeFragmentRepository implements KnowledgeFragmentR
       return null
     }
 
+    console.log(
+      '[FileSystemFragmentRepo] findById, id:',
+      id.value,
+      '引用数:',
+      fragmentData.referencedDocuments?.length ?? 0,
+    )
     return this.mapToEntity(fragmentData)
   }
 
   async findAll(): Promise<KnowledgeFragment[]> {
     const fragmentsData = await this.getAllFragmentsFromFile()
+    console.log(
+      '[FileSystemFragmentRepo] findAll, 片段数:',
+      fragmentsData.length,
+      'vaultId:',
+      this.vaultId,
+    )
     return fragmentsData.map((data) => this.mapToEntity(data))
   }
 

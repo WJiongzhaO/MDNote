@@ -24,6 +24,7 @@ export interface FragmentReference {
   referencedAt: Date
   isConnected: boolean // 是否还接受片段修改
   vaultId?: string // 跨知识库引用时，记录来源知识库ID
+  referenceCount?: number // 引用次数（同一文档多次引用同一片段时）
 }
 
 /**

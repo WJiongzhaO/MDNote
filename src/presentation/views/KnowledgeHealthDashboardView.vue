@@ -9,7 +9,9 @@
             首页
           </button>
           <span class="breadcrumb-sep">/</span>
-          <router-link to="/fragments" class="breadcrumb-link">片段管理</router-link>
+          <router-link :to="`/fragments?vaultId=${vaultId}`" class="breadcrumb-link"
+            >片段管理</router-link
+          >
           <span class="breadcrumb-sep">/</span>
           <span class="breadcrumb-current">健康度</span>
         </div>
@@ -169,9 +171,12 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
-const vaultId = computed(
-  () => props.vaultId ?? (route.query.vaultId as string | undefined) ?? 'default',
-)
+const vaultId = computed(() => {
+  // 优先从查询参数获取，如果没有则使用当前知识库ID
+  if (props.vaultId) return props.vaultId
+  if (route.query.vaultId) return route.query.vaultId as string
+  return 'default'
+})
 const loading = ref(true)
 const loadError = ref<string | null>(null)
 const summary = ref<VaultHealthSummary | null>(null)
@@ -183,8 +188,7 @@ const highImpactTotal = computed(() =>
 )
 
 function fragmentLink(id: string) {
-  const q = route.query.vaultId ? `?vaultId=${encodeURIComponent(String(route.query.vaultId))}` : ''
-  return `/fragments/${id}${q}`
+  return `/fragments/${id}?vaultId=${encodeURIComponent(vaultId.value)}`
 }
 
 function goHome() {
@@ -223,6 +227,8 @@ async function loadSummary() {
   loadError.value = null
   try {
     const app = Application.getInstance()
+    // 先切换到当前知识库，确保使用正确的 vaultId
+    app.switchVault(vaultId.value)
     await app.getApplicationService().initialize(vaultId.value)
     summary.value = await app.getKnowledgeHealthService().getVaultHealthSummary(vaultId.value)
   } catch (e) {
