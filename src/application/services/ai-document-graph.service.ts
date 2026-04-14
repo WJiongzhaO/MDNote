@@ -62,6 +62,14 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Failed to build AI graph.';
 }
 
+function previewText(value: string, maxLength = 120): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
 function readValueString(value: unknown): string | null {
   if (typeof value === 'string') {
     return value;
@@ -99,6 +107,41 @@ function readDocumentContent(document: unknown): string | null {
   }
 
   return readValueString((document as { content?: unknown }).content);
+}
+
+function seemsLikeFilePath(docId: string): boolean {
+  return docId.includes('/') || docId.includes('\\') || /^[a-zA-Z]:/.test(docId);
+}
+
+async function tryReadExternalMarkdown(docId: string): Promise<string | null> {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  if (!seemsLikeFilePath(docId)) {
+    return null;
+  }
+
+  const electronAPI = (window as {
+    electronAPI?: {
+      file?: {
+        readFileContent?: (path: string) => Promise<string | null>;
+      };
+    };
+  }).electronAPI;
+
+  const readFileContent = electronAPI?.file?.readFileContent;
+  if (typeof readFileContent !== 'function') {
+    return null;
+  }
+
+  try {
+    const content = await readFileContent(docId);
+    return typeof content === 'string' ? content : null;
+  } catch (error) {
+    console.warn('[AI Graph] Failed to read external markdown file', { docId, error });
+    return null;
+  }
 }
 
 function isNormalizedContribution(value: ChunkExtractionOutput): value is NormalizedContribution {
@@ -185,6 +228,7 @@ export class AiDocumentGraphService {
   constructor(private readonly deps: AiDocumentGraphServiceDeps) {}
 
   async buildDocumentKnowledgeGraph(docId: string): Promise<AiKnowledgeGraph> {
+    console.log('[AI Graph] buildDocumentKnowledgeGraph called', { docId });
     const config = await this.deps.settingsGateway.load();
 
     if (!config) {
@@ -212,24 +256,71 @@ export class AiDocumentGraphService {
 
       if (documentRepo && chunker && extractor.extractChunk) {
         const document = await documentRepo.findById({ value: docId });
-        const markdown = readDocumentContent(document);
+        const markdown = readDocumentContent(document) ?? (await tryReadExternalMarkdown(docId));
 
         if (!markdown || markdown.trim().length === 0) {
           throw new Error('Document content is required to build AI graph.');
         }
 
-        const title = readDocumentTitle(document) ?? docId;
+        const title =
+          readDocumentTitle(document)
+          ?? (seemsLikeFilePath(docId) ? docId.split(/[\\/]/).pop() || docId : docId);
         contentHash = hashContent(markdown);
         const chunks = chunker.splitMarkdown(markdown, docId);
+        console.log('[AI Graph] Build started', {
+          docId,
+          title,
+          markdownLength: markdown.length,
+          chunkCount: chunks.length
+        });
+
+        chunks.forEach((chunk, index) => {
+          console.log('[AI Graph] Chunk prepared', {
+            docId,
+            chunkIndex: index,
+            chunkId: chunk.chunkId,
+            headingPath: chunk.headingPath,
+            startOffset: chunk.startOffset,
+            endOffset: chunk.endOffset,
+            markdownPreview: previewText(chunk.markdown)
+          });
+        });
+
         const normalizedChunks =
           chunks.length === 0
             ? []
             : await Promise.all(
-                chunks.map(async chunk => {
+                chunks.map(async (chunk, index) => {
                   const extraction = await extractor.extractChunk(chunk, providerConfig);
+                  console.log('[AI Graph] Chunk extraction raw result', {
+                    docId,
+                    chunkIndex: index,
+                    chunkId: chunk.chunkId,
+                    rawEntityCount: extraction.entities.length,
+                    rawRelationCount: extraction.relations.length
+                  });
+
+                  if (extraction.entities.length === 0 && extraction.relations.length === 0) {
+                    console.warn('[AI Graph] Chunk extraction is empty', {
+                      docId,
+                      chunkIndex: index,
+                      chunkId: chunk.chunkId,
+                      markdownPreview: previewText(chunk.markdown)
+                    });
+                  }
+
                   return normalizeChunkContribution(docId, chunk, extraction);
                 })
               );
+
+        normalizedChunks.forEach((chunkContribution, index) => {
+          console.log('[AI Graph] Chunk normalized result', {
+            docId,
+            chunkIndex: index,
+            entityCount: chunkContribution.entities.length,
+            relationCount: chunkContribution.relations.length
+          });
+        });
 
         const contribution =
           chunks.length === 0
@@ -238,6 +329,12 @@ export class AiDocumentGraphService {
                 entities: normalizedChunks.flatMap(chunkContribution => chunkContribution.entities),
                 relations: normalizedChunks.flatMap(chunkContribution => chunkContribution.relations)
               });
+
+        console.log('[AI Graph] Merged contribution', {
+          docId,
+          mergedEntityCount: contribution.entities.length,
+          mergedRelationCount: contribution.relations.length
+        });
 
         await this.deps.graphRepo.replaceDocumentContribution({
           docId,
@@ -249,6 +346,11 @@ export class AiDocumentGraphService {
 
         const storedGraph = await this.deps.graphRepo.getDocumentGraph(docId);
         const graph = storedGraph ?? buildKnowledgeGraph(contribution);
+        console.log('[AI Graph] Graph persisted', {
+          docId,
+          nodeCount: graph.nodes.length,
+          edgeCount: graph.edges.length
+        });
 
         await this.deps.metadataRepo.saveRecord({
           docId,
@@ -267,6 +369,13 @@ export class AiDocumentGraphService {
       if (!this.deps.extractor.buildForDocument) {
         throw new Error('AI graph extractor is required to build document graph.');
       }
+
+      console.warn('[AI Graph] Fallback extractor path is used', {
+        docId,
+        hasDocumentRepo: Boolean(documentRepo),
+        hasChunker: Boolean(chunker),
+        hasExtractChunk: Boolean(extractor.extractChunk)
+      });
 
       const result = await this.deps.extractor.buildForDocument(docId, providerConfig);
       contentHash = result.contentHash;

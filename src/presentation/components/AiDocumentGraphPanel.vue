@@ -2,7 +2,7 @@
   <section class="ai-document-graph-panel">
     <div v-if="state.status === 'not_built'" class="ai-document-graph-panel__state">
       <p>Knowledge graph has not been built for this document yet.</p>
-      <button type="button" @click="handleBuild">Build Knowledge Graph</button>
+      <button v-if="!props.hideInlineActions" type="button" @click="handleBuild">Build Knowledge Graph</button>
     </div>
 
     <div v-else-if="state.status === 'building'" class="ai-document-graph-panel__state">
@@ -18,12 +18,12 @@
 
     <div v-else-if="state.status === 'ready_empty'" class="ai-document-graph-panel__state">
       <p>No meaningful graph was extracted</p>
-      <button type="button" @click="handleBuild">Build Knowledge Graph</button>
+      <button v-if="!props.hideInlineActions" type="button" @click="handleBuild">Build Knowledge Graph</button>
     </div>
 
     <div v-else class="ai-document-graph-panel__state ai-document-graph-panel__state--error">
       <p>{{ state.errorMessage || 'Failed to build knowledge graph.' }}</p>
-      <button type="button" @click="handleBuild">Retry Build</button>
+      <button v-if="!props.hideInlineActions" type="button" @click="handleBuild">Retry Build</button>
     </div>
   </section>
 </template>
@@ -37,6 +37,7 @@ import { getAiAnchorOccurrence } from '../utils/knowledge-graph-jump.util';
 const props = defineProps<{
   documentId: string;
   graphService: AiDocumentGraphService;
+  hideInlineActions?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -78,6 +79,19 @@ onMounted(() => {
 function handleBuild() {
   void build(props.documentId);
 }
+
+function buildGraph() {
+  handleBuild();
+}
+
+function refreshState() {
+  void refresh(props.documentId);
+}
+
+defineExpose({
+  buildGraph,
+  refreshState
+});
 
 function handleJumpTo(payload: { documentId: string; documentTitle?: string; start: number; end: number }) {
   emit('jump-to', payload);

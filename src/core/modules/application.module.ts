@@ -1,6 +1,7 @@
 import { TYPES } from '../container/container.types'
 import type { ServiceContainer } from '../container/service-container.interface'
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface'
+import type { DocumentReader } from '../../domain/repositories/document.repository.interface'
 import type { FolderRepository } from '../../domain/repositories/folder.repository.interface'
 import type { VaultRepository } from '../../domain/repositories/vault.repository.interface'
 import { MarkdownProcessor } from '../../domain/services/markdown-processor.domain.service'
@@ -75,7 +76,8 @@ import type {
 } from '../../domain/services/ai-graph-provider.service'
 import type { AiGraphEntity, AiGraphProviderConfig, AiGraphRelation, AiKnowledgeGraph } from '../../domain/types/ai-knowledge-graph.types'
 import { normalizeAiGraphExtraction } from '../../domain/services/ai-graph-normalizer.service'
-import { OpenAI } from '@langchain/openai'
+import { splitMarkdownIntoGraphChunks } from '../../domain/services/ai-graph-chunker.service'
+import { ChatOpenAI } from '@langchain/openai'
 import { LLMGraphTransformer } from '@langchain/community/experimental/graph_transformers/llm'
 
 type WindowWithElectronAiGraphBridge = Window & {
@@ -99,7 +101,14 @@ function hasElectronAiGraphBridge(): boolean {
 }
 
 class InMemoryAiGraphProviderGateway implements AiGraphProviderGateway {
-  private config: AiGraphProviderConfig | null = null
+  private config: AiGraphProviderConfig | null = {
+    providerName: 'dashscope',
+    apiKey: 'sk-05832c2651bc4447b9a3ba5e3541590e',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-plus',
+    temperature: 0.1,
+    maxTokens: 2048,
+  }
 
   async load(): Promise<Partial<AiGraphProviderConfig> | null> {
     return this.config
@@ -132,18 +141,37 @@ class MockDocumentGraphExtractor {
 }
 
 class RealDocumentGraphExtractor {
-  async buildForDocument(
-    docId: string,
-    config: AiGraphProviderConfig,
-  ): Promise<{ title: string; entities: AiGraphEntity[]; relations: AiGraphRelation[]; graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
-    const model = new OpenAI({
+  private createExtractor(config: AiGraphProviderConfig): LangChainLlmGraphTransformerExtractor {
+    const model = new ChatOpenAI({
       apiKey: config.apiKey,
       configuration: { baseURL: config.baseUrl },
       model: config.model,
       temperature: config.temperature ?? 0.1
     });
     const transformer = new LLMGraphTransformer({ llm: model as never });
-    const extractor = new LangChainLlmGraphTransformerExtractor(transformer as never);
+    return new LangChainLlmGraphTransformerExtractor(transformer as never);
+  }
+
+  async extractChunk(
+    chunk: {
+      chunkId: string;
+      docId: string;
+      markdown: string;
+      headingPath: string[];
+      startOffset: number;
+      endOffset: number;
+    },
+    config: AiGraphProviderConfig,
+  ): Promise<{ entities: { name: string; type: string; description?: string; metadata?: Record<string, unknown> }[]; relations: { source: string; target: string; type: string; name?: string; description?: string; metadata?: Record<string, unknown> }[] }> {
+    const extractor = this.createExtractor(config);
+    return extractor.extractChunk(chunk, config);
+  }
+
+  async buildForDocument(
+    docId: string,
+    config: AiGraphProviderConfig,
+  ): Promise<{ title: string; entities: AiGraphEntity[]; relations: AiGraphRelation[]; graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
+    const extractor = this.createExtractor(config);
     const markdown = `# ${docId}\n${docId}`;
     const extracted = await extractor.extractChunk({
       chunkId: `${docId}:chunk:0`,
@@ -247,7 +275,7 @@ export class ApplicationModule {
 
     // 按当前知识库 vaultId 提供片段仓储（与 ApplicationService.initialize / switchVault 一致）
     container.bind<KnowledgeFragmentRepository>(TYPES.KnowledgeFragmentRepository).toDynamicValue(ctx => {
-      const app = ctx.container.get<ApplicationService>(TYPES.ApplicationService)
+      const app = ctx.get(TYPES.ApplicationService) as ApplicationService
       return StorageAdapter.createKnowledgeFragmentRepository(app.getCurrentVaultId())
     })
 
@@ -294,10 +322,15 @@ export class ApplicationModule {
     container
       .bind<AiDocumentGraphService>(TYPES.AiDocumentGraphService)
       .toDynamicValue(ctx => new AiDocumentGraphService({
-        metadataRepo: ctx.container.get<AiGraphMetadataRepository>(TYPES.AiGraphMetadataRepository),
-        graphRepo: ctx.container.get<AiGraphRepository>(TYPES.AiGraphRepository),
+        metadataRepo: ctx.get(TYPES.AiGraphMetadataRepository) as AiGraphMetadataRepository,
+        graphRepo: ctx.get(TYPES.AiGraphRepository) as AiGraphRepository,
         settingsGateway: aiGraphProviderGateway,
         extractor: documentGraphExtractor,
+        documentRepo: ctx.get(TYPES.DocumentRepository) as DocumentReader,
+        chunker: {
+          splitMarkdown: (markdown: string, docId: string) =>
+            splitMarkdownIntoGraphChunks(markdown, docId),
+        },
       }))
 
     container

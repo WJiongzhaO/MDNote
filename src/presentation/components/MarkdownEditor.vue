@@ -246,20 +246,88 @@
         min-width: 640px;
       ">
         <div class="knowledge-graph-header">
-          <h3>🕸️ AI 知识图谱</h3>
+          <h3>🕸️ 知识图谱</h3>
           <div class="knowledge-graph-actions">
+            <button
+              type="button"
+              class="toolbar-btn sample-btn"
+              @click="switchKnowledgeGraphMode('markdown')"
+              :disabled="knowledgeGraphMode === 'markdown'"
+              title="查看按标题快速生成的知识图谱"
+            >
+              标题图谱
+            </button>
+            <button
+              type="button"
+              class="toolbar-btn sample-btn"
+              @click="switchKnowledgeGraphMode('ai')"
+              :disabled="knowledgeGraphMode === 'ai'"
+              title="查看 AI 生成的知识图谱"
+            >
+              AI 知识图谱
+            </button>
+            <button
+              type="button"
+              class="toolbar-btn sample-btn"
+              @click="buildAiKnowledgeGraph"
+              :disabled="!activeDocumentId"
+              title="生成或更新当前文档的 AI 知识图谱"
+            >
+              生成 AI 知识图谱
+            </button>
+            <template v-if="knowledgeGraphMode === 'markdown'">
+              <button
+                type="button"
+                class="toolbar-btn sample-btn"
+                @click="saveKnowledgeGraph"
+                title="将当前知识图谱保存为独立文件"
+                v-if="knowledgeGraphData"
+              >
+                保存到知识图谱库
+              </button>
+              <button type="button" class="toolbar-btn sample-btn" @click="showSampleGraph" title="查看样例效果">查看样例</button>
+              <button
+                type="button"
+                class="toolbar-btn sample-btn"
+                v-if="knowledgeGraphData"
+                @click="randomizeKnowledgeGraphLayout"
+                title="重新随机排列节点（会丢弃当前坐标，直到再次自动保存）"
+              >
+                随机重新布局
+              </button>
+            </template>
             <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">✕</button>
           </div>
         </div>
-        <AiDocumentGraphPanel
-          v-if="activeDocumentId"
-          class="knowledge-graph-body"
-          :document-id="activeDocumentId"
-          :graph-service="aiDocumentGraphService"
-          @jump-to="onAiKnowledgeGraphJump"
-          @jump-to-fragment="onKnowledgeGraphJumpToFragment"
-        />
-        <div v-else class="knowledge-graph-error">当前文档不可用，无法构建 AI 知识图谱</div>
+        <template v-if="knowledgeGraphMode === 'markdown'">
+          <div v-if="isSampleMode" class="knowledge-graph-sample-hint">（样例展示，实际数据将由 RAG 等方式提取）</div>
+          <div v-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">正在生成图谱…</div>
+          <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">{{ knowledgeGraphError }}</div>
+          <KnowledgeGraphView
+            v-else-if="knowledgeGraphData"
+            :graph="knowledgeGraphData"
+            :graph-load-key="getKnowledgeGraphDocKey()"
+            :layout-randomize-key="kgLayoutRandomizeKey"
+            class="knowledge-graph-body"
+            :render-markdown="renderMarkdown"
+            @graph-update="onKnowledgeGraphUpdate"
+            @jump-to-fragment="onKnowledgeGraphJumpToFragment"
+          />
+          <div v-else class="knowledge-graph-error">当前文档暂无可展示的知识图谱</div>
+        </template>
+        <template v-else>
+          <AiDocumentGraphPanel
+            v-if="activeDocumentId"
+            ref="aiDocumentGraphPanelRef"
+            class="knowledge-graph-body"
+            :document-id="activeDocumentId"
+            :graph-service="aiDocumentGraphService"
+            :hide-inline-actions="true"
+            @jump-to="onAiKnowledgeGraphJump"
+            @jump-to-fragment="onKnowledgeGraphJumpToFragment"
+          />
+          <div v-else class="knowledge-graph-error">当前文档不可用，无法构建 AI 知识图谱</div>
+        </template>
       </div>
     </div>
   </div>
@@ -380,11 +448,19 @@ const showKnowledgeGraphModal = ref(false);
 const knowledgeGraphData = ref<KnowledgeGraph | null>(null);
 const knowledgeGraphError = ref('');
 const isKnowledgeGraphRendering = ref(false);
+const knowledgeGraphMode = ref<'markdown' | 'ai'>('markdown');
 const isSampleMode = ref(false);
 const kgLayoutRandomizeKey = ref(0);
 const knowledgeGraphService = new FileSystemKnowledgeGraphService();
 const aiDocumentGraphService = Application.getInstance().getApplicationService().getAiDocumentGraphService();
-const activeDocumentId = computed(() => props.document?.id || currentFilePath.value || '');
+const aiDocumentGraphPanelRef = ref<{ buildGraph: () => void; refreshState: () => void } | null>(null);
+const activeDocumentId = computed(() => {
+  const externalFilePath = (props.document as any)?.filePath;
+  if (externalFilePath) {
+    return externalFilePath;
+  }
+  return props.document?.id || currentFilePath.value || '';
+});
 
 /** 工作3：文档编辑区右侧「推荐片段」面板 */
 const showRecommendationPanel = ref(true);
@@ -1596,7 +1672,12 @@ const renderContent = async () => {
         }
       }
 
-      const newRenderedContent = await props.renderMarkdown(mainContent.value, docId, fileCache);
+      const newRenderedContent = await props.renderMarkdown(
+        mainContent.value,
+        docId,
+        undefined,
+        fileCache,
+      );
 
       // 获取编辑器的滚动百分比位置（这是我们要同步到预览的基准）
       const editor = editorElement.value;
@@ -2537,16 +2618,59 @@ const randomizeKnowledgeGraphLayout = () => {
   kgLayoutRandomizeKey.value += 1;
 };
 
+const generateHeadingKnowledgeGraph = async () => {
+  isKnowledgeGraphRendering.value = true;
+  knowledgeGraphError.value = '';
+  try {
+    const fullContent = getContent();
+    if (!fullContent || !fullContent.trim()) {
+      knowledgeGraphData.value = null;
+      knowledgeGraphError.value = '当前文档为空，无法根据标题生成图谱';
+      return;
+    }
+
+    const resolvedDocumentId = props.document?.id || currentFilePath.value || undefined;
+    const filePath = currentFilePath.value || (props.document as { filePath?: string } | null)?.filePath || '';
+    const fileName = filePath.split(/[/\\]/).pop();
+    const resolvedTitle = title.value || props.document?.title || fileName || '未命名文档';
+
+    const extracted = extractKnowledgeGraph(fullContent, {
+      documentId: resolvedDocumentId,
+      documentTitle: resolvedTitle
+    });
+    const layoutPayload = loadKgLayoutPayloadFromLocalStorage(getKnowledgeGraphDocKey());
+    knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(extracted, layoutPayload);
+  } catch (e) {
+    knowledgeGraphData.value = null;
+    knowledgeGraphError.value = e instanceof Error ? e.message : '生成标题图谱失败';
+  } finally {
+    isKnowledgeGraphRendering.value = false;
+  }
+};
+
+const switchKnowledgeGraphMode = (mode: 'markdown' | 'ai') => {
+  knowledgeGraphMode.value = mode;
+};
+
+const buildAiKnowledgeGraph = async () => {
+  if (!activeDocumentId.value) return;
+  knowledgeGraphMode.value = 'ai';
+  await nextTick();
+  aiDocumentGraphPanelRef.value?.buildGraph();
+};
+
 // 知识图谱相关方法
 const openKnowledgeGraph = () => {
   showKnowledgeGraphModal.value = true;
+  knowledgeGraphMode.value = 'markdown';
   knowledgeGraphError.value = '';
   isSampleMode.value = false;
-  isKnowledgeGraphRendering.value = false;
   knowledgeGraphData.value = null;
+  void generateHeadingKnowledgeGraph();
 };
 
 const showSampleGraph = () => {
+  knowledgeGraphMode.value = 'markdown';
   knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(
     sampleKnowledgeGraph,
     loadKgLayoutPayloadFromLocalStorage('sample')
@@ -2559,6 +2683,7 @@ const closeKnowledgeGraph = () => {
   showKnowledgeGraphModal.value = false;
   knowledgeGraphData.value = null;
   knowledgeGraphError.value = '';
+  knowledgeGraphMode.value = 'markdown';
   isSampleMode.value = false;
 };
 

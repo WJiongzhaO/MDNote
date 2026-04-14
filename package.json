@@ -15,6 +15,7 @@
     "electron:build": "vue-tsc && vite build && electron-builder"
   },
   "dependencies": {
+    "@langchain/community": "^0.3.59",
     "@langchain/core": "^0.3.69",
     "@langchain/openai": "^0.5.18",
     "@types/dompurify": "^3.0.5",

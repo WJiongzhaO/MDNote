@@ -95,6 +95,7 @@ const AI_GRAPH_SCHEMA_STATEMENTS = [
 let kuzuModule = null;
 let aiGraphRepoState = null;
 let aiGraphRepoLock = Promise.resolve(null);
+const SHOULD_USE_KUZU_AI_GRAPH = process.env.MDNOTE_USE_KUZU === '1';
 
 function getKuzuModule() {
   if (!kuzuModule) {
@@ -223,7 +224,184 @@ function sanitizeAiGraphQuery(query) {
   };
 }
 
+function createInMemoryAiGraphRepository() {
+  const documents = new Map();
+  const mentionsByDoc = new Map();
+  const relationsByDoc = new Map();
+  const entityCatalog = new Map();
+
+  return {
+    async close() {
+      // no-op
+    },
+    async replaceDocumentContribution(contribution) {
+      const now = new Date().toISOString();
+      documents.set(contribution.docId, {
+        docId: contribution.docId,
+        title: contribution.title || '',
+        contentHash: contribution.contentHash || '',
+        updatedAt: now
+      });
+
+      mentionsByDoc.set(
+        contribution.docId,
+        contribution.entities.map(entity => {
+          const nextEntity = {
+            entityId: entity.entityId,
+            name: entity.name,
+            normalizedName: entity.normalizedName,
+            type: entity.type,
+            description: entity.description || '',
+            updatedAt: now
+          };
+          const previous = entityCatalog.get(entity.entityId);
+          entityCatalog.set(entity.entityId, {
+            ...previous,
+            ...nextEntity,
+            createdAt: previous?.createdAt || now
+          });
+
+          return {
+            entityId: entity.entityId,
+            sourceChunkId: entity.sourceChunkId,
+            anchors: Array.isArray(entity.anchors) ? entity.anchors : []
+          };
+        })
+      );
+
+      relationsByDoc.set(
+        contribution.docId,
+        contribution.relations.map(relation => ({
+          relationId: relation.relationId,
+          sourceEntityId: relation.sourceEntityId,
+          targetEntityId: relation.targetEntityId,
+          type: relation.type,
+          description: relation.description || '',
+          sourceChunkId: relation.sourceChunkId
+        }))
+      );
+    },
+    async getDocumentGraph(docId) {
+      if (!documents.has(docId)) {
+        return null;
+      }
+
+      const mentions = mentionsByDoc.get(docId) || [];
+      const relations = relationsByDoc.get(docId) || [];
+      const nodes = mentions.map(mention => {
+        const entity = entityCatalog.get(mention.entityId) || {
+          name: mention.entityId,
+          type: 'Entity',
+          description: ''
+        };
+        const anchors = mention.anchors || [];
+        return {
+          id: mention.entityId,
+          label: entity.name || mention.entityId,
+          entityType: entity.type || 'Entity',
+          description: entity.description || '',
+          primaryAnchor: anchors[0],
+          evidenceCount: anchors.length,
+          evidencePreview: anchors.slice(0, 3)
+        };
+      });
+
+      return {
+        nodes,
+        edges: relations.map(relation => ({
+          id: relation.relationId,
+          source: relation.sourceEntityId,
+          target: relation.targetEntityId,
+          relationType: relation.type || 'RELATED_TO',
+          description: relation.description || ''
+        }))
+      };
+    },
+    async getGlobalGraph(query) {
+      const allMentions = Array.from(mentionsByDoc.values()).flat();
+      const allRelations = Array.from(relationsByDoc.values()).flat();
+      const seededByDoc = query.seedDocId ? new Set((mentionsByDoc.get(query.seedDocId) || []).map(item => item.entityId)) : null;
+
+      let nodeCandidates = allMentions
+        .map(mention => mention.entityId)
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .map(entityId => {
+          const entity = entityCatalog.get(entityId) || {
+            name: entityId,
+            type: 'Entity',
+            description: ''
+          };
+          return {
+            id: entityId,
+            label: entity.name || entityId,
+            entityType: entity.type || 'Entity',
+            description: entity.description || '',
+            evidenceCount: 0,
+            evidencePreview: []
+          };
+        });
+
+      if (seededByDoc) {
+        nodeCandidates = nodeCandidates.filter(node => seededByDoc.has(node.id));
+      }
+
+      if (query.seedNodeId) {
+        nodeCandidates = nodeCandidates.filter(node => node.id === query.seedNodeId);
+      }
+
+      if (query.keyword) {
+        const keyword = query.keyword.toLowerCase();
+        nodeCandidates = nodeCandidates.filter(node =>
+          node.label.toLowerCase().includes(keyword)
+          || (node.description || '').toLowerCase().includes(keyword)
+        );
+      }
+
+      const nodes = nodeCandidates.slice(0, Math.max(1, query.limit));
+      const nodeSet = new Set(nodes.map(node => node.id));
+      const edges = allRelations
+        .map(relation => ({
+          id: relation.relationId,
+          source: relation.sourceEntityId,
+          target: relation.targetEntityId,
+          relationType: relation.type || 'RELATED_TO',
+          description: relation.description || ''
+        }))
+        .filter(edge => nodeSet.has(edge.source) && nodeSet.has(edge.target))
+        .slice(0, Math.max(1, query.limit));
+
+      return { nodes, edges };
+    },
+    async getNodeEvidence(nodeId) {
+      const entity = entityCatalog.get(nodeId);
+      if (!entity) {
+        return null;
+      }
+
+      const anchors = [];
+      for (const mentions of mentionsByDoc.values()) {
+        for (const mention of mentions) {
+          if (mention.entityId === nodeId && Array.isArray(mention.anchors)) {
+            anchors.push(...mention.anchors);
+          }
+        }
+      }
+
+      return {
+        nodeId,
+        label: entity.name || nodeId,
+        anchors
+      };
+    }
+  };
+}
+
 function createAiGraphRepository(dbPath) {
+  if (!SHOULD_USE_KUZU_AI_GRAPH) {
+    console.warn('[Main Process] AI graph is running with in-memory repository. Set MDNOTE_USE_KUZU=1 to enable kuzu backend.');
+    return createInMemoryAiGraphRepository();
+  }
+
   const kuzu = getKuzuModule();
   const db = new kuzu.Database(dbPath);
   const connection = new kuzu.Connection(db);
@@ -592,7 +770,7 @@ function createWindow() {
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
           "style-src 'self' 'unsafe-inline'; " +
           "font-src 'self' data:; " +
-          "connect-src 'self' app: file:;"
+          "connect-src 'self' app: file: http://localhost:5173 ws://localhost:5173 https: wss:;"
         ]
       }
     });
