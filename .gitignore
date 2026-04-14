@@ -42,7 +42,4 @@ data/
 # Electron build artifacts
 release/
 
-# Documentation
-docs/
-
 .worktrees/

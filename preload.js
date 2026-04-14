@@ -81,6 +81,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setLastOpened: (id) => ipcRenderer.invoke('vault-registry:set-last-opened', id),
     checkPathExists: (vaultPath) => ipcRenderer.invoke('vault-registry:check-path-exists', vaultPath)
   },
+  aiGraph: {
+    replaceDocumentContribution: (contribution) =>
+      ipcRenderer.invoke('ai-graph:replace-document-contribution', contribution),
+    getDocumentGraph: (docId) => ipcRenderer.invoke('ai-graph:get-document-graph', docId),
+    getGlobalGraph: (query) => ipcRenderer.invoke('ai-graph:get-global-graph', query),
+    getNodeEvidence: (nodeId) => ipcRenderer.invoke('ai-graph:get-node-evidence', nodeId)
+  },
   dialog: {
     openFolder: (options) => ipcRenderer.invoke('dialog:open-folder', options),
     openFile: () => ipcRenderer.invoke('dialog:open-file'),

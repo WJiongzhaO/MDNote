@@ -1,3 +1,5 @@
+import type { AiGraphProviderConfig } from '../types/ai-knowledge-graph.types';
+
 export interface AiGraphExtractedEntity {
   name: string;
   type: string;
@@ -29,5 +31,8 @@ export interface AiGraphExtractionChunk {
 }
 
 export interface AiGraphExtractor {
-  extractChunk(chunk: AiGraphExtractionChunk): Promise<AiGraphExtractionResult>;
+  extractChunk(
+    chunk: AiGraphExtractionChunk,
+    config: AiGraphProviderConfig
+  ): Promise<AiGraphExtractionResult>;
 }

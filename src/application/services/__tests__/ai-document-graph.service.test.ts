@@ -159,6 +159,83 @@ describe('AiDocumentGraphService', () => {
     });
   });
 
+  it('passes the configured provider settings into chunk extraction', async () => {
+    const chunk = {
+      chunkId: 'doc-1:chunk:0',
+      docId,
+      markdown: '# Title\nBody',
+      headingPath: ['Title'],
+      startOffset: 0,
+      endOffset: 12
+    };
+
+    class RecordingExtractor {
+      readonly calls: Array<{
+        chunkId: string;
+        providerName: string;
+        model: string;
+        contextIsPreserved: boolean;
+      }> = [];
+
+      async extractChunk(
+        currentChunk: typeof chunk,
+        config: { providerName: string; model: string }
+      ) {
+        this.calls.push({
+          chunkId: currentChunk.chunkId,
+          providerName: config.providerName,
+          model: config.model,
+          contextIsPreserved: this instanceof RecordingExtractor
+        });
+
+        return { entities: [], relations: [] };
+      }
+    }
+
+    const extractor = new RecordingExtractor();
+    const service = new AiDocumentGraphService({
+      metadataRepo: {
+        saveRecord: vi.fn().mockResolvedValue(undefined),
+        getRecord: vi.fn().mockResolvedValue(null)
+      },
+      graphRepo: {
+        replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+        getDocumentGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+        getGlobalGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+        getNodeEvidence: vi.fn().mockResolvedValue(null)
+      },
+      settingsGateway: {
+        load: vi.fn().mockResolvedValue({
+          providerName: 'dashscope',
+          apiKey: 'secret',
+          model: 'qwen-max',
+          baseUrl: 'https://example.com/v1'
+        })
+      },
+      extractor,
+      documentRepo: {
+        findById: vi.fn().mockResolvedValue({
+          title: 'Doc',
+          content: '# Title\nBody'
+        })
+      },
+      chunker: {
+        splitMarkdown: vi.fn().mockReturnValue([chunk])
+      }
+    });
+
+    await service.buildDocumentKnowledgeGraph(docId);
+
+    expect(extractor.calls).toEqual([
+      {
+        chunkId: 'doc-1:chunk:0',
+        providerName: 'dashscope',
+        model: 'qwen-max',
+        contextIsPreserved: true
+      }
+    ]);
+  });
+
   it('throws when provider settings are missing', async () => {
     const service = new AiDocumentGraphService({
       metadataRepo: {

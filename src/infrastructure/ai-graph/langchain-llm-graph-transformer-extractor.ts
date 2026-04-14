@@ -4,6 +4,7 @@ import type {
   AiGraphExtractionResult,
   AiGraphExtractor
 } from '../../domain/services/ai-graph-extractor.interface';
+import type { AiGraphProviderConfig } from '../../domain/types/ai-knowledge-graph.types';
 
 type GraphNode = {
   id: string;
@@ -30,7 +31,10 @@ type GraphTransformerLike = {
 export class LangChainLlmGraphTransformerExtractor implements AiGraphExtractor {
   constructor(private readonly transformer: GraphTransformerLike) {}
 
-  async extractChunk(chunk: AiGraphExtractionChunk): Promise<AiGraphExtractionResult> {
+  async extractChunk(
+    chunk: AiGraphExtractionChunk,
+    _config: AiGraphProviderConfig
+  ): Promise<AiGraphExtractionResult> {
     const [graphDocument] = await this.transformer.convertToGraphDocuments([
       new Document({
         pageContent: chunk.markdown,

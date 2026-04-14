@@ -62,7 +62,7 @@ import { JsonFileOpenerStrategy } from '../../domain/services/json-file-opener.s
 import { ImageFileOpenerStrategy } from '../../domain/services/image-file-opener.strategy'
 import { FileOpenerManager } from '../../domain/services/file-opener-manager.service'
 import { InMemoryAiGraphRepository } from '../../infrastructure/ai-graph/in-memory-ai-graph.repository'
-import { KuzuAiGraphRepository } from '../../infrastructure/ai-graph/kuzu-ai-graph.repository'
+import { IpcAiGraphRepository } from '../../infrastructure/ai-graph/ipc-ai-graph.repository'
 import { LocalStorageAiGraphMetadataRepository } from '../../infrastructure/ai-graph/local-storage-ai-graph-metadata.repository'
 import { AiGraphSettingsService } from '../../application/services/ai-graph-settings.service'
 import { AiDocumentGraphService } from '../../application/services/ai-document-graph.service'
@@ -77,8 +77,26 @@ import type { AiGraphEntity, AiGraphProviderConfig, AiGraphRelation, AiKnowledge
 import { normalizeAiGraphExtraction } from '../../domain/services/ai-graph-normalizer.service'
 import { OpenAI } from '@langchain/openai'
 import { LLMGraphTransformer } from '@langchain/community/experimental/graph_transformers/llm'
-import { existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+
+type WindowWithElectronAiGraphBridge = Window & {
+  electronAPI?: {
+    aiGraph?: Partial<Pick<AiGraphRepository, 'replaceDocumentContribution' | 'getDocumentGraph' | 'getGlobalGraph' | 'getNodeEvidence'>>
+  }
+}
+
+function hasElectronAiGraphBridge(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const aiGraph = (window as WindowWithElectronAiGraphBridge).electronAPI?.aiGraph
+
+  return !!aiGraph
+    && typeof aiGraph.replaceDocumentContribution === 'function'
+    && typeof aiGraph.getDocumentGraph === 'function'
+    && typeof aiGraph.getGlobalGraph === 'function'
+    && typeof aiGraph.getNodeEvidence === 'function'
+}
 
 class InMemoryAiGraphProviderGateway implements AiGraphProviderGateway {
   private config: AiGraphProviderConfig | null = null
@@ -134,7 +152,7 @@ class RealDocumentGraphExtractor {
       headingPath: [docId],
       startOffset: 0,
       endOffset: markdown.length
-    });
+    }, config);
     const normalized = normalizeAiGraphExtraction({
       docId,
       chunkId: `${docId}:chunk:0`,
@@ -174,10 +192,6 @@ export class ApplicationModule {
   static configure(container: ServiceContainer): void {
     const aiGraphProviderGateway = new InMemoryAiGraphProviderGateway()
     const documentGraphExtractor = new RealDocumentGraphExtractor()
-    const kuzuDbDir = join(process.cwd(), '.mdnote-ai-graph')
-    if (!existsSync(kuzuDbDir)) {
-      mkdirSync(kuzuDbDir, { recursive: true })
-    }
 
     container
       .bind<DocumentRepository>(TYPES.DocumentRepository)
@@ -263,9 +277,11 @@ export class ApplicationModule {
 
     container.bind<VaultUseCases>(TYPES.VaultUseCases).toSingleton(VaultUseCases)
 
-    container.bind<AiGraphRepository>(TYPES.AiGraphRepository).toDynamicValue(() => new KuzuAiGraphRepository({
-      dbPath: join(kuzuDbDir, 'graph.kuzu')
-    }))
+    container.bind<AiGraphRepository>(TYPES.AiGraphRepository).toDynamicValue(() =>
+      hasElectronAiGraphBridge()
+        ? new IpcAiGraphRepository()
+        : new InMemoryAiGraphRepository()
+    )
 
     container
       .bind<AiGraphMetadataRepository>(TYPES.AiGraphMetadataRepository)
