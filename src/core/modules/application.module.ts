@@ -282,7 +282,7 @@ export class ApplicationModule {
     container
       .bind<KnowledgeFragmentRepository>(TYPES.KnowledgeFragmentRepository)
       .toDynamicValue((ctx) => {
-        const app = ctx.container.get<ApplicationService>(TYPES.ApplicationService)
+        const app = ctx.get(TYPES.ApplicationService) as ApplicationService
         return StorageAdapter.createKnowledgeFragmentRepository(app.getCurrentVaultId())
       })
 
@@ -300,7 +300,7 @@ export class ApplicationModule {
 
     // 按当前知识库 vaultId 提供健康度服务
     container.bind<KnowledgeHealthService>(TYPES.KnowledgeHealthService).toDynamicValue((ctx) => {
-      const app = ctx.container.get<ApplicationService>(TYPES.ApplicationService)
+      const app = ctx.get(TYPES.ApplicationService) as ApplicationService
       return new KnowledgeHealthService(app.getCurrentVaultId())
     })
 
