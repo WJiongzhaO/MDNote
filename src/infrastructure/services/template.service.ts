@@ -7,24 +7,22 @@ export interface DocumentTemplateInfo {
 }
 
 /**
- * 文档模板服务（基于全局“知识片段库”路径下的 templates 目录）
+ * 文档模板服务（基于当前知识库数据路径下的 templates 目录）
  *
- * 注意：
- * - 全局根路径通过 electronAPI.fragment.getGlobalPath 获取
- * - 具体的文件读写使用 electronAPI.file 接口
+ * 根路径通过 electronAPI.file.getDataPath 获取，读写使用 electronAPI.file。
  */
 export class FileSystemTemplateService {
   /**
-   * 获取全局模板根目录（绝对路径）
+   * 获取模板根目录（绝对路径）
    */
   private async getTemplatesRoot(): Promise<string> {
     const electronAPI = (window as any).electronAPI;
-    if (!electronAPI || !electronAPI.fragment || !electronAPI.fragment.getGlobalPath) {
-      throw new Error('模板库需要全局路径支持（fragment API 不可用）');
+    if (!electronAPI?.file?.getDataPath) {
+      throw new Error('模板库需要项目数据路径（file.getDataPath 不可用）');
     }
 
-    const globalPath: string = await electronAPI.fragment.getGlobalPath();
-    const normalized = globalPath.replace(/[\\/]+$/, '');
+    const dataPath: string = await electronAPI.file.getDataPath();
+    const normalized = dataPath.replace(/[\\/]+$/, '');
     return `${normalized}/templates`;
   }
 

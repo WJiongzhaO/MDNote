@@ -1,0 +1,20 @@
+{
+  "references": [
+    {
+      "fragmentId": "frag-002-class",
+      "position": 1851,
+      "length": 29,
+      "content": "类图是面向对象设计的核心图表，遵循 SOLID 原则可提高代码质量。\n\nSOLID 原则：\n1. 单一职责原则 (SRP)：一个类只负责一项职责\n2. 开闭原则 (OCP)：对扩展开放，对修改关闭\n3. 里氏替换原则 (LSP)：子类可以替换父类\n4. 接口隔离原则 (ISP)：接口职责单一\n5. 依赖倒置原则 (DIP)：依赖抽象而非具体",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775905200000
+    },
+    {
+      "fragmentId": "frag-005-agile",
+      "position": 1852,
+      "length": 29,
+      "content": "敏捷开发是一种以人为核心、迭代、循序渐进的开发方法。\n\nScrum 核心角色：\n- 产品负责人 (PO)：负责产品待办列表\n- Scrum Master：流程引导者，消除障碍\n- 开发团队：跨职能的自组织团队\n\nScrum 事件：\n- Sprint 计划会：确定本次迭代目标\n- 每日站会：15分钟同步进度\n- Sprint 评审：展示完成的工作\n- Sprint 回顾：总结改进点",
+      "isConnected": true,
+      "fragmentUpdatedAt": 1775908800000
+    }
+  ]
+}

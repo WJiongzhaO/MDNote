@@ -1,0 +1,16 @@
+{
+  "confidencePolicy": {
+    "defaultLevel": 0,
+    "requireVerification": false,
+    "autoExpireDays": 90
+  },
+  "archiveRules": {
+    "autoArchive": false,
+    "archiveAfterDays": 180
+  },
+  "exportFilters": {
+    "defaultMinConfidence": 2,
+    "excludeArchived": true,
+    "excludeDeprecated": true
+  }
+}

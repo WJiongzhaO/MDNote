@@ -39,59 +39,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readDirectory: (dirPath) => ipcRenderer.invoke('file:read-directory', dirPath),
     readFileContent: (filePath) => ipcRenderer.invoke('file:read-file-content', filePath),
     writeFileContent: (filePath, content) => ipcRenderer.invoke('file:write-file-content', filePath, content),
+    normalizePath: (filePath) => ipcRenderer.invoke('file:normalize-path', filePath),
     deleteNode: (nodePath) => ipcRenderer.invoke('file:delete-node', nodePath),
     renameNode: (oldPath, newName) => ipcRenderer.invoke('file:rename-node', oldPath, newName),
     saveLastOpenedFolder: (folderPath) => ipcRenderer.invoke('file:save-last-opened-folder', folderPath),
     getLastOpenedFolder: () => ipcRenderer.invoke('file:get-last-opened-folder'),
     saveFileCache: (filePath, cacheData) => ipcRenderer.invoke('file:save-file-cache', filePath, cacheData),
     getFileCache: (filePath) => ipcRenderer.invoke('file:get-file-cache', filePath),
-    deleteFileCache: (filePath) => ipcRenderer.invoke('file:delete-file-cache', filePath)
+    deleteFileCache: (filePath) => ipcRenderer.invoke('file:delete-file-cache', filePath),
+    createDirectory: (dirPath) => ipcRenderer.invoke('vault:create-directory', dirPath),
+    deleteDirectory: (dirPath) => ipcRenderer.invoke('vault:delete-directory', dirPath),
+    directoryExists: (dirPath) => ipcRenderer.invoke('vault:directory-exists', dirPath)
   },
-  // 知识片段库 API（使用全局路径，不随项目切换）
+  // 知识片段资源 API（相对当前知识库数据路径，与 file.getDataPath 一致）
   fragment: {
-    read: (filename) => ipcRenderer.invoke('fragment:read', filename),
-    write: (filename, data) => ipcRenderer.invoke('fragment:write', filename, data),
     mkdir: (dirPath) => ipcRenderer.invoke('fragment:mkdir', dirPath),
-    getGlobalPath: () => ipcRenderer.invoke('fragment:get-global-path'),
-    getCustomGlobalPath: () => ipcRenderer.invoke('fragment:get-custom-global-path'),
-    setGlobalPath: (customPath) => ipcRenderer.invoke('fragment:set-global-path', customPath),
-    resetGlobalPath: () => ipcRenderer.invoke('fragment:reset-global-path'),
     copy: (sourcePath, destPath) => ipcRenderer.invoke('fragment:copy', sourcePath, destPath),
     deleteDir: (dirPath) => ipcRenderer.invoke('fragment:delete-dir', dirPath),
-    getFullPath: (relativePath) => ipcRenderer.invoke('fragment:get-full-path', relativePath)
+    getFullPath: (relativePath) => ipcRenderer.invoke('fragment:get-full-path', relativePath),
+    openStorageInExplorer: (fragmentId) =>
+      ipcRenderer.invoke('fragment:open-storage-in-explorer', fragmentId),
+    openFragmentsJsonDirInExplorer: (vaultId) =>
+      ipcRenderer.invoke('fragment:open-fragments-json-dir-in-explorer', vaultId)
   },
-  // Git 操作 API
-  git: {
-    init: () => ipcRenderer.invoke('git:init'),
-    isRepository: () => ipcRenderer.invoke('git:isRepository'),
-    getStatus: () => ipcRenderer.invoke('git:getStatus'),
-    getCurrentBranch: () => ipcRenderer.invoke('git:getCurrentBranch'),
-    getBranches: () => ipcRenderer.invoke('git:getBranches'),
-    commit: (message, files) => ipcRenderer.invoke('git:commit', message, files),
-    add: (files) => ipcRenderer.invoke('git:add', files),
-    addAll: () => ipcRenderer.invoke('git:addAll'),
-    getLog: (limit, skip) => ipcRenderer.invoke('git:getLog', limit, skip),
-    getCommit: (hash) => ipcRenderer.invoke('git:getCommit', hash),
-    getFileHistory: (filePath, limit) => ipcRenderer.invoke('git:getFileHistory', filePath, limit),
-    getDiff: (file) => ipcRenderer.invoke('git:getDiff', file),
-    getDiffBetweenCommits: (fromHash, toHash, file) => ipcRenderer.invoke('git:getDiffBetweenCommits', fromHash, toHash, file),
-    getStagedDiff: (file) => ipcRenderer.invoke('git:getStagedDiff', file),
-    checkoutCommit: (hash, createBranch) => ipcRenderer.invoke('git:checkoutCommit', hash, createBranch),
-    reset: (hash, mode) => ipcRenderer.invoke('git:reset', hash, mode),
-    checkoutFiles: (files) => ipcRenderer.invoke('git:checkoutFiles', files),
-    revert: (count) => ipcRenderer.invoke('git:revert', count),
-    createBranch: (name) => ipcRenderer.invoke('git:createBranch', name),
-    checkoutBranch: (name) => ipcRenderer.invoke('git:checkoutBranch', name),
-    deleteBranch: (name, force) => ipcRenderer.invoke('git:deleteBranch', name, force),
-    renameBranch: (oldName, newName) => ipcRenderer.invoke('git:renameBranch', oldName, newName),
-    addToGitIgnore: (pattern) => ipcRenderer.invoke('git:addToGitIgnore', pattern),
-    removeFromGitIgnore: (pattern) => ipcRenderer.invoke('git:removeFromGitIgnore', pattern),
-    getGitIgnore: () => ipcRenderer.invoke('git:getGitIgnore'),
-    addRemote: (name, url) => ipcRenderer.invoke('git:addRemote', name, url),
-    getRemotes: () => ipcRenderer.invoke('git:getRemotes'),
-    push: (remote, branch) => ipcRenderer.invoke('git:push', remote, branch),
-    pull: (remote, branch) => ipcRenderer.invoke('git:pull', remote, branch),
-    fetch: (remote) => ipcRenderer.invoke('git:fetch', remote)
+  // 知识库 API
+  vault: {
+    createDirectory: (dirPath) => ipcRenderer.invoke('vault:create-directory', dirPath),
+    write: (filePath, data) => ipcRenderer.invoke('vault:write', filePath, data),
+    read: (filePath) => ipcRenderer.invoke('vault:read', filePath),
+    deleteDirectory: (dirPath) => ipcRenderer.invoke('vault:delete-directory', dirPath),
+    exists: (filePath) => ipcRenderer.invoke('vault:exists', filePath),
+    directoryExists: (dirPath) => ipcRenderer.invoke('vault:directory-exists', dirPath),
+    getVaultsPath: () => ipcRenderer.invoke('vault:get-vaults-path')
+  },
+  // 知识库注册表 API
+  vaultRegistry: {
+    getRegistry: () => ipcRenderer.invoke('vault-registry:get'),
+    saveRegistry: (registry) => ipcRenderer.invoke('vault-registry:save', registry),
+    addVault: (item) => ipcRenderer.invoke('vault-registry:add-vault', item),
+    removeVault: (id) => ipcRenderer.invoke('vault-registry:remove-vault', id),
+    setLastOpened: (id) => ipcRenderer.invoke('vault-registry:set-last-opened', id),
+    checkPathExists: (vaultPath) => ipcRenderer.invoke('vault-registry:check-path-exists', vaultPath)
   },
   dialog: {
     openFolder: (options) => ipcRenderer.invoke('dialog:open-folder', options),

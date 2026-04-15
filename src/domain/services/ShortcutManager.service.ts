@@ -57,23 +57,13 @@ export class ShortcutManager {
    * 初始化快捷键系统
    */
   async initialize(): Promise<void> {
-    console.log('[ShortcutManager.initialize] 开始初始化快捷键系统');
-
     if (this.initialized) {
-      console.warn('[ShortcutManager.initialize] 已经初始化过');
       return;
     }
 
-    // 从仓储加载快捷键
     await this.registry.load();
-
-    // 注册默认命令和快捷键
     this.registerDefaults();
-
     this.initialized = true;
-    console.log('[ShortcutManager.initialize] ✅ 快捷键系统初始化完成', {
-      totalShortcuts: this.getAll().length
-    });
   }
 
   /**
@@ -105,7 +95,6 @@ export class ShortcutManager {
     context?: ShortcutContext
   ): Promise<boolean> {
     if (!this.initialized) {
-      console.warn('[ShortcutManager] System not initialized');
       return false;
     }
 
@@ -117,37 +106,18 @@ export class ShortcutManager {
 
     if (shortcuts.length === 0) return false;
 
-    // 执行第一个匹配的快捷键
     const shortcut = shortcuts[0];
 
-    console.log('[ShortcutManager.handleKeyboardEvent] 执行快捷键', {
-      shortcutId: shortcut.id,
-      commandId: shortcut.commandId,
-      hasEditorRef: !!this.editorRef,
-      hasContentRef: !!this.contentRef,
-      editorValue: this.editorRef?.value,
-      contentRefValue: this.contentRef?.value?.substring(0, 50) + '...'
-    });
-
-    // 构建完整的命令上下文，包含 editor 和 content
     const commandContext: CommandContext = {
       keyBinding,
       context: context || this.currentContext
     };
 
-    // 添加 editor 和 content 引用（如果已设置）
     if (this.editorRef) {
       commandContext.editor = this.editorRef.value;
-      console.log('[ShortcutManager.handleKeyboardEvent] 添加 editor 到 context', {
-        editor: commandContext.editor
-      });
     }
     if (this.contentRef) {
       commandContext.content = this.contentRef;
-      console.log('[ShortcutManager.handleKeyboardEvent] 添加 content 到 context', {
-        isRef: 'value' in this.contentRef,
-        contentValue: this.contentRef.value?.substring(0, 50) + '...'
-      });
     }
 
     await this.commandExecutor.execute(shortcut.commandId, commandContext);
@@ -257,22 +227,13 @@ export class ShortcutManager {
    * 设置键盘事件处理器（避免循环依赖）
    */
   setKeyboardProcessor(processor: KeyboardEventProcessor): void {
-    console.log('[ShortcutManager.setKeyboardProcessor] 设置键盘事件处理器', {
-      hasProcessor: !!processor,
-      hasSetHandlerMethod: !!(processor && processor.setKeyboardEventHandler)
-    });
-
     this.keyboardProcessor = processor;
 
     // 设置回调函数
     if (processor.setKeyboardEventHandler) {
-      console.log('[ShortcutManager.setKeyboardProcessor] 设置回调函数');
       processor.setKeyboardEventHandler(
         (event: KeyboardEvent) => this.handleKeyboardEvent(event)
       );
-      console.log('[ShortcutManager.setKeyboardProcessor] ✅ 回调函数已设置');
-    } else {
-      console.error('[ShortcutManager.setKeyboardProcessor] ❌ processor.setKeyboardEventHandler 不存在');
     }
   }
 
@@ -280,11 +241,6 @@ export class ShortcutManager {
    * 设置编辑器和内容引用（用于快捷键命令）
    */
   setEditorContext(editor: Ref, content: Ref<string>): void {
-    console.log('[ShortcutManager.setEditorContext] 设置编辑器上下文', {
-      hasEditor: !!editor,
-      hasContent: !!content,
-      contentValue: content?.value?.substring(0, 50) + '...'
-    });
     this.editorRef = editor;
     this.contentRef = content;
   }
@@ -293,16 +249,8 @@ export class ShortcutManager {
    * 启动键盘监听
    */
   startListening(): void {
-    console.log('[ShortcutManager.startListening] 启动键盘监听', {
-      hasKeyboardProcessor: !!this.keyboardProcessor,
-      hasStartMethod: !!(this.keyboardProcessor && this.keyboardProcessor.start)
-    });
-
     if (this.keyboardProcessor && this.keyboardProcessor.start) {
       this.keyboardProcessor.start();
-      console.log('[ShortcutManager.startListening] ✅ 已调用 keyboardProcessor.start()');
-    } else {
-      console.error('[ShortcutManager.startListening] ❌ keyboardProcessor 或 start 方法不存在');
     }
   }
 
@@ -310,11 +258,8 @@ export class ShortcutManager {
    * 停止键盘监听
    */
   stopListening(): void {
-    console.log('[ShortcutManager.stopListening] 停止键盘监听');
-
     if (this.keyboardProcessor && this.keyboardProcessor.stop) {
       this.keyboardProcessor.stop();
-      console.log('[ShortcutManager.stopListening] ✅ 已停止键盘监听');
     }
   }
 
@@ -350,18 +295,10 @@ export class ShortcutManager {
    * 注册默认快捷键和命令
    */
   private registerDefaults(): void {
-    console.log('[ShortcutManager.registerDefaults] 开始注册默认快捷键和命令', {
-      hasCommandsFactory: !!this.commandsFactory
-    });
-
-    // 使用注入的命令工厂
     const commands = this.commandsFactory.createAllCommands();
     this.registerCommands(commands);
 
-    // 注册默认快捷键
     const defaults = createAllDefaultShortcuts();
     this.registerAll(defaults);
-
-    console.log(`[ShortcutManager] 已注册 ${commands.length} 个命令和 ${defaults.length} 个快捷键`);
   }
 }

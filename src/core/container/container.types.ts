@@ -6,7 +6,9 @@ export const TYPES = {
   DocumentRepository: Symbol.for('DocumentRepository'),
   FolderRepository: Symbol.for('FolderRepository'),
   KnowledgeFragmentRepository: Symbol.for('KnowledgeFragmentRepository'),
-  GitRepository: Symbol.for('GitRepository'),
+  FragmentCategoryRepository: Symbol.for('FragmentCategoryRepository'),
+  VaultRepository: Symbol.for('VaultRepository'),
+  VaultRegistryRepository: Symbol.for('VaultRegistryRepository'),
 
   // 领域服务
   MarkdownProcessor: Symbol.for('MarkdownProcessor'),
@@ -22,20 +24,18 @@ export const TYPES = {
   FragmentReferenceSyncService: Symbol.for('FragmentReferenceSyncService'),
   ImageStorageService: Symbol.for('ImageStorageService'),
 
-  // 变量系统领域服务
   SimpleTemplateProcessor: Symbol.for('SimpleTemplateProcessor'),
   FrontmatterParser: Symbol.for('FrontmatterParser'),
-  FolderVariableResolver: Symbol.for('FolderVariableResolver'),
-  VariableMerger: Symbol.for('VariableMerger'),
 
   // 应用服务
   ApplicationService: Symbol.for('ApplicationService'),
   DocumentUseCases: Symbol.for('DocumentUseCases'),
   FolderUseCases: Symbol.for('FolderUseCases'),
   KnowledgeFragmentUseCases: Symbol.for('KnowledgeFragmentUseCases'),
-  GitUseCases: Symbol.for('GitUseCases'),
-  VariableUseCases: Symbol.for('VariableUseCases'),
+  FragmentCategoryUseCases: Symbol.for('FragmentCategoryUseCases'),
+  KnowledgeHealthService: Symbol.for('KnowledgeHealthService'),
   ExportUseCases: Symbol.for('ExportUseCases'),
+  VaultUseCases: Symbol.for('VaultUseCases'),
 
   // 编辑器工具栏相关
   FormatEditorService: Symbol.for('FormatEditorService'),
@@ -51,6 +51,10 @@ export const TYPES = {
   ShortcutCommandsFactory: Symbol.for('ShortcutCommandsFactory'),
   KeyboardEventProcessor: Symbol.for('KeyboardEventProcessor'),
   PlatformAdapter: Symbol.for('PlatformAdapter'),
+
+  // 工作3 引用图谱与健康度
+  ReferenceGraphService: Symbol.for('ReferenceGraphService'),
+  RecommendationService: Symbol.for('RecommendationService'),
 
   // 导出服务
   ExportFactory: Symbol.for('ExportFactory'),
@@ -68,15 +72,15 @@ export const TYPES = {
   TextFileOpenerStrategy: Symbol.for('TextFileOpenerStrategy'),
   JsonFileOpenerStrategy: Symbol.for('JsonFileOpenerStrategy'),
   ImageFileOpenerStrategy: Symbol.for('ImageFileOpenerStrategy'),
-} as const;
+} as const
 
 export interface ServiceContainer {
-  get<T>(serviceIdentifier: symbol): T;
-  bind<T>(serviceIdentifier: symbol): BindingToSyntax<T>;
+  get<T>(serviceIdentifier: symbol): T
+  bind<T>(serviceIdentifier: symbol): BindingToSyntax<T>
 }
 
 export interface BindingToSyntax<T> {
-  to(constructor: new (...args: any[]) => T): void;
-  toConstantValue(value: T): void;
-  toSingleton(constructor: new (...args: any[]) => T): void;
+  to(constructor: new (...args: any[]) => T): void
+  toConstantValue(value: T): void
+  toSingleton(constructor: new (...args: any[]) => T): void
 }

@@ -1,0 +1,58 @@
+/**
+ * 片段资产管理 / 健康度 / 推荐面板 — 统一观感 token
+ * 与现有 --bg-* / --text-* / --border-* 主题变量协同
+ */
+.fragment-asset-page {
+  --fm-radius: 10px;
+  --fm-radius-sm: 6px;
+  --fm-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --fm-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --fm-accent: var(--accent-info, #2563eb);
+  --fm-accent-soft: rgba(37, 99, 235, 0.1);
+  --fm-success: var(--accent-success, #059669);
+  --fm-warning: var(--accent-warning, #d97706);
+  --fm-danger: var(--accent-danger, #dc2626);
+  --fm-muted: var(--text-secondary, #64748b);
+}
+
+.fragment-asset-page .fm-surface {
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border-secondary, #e2e8f0);
+  border-radius: var(--fm-radius);
+  box-shadow: var(--fm-shadow-sm);
+}
+
+.fragment-asset-page .fm-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fm-muted);
+  margin: 0 0 10px 0;
+}
+
+.fragment-asset-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.fragment-asset-chip--active {
+  background: rgba(5, 150, 105, 0.12);
+  color: var(--fm-success);
+}
+.fragment-asset-chip--archived {
+  background: rgba(217, 119, 6, 0.14);
+  color: var(--fm-warning);
+}
+.fragment-asset-chip--deprecated {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--fm-danger);
+}
+
+.fragment-rec-panel {
+  --rec-accent: var(--accent-info, #2563eb);
+}

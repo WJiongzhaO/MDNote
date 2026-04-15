@@ -17,13 +17,7 @@ export class ShortcutCommandsFactory {
     private readonly editorToolbarUseCase: EditorToolbarUseCase,
     @inject(TYPES.DocumentUseCases)
     private readonly documentUseCases: DocumentUseCases
-  ) {
-    console.log('[ShortcutCommandsFactory.constructor] 构造函数执行', {
-      hasEditorToolbarUseCase: !!this.editorToolbarUseCase,
-      hasDocumentUseCases: !!this.documentUseCases,
-      editorToolbarUseCaseType: typeof this.editorToolbarUseCase
-    });
-  }
+  ) {}
 
   /**
    * 创建所有默认命令
@@ -224,34 +218,13 @@ export class ShortcutCommandsFactory {
    */
   private createFormatHandler(formatType: string, data?: any): (context: CommandContext) => Promise<void> {
     return async (context: CommandContext) => {
-      console.log('[ShortcutCommandsFactory.createFormatHandler] 执行格式化命令', {
-        formatType,
-        data
-      });
-
-      // 获取编辑器内容和选区
       const content = this.getEditorContent(context);
       const selection = this.getEditorSelection(context);
 
       if (!content || !selection) {
-        console.warn('[Shortcut] 无法获取编辑器内容或选区', {
-          hasContent: !!content,
-          hasSelection: !!selection
-        });
         return;
       }
 
-      console.log('[ShortcutCommandsFactory.createFormatHandler] 调用格式化服务', {
-        contentLength: content.length,
-        contentPreview: content.substring(0, 50) + '...',
-        selection: {
-          start: selection.start,
-          end: selection.end,
-          text: selection.text
-        }
-      });
-
-      // 调用编辑器工具栏用例
       const response = this.editorToolbarUseCase.applyFormat(
         {
           content,
@@ -265,13 +238,6 @@ export class ShortcutCommandsFactory {
         formatType
       );
 
-      console.log('[ShortcutCommandsFactory.createFormatHandler] 格式化完成', {
-        newContentLength: response.content.length,
-        newContentPreview: response.content.substring(0, 50) + '...',
-        newCursorPosition: response.newCursorPosition
-      });
-
-      // 更新编辑器内容
       this.updateEditorContent(context, response.content, response.newCursorPosition);
     };
   }
@@ -356,44 +322,17 @@ export class ShortcutCommandsFactory {
    * 获取编辑器内容
    */
   private getEditorContent(context: CommandContext): string | null {
-    console.log('[ShortcutCommandsFactory.getEditorContent] 开始获取编辑器内容', {
-      hasContextContent: !!context.content,
-      contextContentType: typeof context.content,
-      hasValueInContent: 'value' in (context.content || {}),
-      hasContextEditor: !!context.editor
-    });
-
-    // 尝试从 context 中获取内容
     if (context.content) {
-      // 如果是 Vue Ref，需要获取 value
       if (typeof context.content.value !== 'undefined') {
-        const content = context.content.value;
-        console.log('[ShortcutCommandsFactory.getEditorContent] 从 Ref.value 获取内容', {
-          contentLength: content.length,
-          contentPreview: content.substring(0, 50) + '...'
-        });
-        return content;
+        return context.content.value;
       }
-      const content = context.content as string;
-      console.log('[ShortcutCommandsFactory.getEditorContent] 直接从 context.content 获取内容', {
-        contentLength: content.length,
-        contentPreview: content.substring(0, 50) + '...'
-      });
-      return content;
+      return context.content as string;
     }
 
-    // 尝试从编辑器元素获取
     if (context.editor) {
-      const textContent = context.editor.textContent || '';
-      console.log('[ShortcutCommandsFactory.getEditorContent] 从 editor.textContent 获取内容（回退方案）', {
-        textContentLength: textContent.length,
-        textContentPreview: textContent.substring(0, 50) + '...'
-      });
-      console.warn('[ShortcutCommandsFactory.getEditorContent] ⚠️ 使用了回退方案，可能不是 Markdown 源文本！');
-      return textContent;
+      return context.editor.textContent || '';
     }
 
-    console.error('[ShortcutCommandsFactory.getEditorContent] ❌ 无法获取编辑器内容！');
     return null;
   }
 
@@ -430,33 +369,15 @@ export class ShortcutCommandsFactory {
    * 更新编辑器内容
    */
   private updateEditorContent(context: CommandContext, newContent: string, newCursorPosition: number): void {
-    console.log('[ShortcutCommandsFactory.updateEditorContent] 开始更新编辑器内容', {
-      newContentLength: newContent.length,
-      newCursorPosition,
-      newContentPreview: newContent.substring(0, 50) + '...'
-    });
-
-    // 更新 context.content Ref
     if (context.content && typeof context.content.value !== 'undefined') {
-      console.log('[ShortcutCommandsFactory.updateEditorContent] 更新 context.content.value');
       context.content.value = newContent;
-    } else {
-      console.warn('[ShortcutCommandsFactory.updateEditorContent] ⚠️ context.content 不是 Ref 或不存在');
     }
 
-    // 更新编辑器元素
     if (context.editor) {
-      console.log('[ShortcutCommandsFactory.updateEditorContent] 更新 editor.textContent');
       context.editor.textContent = newContent;
-
-      // 设置光标位置
       this.setCursorPosition(context.editor, newCursorPosition);
-
-      // 手动触发 input 事件，让 handleEditorInput 处理内容同步和渲染
-      // 这样可以确保预览立即更新，就像用户手动输入一样
       const inputEvent = new Event('input', { bubbles: true });
       context.editor.dispatchEvent(inputEvent);
-      console.log('[ShortcutCommandsFactory.updateEditorContent] 已触发 input 事件');
     }
   }
 

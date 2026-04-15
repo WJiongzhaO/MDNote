@@ -321,7 +321,8 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { ExportConfig, ExportPreset, ExportPresets } from '../../domain/types/export-config.types';
+import type { ExportConfig, ExportPreset } from '../../domain/types/export-config.types';
+import { ExportPresets } from '../../domain/types/export-config.types';
 
 interface Props {
   show: boolean;

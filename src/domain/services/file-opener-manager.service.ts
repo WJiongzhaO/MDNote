@@ -56,11 +56,9 @@ export class FileOpenerManager {
   getStrategyForFile(filePath: string): FileOpenerStrategy | null {
     const fileName = filePath.split(/[/\\]/).pop() || '';
     const extension = fileName.split('.').pop()?.toLowerCase() || '';
-    console.log(`[FileOpenerManager] 文件名: ${fileName}, 扩展名: ${extension}`);
 
     for (const strategy of this.strategies) {
       const canHandle = strategy.canHandle(filePath);
-      console.log(`[FileOpenerManager] 策略 ${strategy.constructor.name} canHandle(${filePath}): ${canHandle}`);
       if (canHandle) {
         return strategy;
       }
@@ -93,29 +91,17 @@ export class FileOpenerManager {
    * 打开文件
    */
   async openFile(filePath: string, content?: string): Promise<FileOpenResult> {
-    console.log(`[FileOpenerManager] 查找文件策略: ${filePath}`);
-    console.log(`[FileOpenerManager] 可用策略数量: ${this.strategies.length}`);
-
-    this.strategies.forEach((strategy, index) => {
-      console.log(`[FileOpenerManager] 策略 ${index}: ${strategy.constructor.name} - 支持: ${strategy.getSupportedExtensions().join(', ')}`);
-    });
-
     const strategy = this.getStrategyForFile(filePath);
-    console.log(`[FileOpenerManager] 匹配到的策略: ${strategy ? strategy.constructor.name : 'null'}`);
 
     if (!strategy) {
-      // 如果没有找到合适的策略，使用默认的文本策略
-      console.log(`[FileOpenerManager] 未找到匹配策略，使用默认文本策略`);
       return this.openAsDefaultText(filePath, content || '');
     }
 
     try {
-      // 对于某些文件类型（如图片），我们不需要文件内容
       const fileContent = this.needsContent(filePath) ? (content || '') : '';
       return await strategy.openFile(filePath, fileContent);
     } catch (error) {
       console.error(`使用策略 ${strategy.constructor.name} 打开文件失败:`, error);
-      // 如果策略执行失败，回退到默认文本处理
       return this.openAsDefaultText(filePath, content || '');
     }
   }

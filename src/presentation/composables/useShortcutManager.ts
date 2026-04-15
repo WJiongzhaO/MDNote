@@ -2,6 +2,7 @@ import { ref, onMounted, onUnmounted, type Ref } from 'vue';
 import { useInjection } from './useInjection';
 import { TYPES } from '@/core/container/container.types';
 import type { ShortcutManager } from '@/domain/services/ShortcutManager.service';
+import type { KeyboardEventProcessor } from '@/infrastructure/services/KeyboardEventProcessor.service';
 import type { Shortcut } from '@/domain/values/Shortcut.vo';
 import type { KeyBinding } from '@/domain/values/KeyBinding.vo';
 import type { ShortcutContext, ShortcutCategory } from '@/domain/values/Shortcut.vo';
@@ -13,6 +14,7 @@ import type { ShortcutContext, ShortcutCategory } from '@/domain/values/Shortcut
  */
 export function useShortcutManager() {
   const shortcutManager = useInjection<ShortcutManager>(TYPES.ShortcutManager);
+  const keyboardProcessor = useInjection<KeyboardEventProcessor>(TYPES.KeyboardEventProcessor);
 
   const shortcuts = ref<Shortcut[]>([]);
   const currentContext = ref<ShortcutContext>('global');
@@ -24,22 +26,15 @@ export function useShortcutManager() {
    */
   const initialize = async () => {
     if (initialized.value) {
-      console.log('[useShortcutManager.initialize] 已经初始化，跳过');
       return;
     }
 
-    console.log('[useShortcutManager.initialize] 开始初始化快捷键系统');
-
     try {
       await shortcutManager.initialize();
+      shortcutManager.setKeyboardProcessor(keyboardProcessor);
       initialized.value = true;
 
-      // 加载快捷键列表
       await loadShortcuts();
-
-      console.log('[useShortcutManager] ✅ 快捷键系统初始化成功', {
-        totalShortcuts: shortcuts.value.length
-      });
     } catch (error) {
       console.error('[useShortcutManager] ❌ 初始化失败:', error);
       throw error;
@@ -123,19 +118,12 @@ export function useShortcutManager() {
    * 启动键盘监听
    */
   const startListening = () => {
-    console.log('[useShortcutManager.startListening] 准备启动键盘监听', {
-      initialized: initialized.value
-    });
-
     if (!initialized.value) {
-      console.error('[useShortcutManager] ❌ 系统未初始化，无法启动监听');
       return;
     }
 
     shortcutManager.startListening();
     listening.value = true;
-
-    console.log('[useShortcutManager] ✅ 已启动键盘监听');
   };
 
   /**
@@ -144,8 +132,6 @@ export function useShortcutManager() {
   const stopListening = () => {
     shortcutManager.stopListening();
     listening.value = false;
-
-    console.log('[useShortcutManager] 已停止键盘监听');
   };
 
   /**
@@ -220,45 +206,16 @@ export function useEditorShortcuts(options: {
   content: Ref<string>;
   onContentUpdate?: (newContent: string, cursorPosition?: number) => void;
 }) {
-  console.log('[useEditorShortcuts] ===== 函数被调用 =====', {
-    hasEditor: !!options.editor,
-    hasContent: !!options.content
-  });
-
   const { initialize, setContext, startListening, shortcutManager } = useShortcutManager();
 
-  console.log('[useEditorShortcuts] 获取到 shortcutManager', {
-    hasManager: !!shortcutManager
-  });
-
   onMounted(async () => {
-    console.log('[useEditorShortcuts] onMounted 开始执行');
-
-    // 初始化快捷键系统
     await initialize();
-
-    console.log('[useEditorShortcuts] 准备设置编辑器上下文', {
-      hasEditor: !!options.editor,
-      hasContent: !!options.content,
-      contentLength: options.content?.value?.length || 0
-    });
-
-    // 设置编辑器和内容引用到 ShortcutManager
     shortcutManager.setEditorContext(options.editor, options.content);
-
-    // 设置为编辑器上下文
     setContext('editor');
-
-    // 启动键盘监听
     startListening();
-
-    console.log('[useEditorShortcuts] 编辑器快捷键已启用');
   });
 
-  onUnmounted(() => {
-    // 清理工作（如果需要）
-    console.log('[useEditorShortcuts] 编辑器快捷键已禁用');
-  });
+  onUnmounted(() => {});
 
   return {
     initialize,

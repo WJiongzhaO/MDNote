@@ -241,7 +241,7 @@ export async function processImagesInHTML(html: string, documentId?: string): Pr
           } else if (documentId.startsWith('fragment:')) {
             const fragmentId = documentId.substring(9);
             relativePath = `fragments/assets/${fragmentId}/${fileName}`;
-            // 知识片段使用全局路径
+            // 知识片段资源：fragment.getFullPath（当前知识库数据路径）
             if (electronAPI.fragment && electronAPI.fragment.getFullPath) {
               imagePath = await electronAPI.fragment.getFullPath(relativePath);
             } else {

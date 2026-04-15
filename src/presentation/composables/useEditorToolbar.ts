@@ -192,14 +192,6 @@ export function useEditorToolbar(
       text: range.toString()
     };
 
-    // 调试日志：显示选区信息
-    console.log('[选区更新]', {
-      text: range.toString(),
-      start: position.start,
-      end: position.end,
-      collapsed: range.collapsed
-    });
-
     // 检测格式状态
     detectFormats(range);
 
@@ -248,6 +240,13 @@ export function useEditorToolbar(
    * 检测块级元素类型
    */
   const detectBlockType = (range: Range) => {
+    const editor = editorRef.value;
+    if (!editor) {
+      blockType.value = 'p';
+      return;
+    }
+
+    // 首先尝试检测 HTML 标签
     const container = range.startContainer;
     let node: Node | null = container.nodeType === Node.TEXT_NODE
       ? container.parentNode
@@ -264,6 +263,36 @@ export function useEditorToolbar(
       node = node.parentNode;
     }
 
+    // 如果没有找到 HTML 标签，尝试检测 Markdown 井号标题
+    // 获取编辑器的纯文本内容
+    const textContent = getTextContent(editor);
+    
+    // 计算光标在文本中的位置
+    const cursorPosition = calculateTextLength(editor, range.startContainer, range.startOffset);
+    
+    // 找到光标所在的行
+    const lines = textContent.split('\n');
+    let currentPos = 0;
+    let currentLine = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (cursorPosition >= currentPos && cursorPosition <= currentPos + line.length) {
+        currentLine = line;
+        break;
+      }
+      currentPos += line.length + 1; // +1 for newline
+    }
+    
+    // 检查是否是 Markdown 井号标题
+    const headingMatch = currentLine.match(/^(#{1,6})\s/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      blockType.value = `h${level}` as any;
+      return;
+    }
+    
+    // 默认为段落
     blockType.value = 'p';
   };
 

@@ -1,0 +1,26 @@
+import { Application } from '../../core/application';
+
+/**
+ * 读取文档全文，供知识图谱「按片段跳转」在文中查找 {{ref:...}}。
+ * 优先按路径读本地文件；否则走文档用例（库内文档 id）。
+ */
+export async function readDocumentTextForKnowledgeJump(documentId: string): Promise<string | null> {
+  const electronAPI = (window as any).electronAPI;
+  const pathLike =
+    documentId.includes('/') || documentId.includes('\\') || documentId.startsWith('file:');
+  const normalizedPath = documentId.startsWith('file:') ? documentId.slice(5) : documentId;
+  if (pathLike && electronAPI?.file?.readFileContent) {
+    try {
+      return await electronAPI.file.readFileContent(normalizedPath);
+    } catch {
+      /* 继续尝试 vault 文档 */
+    }
+  }
+  try {
+    const application = Application.getInstance();
+    const doc = await application.getDocumentUseCases().getDocument(documentId);
+    return doc?.content ?? null;
+  } catch {
+    return null;
+  }
+}
