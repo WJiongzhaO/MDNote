@@ -20,6 +20,16 @@ import type {
 
 const GRAPH_VERSION = 'p0';
 
+/** 构建 AI 知识图谱时的进度（供 UI 展示） */
+export type AiDocumentGraphBuildProgressEvent =
+  | { phase: 'chunks'; current: number; total: number }
+  | { phase: 'merge' }
+  | { phase: 'persist' };
+
+export interface BuildDocumentKnowledgeGraphOptions {
+  onProgress?: (event: AiDocumentGraphBuildProgressEvent) => void;
+}
+
 type NormalizedContribution = Pick<AiDocumentGraphContribution, 'entities' | 'relations'>;
 type ChunkExtractionOutput = AiGraphExtractionResult | NormalizedContribution;
 
@@ -227,7 +237,11 @@ function buildKnowledgeGraph(contribution: NormalizedContribution): AiKnowledgeG
 export class AiDocumentGraphService {
   constructor(private readonly deps: AiDocumentGraphServiceDeps) {}
 
-  async buildDocumentKnowledgeGraph(docId: string): Promise<AiKnowledgeGraph> {
+  async buildDocumentKnowledgeGraph(
+    docId: string,
+    options?: BuildDocumentKnowledgeGraphOptions
+  ): Promise<AiKnowledgeGraph> {
+    const onProgress = options?.onProgress;
     console.log('[AI Graph] buildDocumentKnowledgeGraph called', { docId });
     const config = await this.deps.settingsGateway.load();
 
@@ -286,32 +300,38 @@ export class AiDocumentGraphService {
           });
         });
 
-        const normalizedChunks =
-          chunks.length === 0
-            ? []
-            : await Promise.all(
-                chunks.map(async (chunk, index) => {
-                  const extraction = await extractor.extractChunk(chunk, providerConfig);
-                  console.log('[AI Graph] Chunk extraction raw result', {
-                    docId,
-                    chunkIndex: index,
-                    chunkId: chunk.chunkId,
-                    rawEntityCount: extraction.entities.length,
-                    rawRelationCount: extraction.relations.length
-                  });
+        const normalizedChunks: NormalizedContribution[] = [];
+        if (chunks.length === 0) {
+          onProgress?.({ phase: 'chunks', current: 0, total: 1 });
+          onProgress?.({ phase: 'chunks', current: 1, total: 1 });
+        } else {
+          onProgress?.({ phase: 'chunks', current: 0, total: chunks.length });
+          for (let index = 0; index < chunks.length; index += 1) {
+            const chunk = chunks[index];
+            const extraction = await extractor.extractChunk(chunk, providerConfig);
+            console.log(
+              `[AI Graph] Chunk extraction raw result ${JSON.stringify({
+                docId,
+                chunkIndex: index,
+                chunkId: chunk.chunkId,
+                rawEntityCount: extraction.entities.length,
+                rawRelationCount: extraction.relations.length
+              })}`
+            );
 
-                  if (extraction.entities.length === 0 && extraction.relations.length === 0) {
-                    console.warn('[AI Graph] Chunk extraction is empty', {
-                      docId,
-                      chunkIndex: index,
-                      chunkId: chunk.chunkId,
-                      markdownPreview: previewText(chunk.markdown)
-                    });
-                  }
+            if (extraction.entities.length === 0 && extraction.relations.length === 0) {
+              console.warn('[AI Graph] Chunk extraction is empty', {
+                docId,
+                chunkIndex: index,
+                chunkId: chunk.chunkId,
+                markdownPreview: previewText(chunk.markdown)
+              });
+            }
 
-                  return normalizeChunkContribution(docId, chunk, extraction);
-                })
-              );
+            normalizedChunks.push(normalizeChunkContribution(docId, chunk, extraction));
+            onProgress?.({ phase: 'chunks', current: index + 1, total: chunks.length });
+          }
+        }
 
         normalizedChunks.forEach((chunkContribution, index) => {
           console.log('[AI Graph] Chunk normalized result', {
@@ -321,6 +341,8 @@ export class AiDocumentGraphService {
             relationCount: chunkContribution.relations.length
           });
         });
+
+        onProgress?.({ phase: 'merge' });
 
         const contribution =
           chunks.length === 0
@@ -335,6 +357,8 @@ export class AiDocumentGraphService {
           mergedEntityCount: contribution.entities.length,
           mergedRelationCount: contribution.relations.length
         });
+
+        onProgress?.({ phase: 'persist' });
 
         await this.deps.graphRepo.replaceDocumentContribution({
           docId,
@@ -377,8 +401,13 @@ export class AiDocumentGraphService {
         hasExtractChunk: Boolean(extractor.extractChunk)
       });
 
+      onProgress?.({ phase: 'chunks', current: 0, total: 1 });
       const result = await this.deps.extractor.buildForDocument(docId, providerConfig);
+      onProgress?.({ phase: 'chunks', current: 1, total: 1 });
+      onProgress?.({ phase: 'merge' });
       contentHash = result.contentHash;
+
+      onProgress?.({ phase: 'persist' });
 
       await this.deps.graphRepo.replaceDocumentContribution({
         docId,

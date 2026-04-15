@@ -128,9 +128,24 @@
             />
           </template>
           <label class="kg-edit-label">绑定知识片段</label>
-          <select v-model="inspectorNodeFragmentId" class="kg-edit-input">
+          <select
+            :value="inspectorNodeFragmentId"
+            class="kg-edit-input"
+            @focus="ensureFragmentsLoaded"
+            @pointerdown="ensureFragmentsLoaded"
+            @change="onFragmentBindSelectChange"
+          >
             <option value="">不绑定</option>
-            <option v-for="f in fragments" :key="f.id" :value="f.id">{{ f.title || f.id }}</option>
+            <option
+              v-if="isBoundFragmentOutsideTopFive"
+              :value="inspectorNodeFragmentId"
+            >
+              {{ boundFragmentDropdownLabel }}（当前绑定）
+            </option>
+            <option v-for="f in relevanceTopFiveFragments" :key="f.id" :value="f.id">
+              {{ fragmentDisplayTitle(f) }}
+            </option>
+            <option :value="FRAGMENT_BIND_PICKER_VALUE">其他片段…</option>
           </select>
           <p v-if="fragmentsLoadError" class="kg-inspector-warn">{{ fragmentsLoadError }}</p>
 
@@ -209,6 +224,63 @@
           <div class="kg-fragment-detail-body" v-html="fragmentDetailHtml"></div>
         </div>
       </div>
+
+      <div
+        v-if="fragmentPickerOpen"
+        class="kg-fragment-picker-overlay"
+        @click.self="closeFragmentPicker"
+      >
+        <div class="kg-fragment-picker-modal" @click.stop>
+          <div class="kg-fragment-picker-head">
+            <h4 class="kg-fragment-picker-title">选择要绑定的知识片段</h4>
+            <button type="button" class="kg-fragment-picker-close" @click="closeFragmentPicker">关闭</button>
+          </div>
+          <input
+            v-model="fragmentPickerSearch"
+            type="search"
+            class="kg-fragment-picker-search"
+            placeholder="搜索标题或 ID…"
+            autocomplete="off"
+          />
+          <div class="kg-fragment-picker-list">
+            <p v-if="filteredFragmentsForPicker.length === 0" class="kg-fragment-picker-empty">没有匹配的片段</p>
+            <button
+              v-for="f in filteredFragmentsForPicker"
+              :key="f.id"
+              type="button"
+              class="kg-fragment-picker-card"
+              :class="{ 'is-selected': f.id === inspectorNodeFragmentId }"
+              @click="selectFragmentFromPicker(f.id)"
+            >
+              <div class="kg-fragment-picker-card-title">{{ fragmentDisplayTitle(f) }}</div>
+              <div class="kg-fragment-picker-card-preview">
+                <template v-if="pickerRowPreview[f.id]?.loading">
+                  <div class="kg-picker-preview-loading">预览加载中…</div>
+                </template>
+                <template v-else-if="pickerRowPreview[f.id]?.imageUrl">
+                  <img
+                    :src="pickerRowPreview[f.id]!.imageUrl"
+                    class="kg-picker-preview-img"
+                    alt=""
+                    @error="onPickerPreviewImageError"
+                  />
+                </template>
+                <div
+                  v-else-if="pickerRowPreview[f.id]?.mermaidSvg"
+                  class="kg-picker-mermaid-wrap"
+                  v-html="pickerRowPreview[f.id]!.mermaidSvg"
+                ></div>
+                <div
+                  v-else-if="pickerRowPreview[f.id]?.html"
+                  class="kg-picker-preview-md"
+                  v-html="pickerRowPreview[f.id]!.html"
+                ></div>
+                <div v-else class="kg-picker-preview-placeholder">暂无预览</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -248,6 +320,8 @@ type ExtendedKgNode = KgNode & {
 
 interface Props {
   graph: KnowledgeGraph | null;
+  currentDocumentId?: string;
+  currentVaultId?: string;
   /** 父组件在「随机重新布局」时递增，用于在 nodePositions 均为空时仍能触发重新 cose */
   layoutRandomizeKey?: number;
   /**
@@ -266,7 +340,9 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   layoutRandomizeKey: 0,
-  graphLoadKey: ''
+  graphLoadKey: '',
+  currentDocumentId: '',
+  currentVaultId: 'default'
 });
 
 const emit = defineEmits<{
@@ -275,14 +351,118 @@ const emit = defineEmits<{
   (e: 'graph-update', graph: KnowledgeGraph): void;
 }>();
 
+const fragmentVaultId = computed(() => {
+  const id = props.currentVaultId?.trim();
+  return id || 'default';
+});
+
 const {
   fragments,
   loadFragments,
   getFragment,
   error: fragmentsComposableError
-} = useKnowledgeFragments();
+} = useKnowledgeFragments(fragmentVaultId);
 
 const fragmentsLoadError = computed(() => fragmentsComposableError.value || '');
+
+function ensureFragmentsLoaded(): void {
+  if (fragments.value.length > 0) {
+    console.log('[知识图谱] 片段已存在，跳过加载', {
+      vaultId: fragmentVaultId.value,
+      count: fragments.value.length
+    });
+    return;
+  }
+  console.log('[知识图谱] 开始加载绑定片段列表', {
+    vaultId: fragmentVaultId.value,
+    currentDocumentId: currentGraphDocumentId.value || '(empty)'
+  });
+  void loadFragments().then(() => {
+    console.log('[知识图谱] 绑定片段加载完成', {
+      vaultId: fragmentVaultId.value,
+      count: fragments.value.length,
+      error: fragmentsLoadError.value || ''
+    });
+  });
+}
+
+const currentGraphDocumentId = computed(() => {
+  const explicitDocId = props.currentDocumentId?.trim();
+  if (explicitDocId) return explicitDocId;
+  const nodes = props.graph?.nodes ?? [];
+  for (const node of nodes) {
+    const occurrences = node.occurrences ?? [];
+    for (const occ of occurrences) {
+      if (occ.documentId && occ.documentId.trim()) {
+        return occ.documentId.trim();
+      }
+    }
+  }
+  return '';
+});
+
+function normalizeTextForSimilarity(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+function buildBigrams(text: string): Set<string> {
+  if (!text) return new Set<string>();
+  if (text.length === 1) return new Set<string>([text]);
+  const grams = new Set<string>();
+  for (let i = 0; i < text.length - 1; i += 1) {
+    grams.add(text.slice(i, i + 2));
+  }
+  return grams;
+}
+
+function calculateNameSimilarity(left: string, right: string): number {
+  const a = normalizeTextForSimilarity(left);
+  const b = normalizeTextForSimilarity(right);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const containBonus = a.includes(b) || b.includes(a) ? 0.2 : 0;
+  const gramsA = buildBigrams(a);
+  const gramsB = buildBigrams(b);
+  if (gramsA.size === 0 || gramsB.size === 0) return containBonus;
+  let intersection = 0;
+  gramsA.forEach((g) => {
+    if (gramsB.has(g)) intersection += 1;
+  });
+  const union = gramsA.size + gramsB.size - intersection;
+  if (union <= 0) return containBonus;
+  return Math.min(1, intersection / union + containBonus);
+}
+
+const sortedFragments = computed<KnowledgeFragmentResponse[]>(() => {
+  const all = [...fragments.value];
+  const nodeName = (inspectorNodeLabel.value || '').trim();
+  return all.sort((a, b) => {
+    const aSimilarity = calculateNameSimilarity(nodeName, a.title || '');
+    const bSimilarity = calculateNameSimilarity(nodeName, b.title || '');
+    if (aSimilarity !== bSimilarity) return bSimilarity - aSimilarity;
+
+    const aUpdated = Date.parse(a.updatedAt || '') || 0;
+    const bUpdated = Date.parse(b.updatedAt || '') || 0;
+    if (aUpdated !== bUpdated) return bUpdated - aUpdated;
+
+    return (a.title || a.id).localeCompare(b.title || b.id, 'zh-Hans-CN');
+  });
+});
+
+/** 下拉中按相关性展示的前 N 条；其余通过「其他片段」弹窗选择 */
+const FRAGMENT_BIND_PICKER_VALUE = '__kg_fragment_picker__';
+const FRAGMENT_DROPDOWN_TOP_N = 5;
+
+const relevanceTopFiveFragments = computed(() =>
+  sortedFragments.value.slice(0, FRAGMENT_DROPDOWN_TOP_N)
+);
+
+function fragmentDisplayTitle(f: KnowledgeFragmentResponse): string {
+  return (f.title || f.id).trim() || f.id;
+}
 
 const kgPreviewImagePathCache: Record<string, string> = {};
 
@@ -296,6 +476,22 @@ const inspectorFragmentMermaidSvg = ref('');
 const fragmentDetailOpen = ref(false);
 const fragmentDetailTitle = ref('');
 const fragmentDetailHtml = ref('');
+
+const fragmentPickerOpen = ref(false);
+const fragmentPickerSearch = ref('');
+type PickerRowPreviewEntry = { loading: boolean; html?: string; imageUrl?: string; mermaidSvg?: string };
+const pickerRowPreview = ref<Record<string, PickerRowPreviewEntry>>({});
+
+const filteredFragmentsForPicker = computed(() => {
+  const q = fragmentPickerSearch.value.trim().toLowerCase();
+  const list = sortedFragments.value;
+  if (!q) return list;
+  return list.filter((f) => {
+    const t = (f.title || '').toLowerCase();
+    const id = f.id.toLowerCase();
+    return t.includes(q) || id.includes(q);
+  });
+});
 
 function escapeHtml(s: string): string {
   return s
@@ -339,11 +535,13 @@ function clearFragmentPreviewState() {
   fragmentDetailOpen.value = false;
   fragmentDetailTitle.value = '';
   fragmentDetailHtml.value = '';
+  fragmentPickerOpen.value = false;
+  fragmentPickerSearch.value = '';
+  pickerRowPreview.value = {};
 }
 
-async function renderInspectorFragmentMermaid(frag: KnowledgeFragmentResponse) {
-  inspectorFragmentMermaidSvg.value = '';
-  if (!frag.previewMermaidCode) return;
+async function renderMermaidCodeToSvgHtml(code: string): Promise<string> {
+  if (!code?.trim()) return '';
   try {
     const { InversifyContainer } = await import('../../core/container/inversify.container');
     const { TYPES } = await import('../../core/container/container.types');
@@ -351,17 +549,24 @@ async function renderInspectorFragmentMermaid(frag: KnowledgeFragmentResponse) {
     const renderer = container.get<{
       renderDiagram: (code: string, opts?: Record<string, unknown>) => Promise<string>;
     }>(TYPES.MermaidRenderer);
-    const svg = await renderer.renderDiagram(frag.previewMermaidCode, {
+    const svg = await renderer.renderDiagram(code, {
       theme: 'default',
       securityLevel: 'loose',
       fontFamily: 'inherit'
     });
     if (typeof svg === 'string' && svg.includes('<svg')) {
-      inspectorFragmentMermaidSvg.value = `<div class="kg-mermaid-svg-host">${svg}</div>`;
+      return `<div class="kg-mermaid-svg-host">${svg}</div>`;
     }
   } catch (e) {
     console.warn('[知识图谱] Mermaid 预览失败', e);
   }
+  return '';
+}
+
+async function renderInspectorFragmentMermaid(frag: KnowledgeFragmentResponse) {
+  inspectorFragmentMermaidSvg.value = '';
+  if (!frag.previewMermaidCode) return;
+  inspectorFragmentMermaidSvg.value = await renderMermaidCodeToSvgHtml(frag.previewMermaidCode);
 }
 
 async function refreshInspectorFragmentPreview() {
@@ -438,12 +643,76 @@ function closeFragmentDetail() {
   fragmentDetailOpen.value = false;
 }
 
+async function ensurePickerPreviewForFragment(frag: KnowledgeFragmentResponse): Promise<void> {
+  const id = frag.id;
+  const cur = pickerRowPreview.value[id];
+  if (cur && !cur.loading && (cur.html || cur.imageUrl || cur.mermaidSvg)) return;
+  if (cur?.loading) return;
+
+  pickerRowPreview.value = { ...pickerRowPreview.value, [id]: { loading: true } };
+
+  try {
+    let html = '';
+    let imageUrl = '';
+    let mermaidSvg = '';
+    if (frag.previewType === 'image' && frag.previewImage) {
+      imageUrl = await resolveKgPreviewImageUrl(frag.previewImage);
+    } else if (frag.previewType === 'mermaid' && frag.previewMermaidCode) {
+      mermaidSvg = await renderMermaidCodeToSvgHtml(frag.previewMermaidCode);
+    } else {
+      const previewMd = frag.markdown.substring(0, 500);
+      if (props.renderMarkdown) {
+        html = await props.renderMarkdown(previewMd, `fragment:${frag.id}`);
+      } else {
+        html = `<pre class="kg-fragment-plain">${escapeHtml(previewMd)}</pre>`;
+      }
+    }
+    pickerRowPreview.value = { ...pickerRowPreview.value, [id]: { loading: false, html, imageUrl, mermaidSvg } };
+  } catch (e) {
+    console.warn('[知识图谱] 片段列表预览失败', e);
+    pickerRowPreview.value = {
+      ...pickerRowPreview.value,
+      [id]: { loading: false, html: '<p class="kg-picker-preview-err">预览加载失败</p>' }
+    };
+  }
+}
+
+function onFragmentBindSelectChange(e: Event) {
+  const el = e.target as HTMLSelectElement;
+  const val = el.value;
+  if (val === FRAGMENT_BIND_PICKER_VALUE) {
+    fragmentPickerOpen.value = true;
+    void nextTick(() => {
+      el.value = inspectorNodeFragmentId.value;
+    });
+    return;
+  }
+  inspectorNodeFragmentId.value = val;
+}
+
+function closeFragmentPicker() {
+  fragmentPickerOpen.value = false;
+  fragmentPickerSearch.value = '';
+  pickerRowPreview.value = {};
+}
+
+function selectFragmentFromPicker(id: string) {
+  inspectorNodeFragmentId.value = id;
+  closeFragmentPicker();
+}
+
+function onPickerPreviewImageError(ev: Event) {
+  const el = ev.target as HTMLImageElement;
+  el.style.display = 'none';
+}
+
 const containerRef = ref<HTMLDivElement | null>(null);
 let cy: cytoscape.Core | null = null;
 /** 每次 initGraph 递增；丢弃已过期的 layoutstop 与拖拽 emit，避免污染父级当前图谱 */
 let kgViewLayoutSession = 0;
 let viewportEmitTimer: ReturnType<typeof setTimeout> | null = null;
-const KG_VIEWPORT_EMIT_MS = 450;
+/** 视口 pan/zoom 防抖；切换页面/写盘前应调用 syncPendingViewportToParent 立即同步，避免未到期时丢失视角 */
+const KG_VIEWPORT_EMIT_MS = 120;
 
 function clearViewportEmitTimer() {
   if (viewportEmitTimer != null) {
@@ -460,6 +729,13 @@ function scheduleEmitViewport() {
     emitGraphUpdateIfCyStateChanged();
   }, KG_VIEWPORT_EMIT_MS);
 }
+
+/** 清除视口防抖并将画布当前坐标/视角推给父组件（切换文档或落盘前调用，避免「快速换页未保存」） */
+function syncPendingViewportToParent(): void {
+  clearViewportEmitTimer();
+  emitGraphUpdateIfCyStateChanged();
+}
+
 /** 布局稳定后选中新建节点/边（由 runPostLayoutHookIfAny 消费） */
 let pendingPostLayoutAction: { type: 'node'; id: string } | { type: 'edge'; index: number } | null = null;
 
@@ -564,6 +840,19 @@ const inspectorNodeLabel = ref('');
 const inspectorNodeType = ref<KgNode['type']>('link');
 const inspectorNodeLevel = ref(2);
 const inspectorNodeFragmentId = ref('');
+
+const isBoundFragmentOutsideTopFive = computed(() => {
+  const id = inspectorNodeFragmentId.value.trim();
+  if (!id) return false;
+  return !relevanceTopFiveFragments.value.some((f) => f.id === id);
+});
+
+const boundFragmentDropdownLabel = computed(() => {
+  const id = inspectorNodeFragmentId.value.trim();
+  const f = fragments.value.find((x) => x.id === id) ?? sortedFragments.value.find((x) => x.id === id);
+  return f ? fragmentDisplayTitle(f) : id;
+});
+
 const inspectorEdgeIndex = ref(-1);
 const inspectorEdgeRelation = ref('');
 const inspectorEdgeSourceLabel = ref('');
@@ -880,6 +1169,23 @@ watch(
 );
 
 watch(
+  () =>
+    [fragmentPickerOpen.value, filteredFragmentsForPicker.value.map((f) => f.id).join('\n')] as const,
+  async ([open]) => {
+    if (!open) return;
+    if (fragments.value.length === 0) {
+      await loadFragments();
+    }
+    const list = filteredFragmentsForPicker.value;
+    const chunk = 4;
+    for (let i = 0; i < list.length; i += chunk) {
+      const slice = list.slice(i, i + chunk);
+      await Promise.all(slice.map((f) => ensurePickerPreviewForFragment(f)));
+    }
+  }
+);
+
+watch(
   () => graphStructureKey(props.graph),
   () => {
     if (inspectorKind.value === 'node' && inspectorNodeId.value) {
@@ -1134,23 +1440,28 @@ function applySavedViewport(cyInstance: cytoscape.Core, vs: KgViewport): boolean
  * 侧栏 flex 首帧容器宽高常为 0，先 resize 再操作，并在下一帧再跑一次。
  */
 function resizeAndFitOrViewport(cyInstance: cytoscape.Core, graph: KnowledgeGraph, padding = KG_FIT_PADDING): void {
+  const needsRetryOnNextFrame = () => cyInstance.width() <= 1 || cyInstance.height() <= 1;
   cyInstance.resize();
   const vs = graph.viewState;
   if (vs && applySavedViewport(cyInstance, vs)) {
-    requestAnimationFrame(() => {
-      if ((cyInstance as { destroyed?: () => boolean }).destroyed?.()) return;
-      cyInstance.resize();
-      applySavedViewport(cyInstance, vs);
-    });
+    if (needsRetryOnNextFrame()) {
+      requestAnimationFrame(() => {
+        if ((cyInstance as { destroyed?: () => boolean }).destroyed?.()) return;
+        cyInstance.resize();
+        applySavedViewport(cyInstance, vs);
+      });
+    }
     return;
   }
   cyInstance.fit(undefined, padding);
-  requestAnimationFrame(() => {
-    const destroyed = (cyInstance as { destroyed?: () => boolean }).destroyed?.();
-    if (destroyed) return;
-    cyInstance.resize();
-    cyInstance.fit(undefined, padding);
-  });
+  if (needsRetryOnNextFrame()) {
+    requestAnimationFrame(() => {
+      const destroyed = (cyInstance as { destroyed?: () => boolean }).destroyed?.();
+      if (destroyed) return;
+      cyInstance.resize();
+      cyInstance.fit(undefined, padding);
+    });
+  }
 }
 
 /**
@@ -1289,19 +1600,86 @@ function bindGraphEvents(cyInstance: cytoscape.Core, layoutSession: number) {
   });
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+type DegreeVisualPreset = {
+  hue: number;
+  saturation: number;
+  lightness: number;
+};
+
+// 连接数越大，颜色越显眼（更高饱和/更低明度）
+const DEGREE_VISUAL_PRESETS: DegreeVisualPreset[] = [
+  { hue: 138, saturation: 42, lightness: 78 }, // degree=1 柔和绿色（最低显眼）
+  { hue: 52, saturation: 56, lightness: 80 },  // degree=2 淡黄色
+  { hue: 205, saturation: 44, lightness: 82 }, // degree=3 更柔和淡蓝色
+  { hue: 30, saturation: 52, lightness: 76 },  // degree=4 更淡橙色
+  { hue: 268, saturation: 50, lightness: 74 }, // degree=5 更淡紫色
+  { hue: 216, saturation: 56, lightness: 70 }  // degree>=6 柔和显眼蓝色（替代红色）
+];
+
+function buildNodeVisualStyle(
+  degree: number,
+  maxDegree: number
+): {
+  nodeSize: number;
+  nodeColor: string;
+  nodeBorderColor: string;
+  nodeTextColor: string;
+} {
+  const normalized = maxDegree > 0 ? degree / maxDegree : 0;
+  const size = 34 + normalized * 30;
+
+  const safeDegree = Math.max(1, Math.floor(degree || 1));
+  const presetIndex = Math.min(safeDegree, DEGREE_VISUAL_PRESETS.length) - 1;
+  const preset = DEGREE_VISUAL_PRESETS[presetIndex];
+
+  // 在同连接度固定底色上，轻微叠加全局归一化提升“高连接更显眼”的连续感
+  const hue = preset.hue;
+  const saturation = clamp(preset.saturation + normalized * 6, 35, 88);
+  const lightness = clamp(preset.lightness - normalized * 8, 44, 84);
+  const borderLightness = clamp(lightness - 18, 24, 62);
+
+  return {
+    nodeSize: Number(size.toFixed(1)),
+    nodeColor: `hsl(${hue}, ${saturation.toFixed(1)}%, ${lightness.toFixed(1)}%)`,
+    nodeBorderColor: `hsl(${hue}, ${(saturation + 8).toFixed(1)}%, ${borderLightness.toFixed(1)}%)`,
+    nodeTextColor: normalized > 0.62 ? '#0f172a' : '#111827'
+  };
+}
+
 function buildElements(graph: KnowledgeGraph) {
   const { nodes, edges } = graph;
   const posMap = graph.nodePositions;
   const elements: Array<{ group: string; data: Record<string, unknown>; position?: { x: number; y: number } }> = [];
+  const degreeByNodeId = new Map<string, number>();
 
+  nodes.forEach(n => {
+    degreeByNodeId.set(n.id, 0);
+  });
+  edges.forEach(edge => {
+    if (degreeByNodeId.has(edge.source)) {
+      degreeByNodeId.set(edge.source, (degreeByNodeId.get(edge.source) || 0) + 1);
+    }
+    if (degreeByNodeId.has(edge.target)) {
+      degreeByNodeId.set(edge.target, (degreeByNodeId.get(edge.target) || 0) + 1);
+    }
+  });
+  const maxDegree = Math.max(1, ...Array.from(degreeByNodeId.values()));
   nodes.forEach((n) => {
+    const degree = degreeByNodeId.get(n.id) || 0;
+    const visual = buildNodeVisualStyle(degree, maxDegree);
     const p = posMap?.[n.id];
     const el: (typeof elements)[0] = {
       group: 'nodes',
       data: {
         id: n.id,
         label: n.label,
-        type: n.type
+        type: n.type,
+        nodeDegree: degree,
+        ...visual
       }
     };
     if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
@@ -1327,6 +1705,7 @@ function buildElements(graph: KnowledgeGraph) {
 }
 
 defineExpose({
+  syncPendingViewportToParent,
   getNodeOccurrences
 });
 
@@ -1371,24 +1750,28 @@ function initGraph() {
         }
       },
       {
-        selector: 'node[type="section"]',
+        selector: 'node[nodeSize]',
         style: {
-          'background-color': '#e3f2fd',
-          'border-color': '#1d4ed8'
+          width: 'data(nodeSize)',
+          height: 'data(nodeSize)'
         }
       },
       {
-        selector: 'node[type="link"]',
+        selector: 'node[nodeColor]',
         style: {
-          'background-color': '#dcfce7',
-          'border-color': '#16a34a'
+          'background-color': 'data(nodeColor)'
         }
       },
       {
-        selector: 'node[type="tag"]',
+        selector: 'node[nodeTextColor]',
         style: {
-          'background-color': '#fff7ed',
-          'border-color': '#ea580c'
+          color: 'data(nodeTextColor)'
+        }
+      },
+      {
+        selector: 'node[nodeBorderColor]',
+        style: {
+          'border-color': 'data(nodeBorderColor)'
         }
       },
       {
@@ -1516,6 +1899,7 @@ watch(
 onMounted(() => {
   window.addEventListener('keydown', onWindowKeyDown, true);
   window.addEventListener('keyup', onWindowKeyUp, true);
+  ensureFragmentsLoaded();
   // 图谱在首帧之后才出现（v-if）时，immediate 可能拿不到 containerRef，再补一次
   nextTick(() => {
     if (props.graph?.nodes?.length && containerRef.value && !cy) {
@@ -1525,7 +1909,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  clearViewportEmitTimer();
+  syncPendingViewportToParent();
   window.removeEventListener('keydown', onWindowKeyDown, true);
   window.removeEventListener('keyup', onWindowKeyUp, true);
   cancelHidePopover();
@@ -2008,6 +2392,177 @@ onUnmounted(() => {
 
 .kg-fragment-detail-loading {
   margin: 0;
+  color: var(--text-secondary);
+}
+
+.kg-fragment-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1320;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 24px;
+}
+
+.kg-fragment-picker-modal {
+  width: min(560px, 100%);
+  max-height: min(85vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.kg-fragment-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.kg-fragment-picker-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.kg-fragment-picker-close {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.kg-fragment-picker-search {
+  margin: 10px 16px 0;
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.kg-fragment-picker-list {
+  padding: 12px 16px 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+
+.kg-fragment-picker-empty {
+  margin: 8px 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.kg-fragment-picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.kg-fragment-picker-card:hover {
+  border-color: var(--accent-primary, #6366f1);
+  background: var(--bg-primary);
+}
+
+.kg-fragment-picker-card.is-selected {
+  border-color: var(--accent-primary, #6366f1);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.25);
+}
+
+.kg-fragment-picker-card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.kg-fragment-picker-card-preview {
+  min-height: 48px;
+  max-height: 140px;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+  padding: 8px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.kg-picker-preview-loading,
+.kg-picker-preview-placeholder {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.kg-picker-preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+.kg-picker-mermaid-wrap {
+  max-height: 120px;
+  overflow: auto;
+}
+
+.kg-picker-mermaid-wrap :deep(.kg-mermaid-svg-host svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.kg-picker-preview-md {
+  max-height: 120px;
+  overflow: auto;
+  color: var(--text-primary);
+}
+
+.kg-picker-preview-md :deep(p) {
+  margin: 0 0 0.35em;
+}
+
+.kg-picker-preview-md :deep(pre) {
+  font-size: 0.72rem;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.kg-picker-preview-err {
+  margin: 0;
+  font-size: 0.78rem;
   color: var(--text-secondary);
 }
 </style>

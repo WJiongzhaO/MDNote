@@ -59,7 +59,7 @@ export class LangChainLlmGraphTransformerExtractor implements AiGraphExtractor {
       relations: (graphDocument?.relationships ?? []).map(rel => ({
         source: String(rel.source.id),
         target: String(rel.target.id),
-        type: String(rel.type ?? 'RELATED_TO'),
+        type: String(rel.type ?? '关联'),
         description:
           typeof rel.properties?.description === 'string' ? rel.properties.description : undefined,
         metadata: rel.properties ?? {}

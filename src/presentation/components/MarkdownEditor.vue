@@ -222,66 +222,69 @@
     />
 
     <!-- 知识图谱模态框 -->
-    <div v-if="showKnowledgeGraphModal" class="modal-overlay" @click="closeKnowledgeGraph" style="
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    ">
-      <div class="knowledge-graph-modal" @click.stop style="
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        width: 90vw;
-        max-width: 1200px;
-        height: 90vh;
-        overflow: hidden;
-        position: relative;
-        min-width: 640px;
-      ">
-        <div class="knowledge-graph-header">
+    <div v-if="showKnowledgeGraphModal" class="modal-overlay knowledge-graph-floating-layer">
+      <div
+        ref="knowledgeGraphWindowRef"
+        class="knowledge-graph-modal knowledge-graph-floating-window"
+        :style="knowledgeGraphWindowStyle"
+        @click.stop
+      >
+        <div class="knowledge-graph-header knowledge-graph-header-draggable" @mousedown="startKnowledgeGraphDrag">
           <h3>🕸️ 知识图谱</h3>
-          <div class="knowledge-graph-actions">
-            <button
-              type="button"
-              class="toolbar-btn sample-btn"
-              @click="switchKnowledgeGraphMode('markdown')"
-              :disabled="knowledgeGraphMode === 'markdown'"
-              title="查看按标题快速生成的知识图谱"
-            >
-              标题图谱
-            </button>
-            <button
-              type="button"
-              class="toolbar-btn sample-btn"
-              @click="switchKnowledgeGraphMode('ai')"
-              :disabled="knowledgeGraphMode === 'ai'"
-              title="查看 AI 生成的知识图谱"
-            >
-              AI 知识图谱
-            </button>
-            <button
-              type="button"
-              class="toolbar-btn sample-btn"
-              @click="buildAiKnowledgeGraph"
-              :disabled="!activeDocumentId"
-              title="生成或更新当前文档的 AI 知识图谱"
-            >
-              生成 AI 知识图谱
-            </button>
-            <template v-if="knowledgeGraphMode === 'markdown'">
+          <div class="knowledge-graph-header-toolbar">
+            <div class="kg-mode-tabs" @mousedown.stop>
               <button
+                type="button"
+                class="kg-mode-tab"
+                :class="{ active: knowledgeGraphMode === 'markdown' }"
+                title="按文档标题结构生成图谱（切换到此页会自动生成或恢复）"
+                @click="onClickKnowledgeGraphModeTab('markdown')"
+              >
+                <svg class="kg-mode-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="9" cy="9" r="2.2" fill="currentColor" />
+                  <circle cx="15" cy="9" r="2.2" fill="currentColor" />
+                  <circle cx="12" cy="15" r="2.2" fill="currentColor" />
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    d="M10.6 10.3L11.4 13.7M13.4 10.3L12.6 13.7M10.1 9.8L14 9.8"
+                  />
+                </svg>
+                标题图谱
+              </button>
+              <button
+                type="button"
+                class="kg-mode-tab"
+                :class="{ active: knowledgeGraphMode === 'ai' }"
+                title="由 AI 从正文抽取实体与关系"
+                @click="onClickKnowledgeGraphModeTab('ai')"
+              >
+                <svg class="kg-mode-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="9" cy="9" r="2.2" fill="currentColor" opacity="0.35" />
+                  <circle cx="15" cy="9" r="2.2" fill="currentColor" opacity="0.35" />
+                  <circle cx="12" cy="15" r="2.2" fill="currentColor" />
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    d="M10.6 10.3L11.4 13.7M13.4 10.3L12.6 13.7M10.1 9.8L14 9.8"
+                  />
+                </svg>
+                AI 知识图谱
+              </button>
+            </div>
+            <span class="kg-toolbar-divider" aria-hidden="true" />
+            <div class="knowledge-graph-actions" @mousedown.stop>
+              <button
+                v-if="selectedKnowledgeGraphIsTemp"
                 type="button"
                 class="toolbar-btn sample-btn"
                 @click="saveKnowledgeGraph"
-                title="将当前知识图谱保存为独立文件"
-                v-if="knowledgeGraphData"
+                title="将临时图谱首次保存为知识库中的 JSON 文件"
+                :disabled="!knowledgeGraphData"
               >
                 保存到知识图谱库
               </button>
@@ -289,56 +292,152 @@
               <button
                 type="button"
                 class="toolbar-btn sample-btn"
-                v-if="knowledgeGraphData"
+                :disabled="!knowledgeGraphData"
                 @click="randomizeKnowledgeGraphLayout"
                 title="重新随机排列节点（会丢弃当前坐标，直到再次自动保存）"
               >
                 随机重新布局
               </button>
-            </template>
-            <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">✕</button>
+              <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">✕</button>
+            </div>
           </div>
         </div>
-        <template v-if="knowledgeGraphMode === 'markdown'">
-          <div v-if="isSampleMode" class="knowledge-graph-sample-hint">（样例展示，实际数据将由 RAG 等方式提取）</div>
-          <div v-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">正在生成图谱…</div>
-          <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">{{ knowledgeGraphError }}</div>
-          <KnowledgeGraphView
-            v-else-if="knowledgeGraphData"
-            :graph="knowledgeGraphData"
-            :graph-load-key="getKnowledgeGraphDocKey()"
-            :layout-randomize-key="kgLayoutRandomizeKey"
-            class="knowledge-graph-body"
-            :render-markdown="renderMarkdown"
-            @graph-update="onKnowledgeGraphUpdate"
-            @jump-to-fragment="onKnowledgeGraphJumpToFragment"
-          />
-          <div v-else class="knowledge-graph-error">当前文档暂无可展示的知识图谱</div>
-        </template>
-        <template v-else>
-          <AiDocumentGraphPanel
-            v-if="activeDocumentId"
-            ref="aiDocumentGraphPanelRef"
-            class="knowledge-graph-body"
-            :document-id="activeDocumentId"
-            :graph-service="aiDocumentGraphService"
-            :hide-inline-actions="true"
-            @jump-to="onAiKnowledgeGraphJump"
-            @jump-to-fragment="onKnowledgeGraphJumpToFragment"
-          />
-          <div v-else class="knowledge-graph-error">当前文档不可用，无法构建 AI 知识图谱</div>
-        </template>
+        <div class="knowledge-graph-panel-body">
+          <aside class="knowledge-graph-list">
+            <div class="knowledge-graph-list-title">图谱列表</div>
+            <div v-if="knowledgeGraphListLoading" class="knowledge-graph-list-loading">加载中...</div>
+            <div v-else>
+              <div class="knowledge-graph-list-group">
+                <div class="knowledge-graph-list-group-title">未保存（各 1 槽）</div>
+                <div
+                  v-for="slot in knowledgeGraphTempSlots"
+                  :key="slot.kind"
+                  class="knowledge-graph-list-item kg-temp-slot"
+                  :class="{
+                    active: slot.entry && selectedKnowledgeGraphEntryKey === slot.entry.entryKey,
+                    'kg-temp-slot--empty': !slot.entry
+                  }"
+                  @click="onKnowledgeGraphTempSlotClick(slot.kind)"
+                >
+                  <div class="knowledge-graph-list-item-row">
+                    <span class="knowledge-graph-list-item-title">{{
+                      slot.entry
+                        ? slot.entry.title
+                        : slot.kind === 'heading'
+                          ? '标题图谱'
+                          : 'AI 知识图谱'
+                    }}</span>
+                    <span
+                      class="knowledge-graph-list-badge"
+                      :class="slot.kind === 'ai' ? 'ai' : 'heading'"
+                      >{{ slot.kind === 'ai' ? 'AI' : '标题' }}</span>
+                  </div>
+                  <div class="knowledge-graph-list-item-meta">
+                    {{
+                      slot.entry
+                        ? formatKnowledgeGraphListTime(slot.entry.updatedAt)
+                        : '空槽 · 点击生成或切换到此槽'
+                    }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="knowledge-graph-list-group">
+                <div class="knowledge-graph-list-group-title">已保存 ({{ savedGraphEntries.length }})</div>
+                <div
+                  v-for="item in savedGraphEntries"
+                  :key="item.entryKey"
+                  class="knowledge-graph-list-item"
+                  :class="{ active: selectedKnowledgeGraphEntryKey === item.entryKey }"
+                  @click="selectKnowledgeGraphEntry(item.entryKey)"
+                >
+                  <div class="knowledge-graph-list-item-row">
+                    <span class="knowledge-graph-list-item-title">{{ item.title }}</span>
+                    <span class="knowledge-graph-list-badge" :class="item.graphType">{{ item.graphType === 'ai' ? 'AI' : '标题' }}</span>
+                  </div>
+                  <div class="knowledge-graph-list-item-meta">{{ formatKnowledgeGraphListTime(item.updatedAt) }}</div>
+                </div>
+              </div>
+
+              <div
+                v-if="unsavedGraphEntries.length === 0 && savedGraphEntries.length === 0"
+                class="knowledge-graph-list-empty"
+              >
+                当前文档暂无图谱
+              </div>
+            </div>
+          </aside>
+
+          <div class="knowledge-graph-main-pane">
+            <div v-if="isSampleMode" class="knowledge-graph-sample-hint">（样例展示，实际数据将由 RAG 等方式提取）</div>
+            <div
+              v-else-if="isKnowledgeGraphRendering && knowledgeGraphMode === 'ai' && !isSampleMode"
+              class="knowledge-graph-ai-building"
+            >
+              <p class="knowledge-graph-ai-building-title">正在生成 AI 知识图谱</p>
+              <div class="kg-progress-track" role="progressbar" :aria-valuenow="aiGraphBuildProgress" aria-valuemin="0" aria-valuemax="100">
+                <div class="kg-progress-fill" :style="{ width: `${aiGraphBuildProgress}%` }" />
+              </div>
+              <p class="kg-progress-hint">{{ aiGraphBuildLabel || '请稍候…' }}</p>
+            </div>
+            <div v-else-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">正在生成图谱…</div>
+            <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">{{ knowledgeGraphError }}</div>
+            <KnowledgeGraphView
+              v-else-if="knowledgeGraphData"
+              ref="knowledgeGraphViewRef"
+              :graph="knowledgeGraphData"
+              :current-document-id="activeDocumentId || ''"
+              :current-vault-id="knowledgeGraphVaultId"
+              :graph-load-key="activeKnowledgeGraphLoadKey"
+              :layout-randomize-key="kgLayoutRandomizeKey"
+              class="knowledge-graph-body"
+              :render-markdown="renderMarkdown"
+              @graph-update="onKnowledgeGraphUpdate"
+              @jump-to-fragment="onKnowledgeGraphJumpToFragment"
+            />
+            <div
+              v-else-if="knowledgeGraphMode === 'ai' && !isSampleMode"
+              class="knowledge-graph-ai-placeholder"
+            >
+              <p class="knowledge-graph-ai-placeholder-text">
+                {{
+                  activeDocumentId
+                    ? '当前会话还没有临时生成的 AI 知识图谱（不会自动打开已保存文件）。点击下方按钮从正文抽取实体与关系。'
+                    : '请先打开或关联一篇文档，再生成 AI 知识图谱。'
+                }}
+              </p>
+              <button
+                type="button"
+                class="kg-ai-generate-primary-btn"
+                :disabled="!activeDocumentId || isKnowledgeGraphRendering"
+                title="生成或更新当前文档的 AI 知识图谱"
+                @click="buildAiKnowledgeGraph"
+              >
+                <svg class="kg-ai-generate-star" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M12 2l2.2 7.1h7l-5.6 4.1 2.1 6.8L12 17l-5.7 4.2 2.1-6.8L2.8 9.1h7L12 2z"
+                  />
+                </svg>
+                生成 AI 知识图谱
+              </button>
+            </div>
+            <div v-else-if="!isSampleMode" class="knowledge-graph-empty-hint">
+              当前暂无图谱数据，请切换「标题图谱」将自动从标题生成，或切换到「AI 知识图谱」并生成。
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, toRaw } from 'vue';
+import { useRoute } from 'vue-router';
 import MermaidEditor from './MermaidEditor.vue';
 import FormulaEditor from './FormulaEditor.vue';
 import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
-import AiDocumentGraphPanel from './AiDocumentGraphPanel.vue';
 import ExportConfigModal from './ExportConfigModal.vue';
 import ExportProgressModal from './ExportProgressModal.vue';
 import KnowledgeGraphView from './KnowledgeGraphView.vue';
@@ -354,18 +453,20 @@ import { extractKnowledgeGraph, sampleKnowledgeGraph, type KnowledgeGraph } from
 import { NodeType } from '../../domain/types/knowledge-fragment.types';
 import {
   mergeKgPositionSources,
-  loadKgLayoutFromLocalStorage,
   loadKgLayoutPayloadFromLocalStorage,
   mergeKgStoragePayloadIntoGraph,
-  saveKgLayoutToLocalStorage,
   clearKgLayoutLocalStorage
 } from '../../domain/services/knowledge-graph-layout';
-import { FileSystemKnowledgeGraphService } from '../../infrastructure/services/knowledge-graph-file.service';
+import {
+  FileSystemKnowledgeGraphService,
+  type KnowledgeGraphInfo
+} from '../../infrastructure/services/knowledge-graph-file.service';
 import { resolveFragmentReferenceJump } from '../../domain/services/knowledge-graph-fragment-jump';
 import { readDocumentTextForKnowledgeJump } from '../utils/knowledge-graph-jump.util';
 
 interface Props {
   document: DocumentResponse | null;
+  vaultId?: string;
   renderMarkdown: (content: string, documentId?: string, variables?: Record<string, any>, fileCache?: any) => Promise<string>;
 }
 
@@ -376,6 +477,7 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+const route = useRoute();
 
 const title = ref('');
 const content = ref(''); // 原始 Markdown 内容（包含 frontmatter 和正文）
@@ -448,18 +550,107 @@ const showKnowledgeGraphModal = ref(false);
 const knowledgeGraphData = ref<KnowledgeGraph | null>(null);
 const knowledgeGraphError = ref('');
 const isKnowledgeGraphRendering = ref(false);
+/** AI 构建进度 0–100，仅在为 AI 生成时更新 */
+const aiGraphBuildProgress = ref(0);
+const aiGraphBuildLabel = ref('');
 const knowledgeGraphMode = ref<'markdown' | 'ai'>('markdown');
 const isSampleMode = ref(false);
 const kgLayoutRandomizeKey = ref(0);
 const knowledgeGraphService = new FileSystemKnowledgeGraphService();
 const aiDocumentGraphService = Application.getInstance().getApplicationService().getAiDocumentGraphService();
-const aiDocumentGraphPanelRef = ref<{ buildGraph: () => void; refreshState: () => void } | null>(null);
+const knowledgeGraphWindowRef = ref<HTMLDivElement | null>(null);
+const knowledgeGraphViewRef = ref<InstanceType<typeof KnowledgeGraphView> | null>(null);
+const knowledgeGraphWindowPosition = ref({ x: 80, y: 64 });
+const knowledgeGraphWindowDrag = ref({
+  active: false,
+  offsetX: 0,
+  offsetY: 0
+});
+const hasInitializedKnowledgeGraphWindow = ref(false);
+
+type KnowledgeGraphEntryType = 'heading' | 'ai';
+type KnowledgeGraphEntrySource = 'temp' | 'saved';
+
+interface KnowledgeGraphEntry {
+  entryKey: string;
+  source: KnowledgeGraphEntrySource;
+  graphType: KnowledgeGraphEntryType;
+  title: string;
+  updatedAt: string;
+  graph?: KnowledgeGraph;
+  fullPath?: string;
+}
+
+interface TempKnowledgeGraphEntry {
+  entryKey: string;
+  graphType: KnowledgeGraphEntryType;
+  title: string;
+  updatedAt: string;
+  graph: KnowledgeGraph;
+}
+
+const knowledgeGraphListLoading = ref(false);
+const selectedKnowledgeGraphEntryKey = ref<string | null>(null);
+const lastOpenedGraphByDoc = ref<Record<string, string>>({});
+const activeKnowledgeGraphLoadKey = ref('kg-empty');
+const headingTempGraphByDoc = ref<Record<string, TempKnowledgeGraphEntry>>({});
+const aiTempGraphByDoc = ref<Record<string, TempKnowledgeGraphEntry>>({});
+const savedGraphEntries = ref<KnowledgeGraphEntry[]>([]);
+
+const knowledgeGraphVaultId = computed(() => {
+  const fromRoute = (route.query.vaultId as string | undefined)?.trim();
+  if (fromRoute) return fromRoute;
+  const fromProp = props.vaultId?.trim();
+  if (fromProp) return fromProp;
+  try {
+    const fromApp = Application.getInstance().getApplicationService().getCurrentVaultId();
+    const normalized = fromApp?.trim();
+    return normalized || 'default';
+  } catch {
+    return 'default';
+  }
+});
+
 const activeDocumentId = computed(() => {
   const externalFilePath = (props.document as any)?.filePath;
   if (externalFilePath) {
     return externalFilePath;
   }
   return props.document?.id || currentFilePath.value || '';
+});
+
+const knowledgeGraphWindowStyle = computed(() => ({
+  left: `${knowledgeGraphWindowPosition.value.x}px`,
+  top: `${knowledgeGraphWindowPosition.value.y}px`
+}));
+
+const unsavedGraphEntries = computed<KnowledgeGraphEntry[]>(() => {
+  const scopeId = getKnowledgeGraphScopeId();
+  const out: KnowledgeGraphEntry[] = [];
+  const headingTempGraph = headingTempGraphByDoc.value[scopeId];
+  const aiTempGraph = aiTempGraphByDoc.value[scopeId];
+  if (headingTempGraph) {
+    out.push({
+      ...headingTempGraph,
+      source: 'temp'
+    });
+  }
+  if (aiTempGraph) {
+    out.push({
+      ...aiTempGraph,
+      source: 'temp'
+    });
+  }
+  return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+});
+
+/** 侧栏「未保存」固定两个槽位：标题临时 / AI 临时，每槽至多 1 份（与 headingTempGraphByDoc / aiTempGraphByDoc 一致） */
+const knowledgeGraphTempSlots = computed(() => {
+  const scopeId = getKnowledgeGraphScopeId();
+  return [
+    { kind: 'heading' as const, entry: headingTempGraphByDoc.value[scopeId] ?? null },
+    { kind: 'ai' as const, entry: aiTempGraphByDoc.value[scopeId] ?? null }
+  ];
 });
 
 /** 工作3：文档编辑区右侧「推荐片段」面板 */
@@ -1977,6 +2168,9 @@ onMounted(() => {
 
   // 添加点击外部关闭右键菜单的事件监听
   document.addEventListener('click', handleClickOutside);
+  window.addEventListener('mousemove', handleKnowledgeGraphWindowDrag);
+  window.addEventListener('mouseup', stopKnowledgeGraphWindowDrag);
+  window.addEventListener('resize', ensureKnowledgeGraphWindowInViewport);
 
   if (content.value) {
     renderContent();
@@ -1995,6 +2189,11 @@ onMounted(() => {
 onUnmounted(() => {
   // 移除点击外部关闭右键菜单的事件监听
   document.removeEventListener('click', handleClickOutside);
+  window.removeEventListener('mousemove', handleKnowledgeGraphWindowDrag);
+  window.removeEventListener('mouseup', stopKnowledgeGraphWindowDrag);
+  window.removeEventListener('resize', ensureKnowledgeGraphWindowInViewport);
+  stopKnowledgeGraphWindowDrag();
+  void flushKnowledgeGraphToDisk();
 
   // 组件卸载前，如果有未保存的更改，强制保存
   if (hasChanges.value) {
@@ -2554,17 +2753,79 @@ const closeFormulaEditor = () => {
   currentFormulaCode.value = '';
 };
 
-function getKnowledgeGraphDocKey(): string {
-  if (isSampleMode.value) return 'sample';
-  return props.document?.id || currentFilePath.value || 'untitled';
+/**
+ * 知识图谱布局在 localStorage 中的键：文档 scope + 列表项 entryKey。
+ * 仅按文档存会导致同一文档下多个图谱互相覆盖，切换回来位置错乱。
+ */
+function getKnowledgeGraphLayoutStorageKey(
+  layoutScopeOverride?: string,
+  entryKeyOverride?: string | null
+): string {
+  if (layoutScopeOverride === undefined && isSampleMode.value) {
+    return 'sample';
+  }
+  const scopeId = layoutScopeOverride ?? getKnowledgeGraphScopeId();
+  if (scopeId === 'sample') {
+    return 'sample';
+  }
+  const ek = entryKeyOverride !== undefined ? entryKeyOverride : selectedKnowledgeGraphEntryKey.value;
+  if (ek) {
+    return `${scopeId}::${ek}`;
+  }
+  return scopeId;
+}
+
+/** 读取当前图谱的布局缓存；优先复合键，回退旧版「仅文档」键以兼容已有数据 */
+function loadKgLayoutPayloadForGraph(
+  layoutScopeOverride?: string,
+  entryKeyOverride?: string | null
+): KgLayoutStoragePayload | null {
+  if (layoutScopeOverride === undefined && isSampleMode.value) {
+    return loadKgLayoutPayloadFromLocalStorage('sample');
+  }
+  const scopeId = layoutScopeOverride ?? getKnowledgeGraphScopeId();
+  if (scopeId === 'sample') {
+    return loadKgLayoutPayloadFromLocalStorage('sample');
+  }
+  const ek = entryKeyOverride !== undefined ? entryKeyOverride : selectedKnowledgeGraphEntryKey.value;
+  if (ek) {
+    const composite = `${scopeId}::${ek}`;
+    const from = loadKgLayoutPayloadFromLocalStorage(composite);
+    if (from) return from;
+    return loadKgLayoutPayloadFromLocalStorage(scopeId);
+  }
+  return loadKgLayoutPayloadFromLocalStorage(scopeId);
 }
 
 const onKnowledgeGraphUpdate = (g: KnowledgeGraph) => {
   knowledgeGraphData.value = g;
-  const key = getKnowledgeGraphDocKey();
-  if (g.nodePositions && key) {
-    saveKgLayoutToLocalStorage(key, g.nodePositions, g.viewState);
+  const selectedKey = selectedKnowledgeGraphEntryKey.value;
+  if (selectedKey) {
+    const selected = findGraphEntryByKey(selectedKey);
+    if (selected) {
+      selected.graph = g;
+      selected.updatedAt = new Date().toISOString();
+      if (selected.source === 'temp') {
+        if (selected.graphType === 'heading') {
+          const scopeId = getKnowledgeGraphScopeId();
+          const temp = headingTempGraphByDoc.value[scopeId];
+          if (temp) {
+            temp.graph = g;
+            temp.updatedAt = selected.updatedAt;
+          }
+        }
+        if (selected.graphType === 'ai') {
+          const scopeId = getKnowledgeGraphScopeId();
+          const temp = aiTempGraphByDoc.value[scopeId];
+          if (temp) {
+            temp.graph = g;
+            temp.updatedAt = selected.updatedAt;
+          }
+        }
+      }
+    }
   }
+  /** 不在拖动时落盘：仅更新内存，写入 JSON 在切换显示内容时由 flushKnowledgeGraphToDisk 完成 */
 };
 
 const onKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string }) => {
@@ -2606,17 +2867,305 @@ const onKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string }) =
   }
 };
 
-const onAiKnowledgeGraphJump = (payload: { documentId: string; start: number; end: number }) => {
-  emit('navigate-knowledge-jump', payload);
-};
+function getKnowledgeGraphWindowSize(): { width: number; height: number } {
+  const rect = knowledgeGraphWindowRef.value?.getBoundingClientRect();
+  if (rect && rect.width > 0 && rect.height > 0) {
+    return { width: rect.width, height: rect.height };
+  }
+  return {
+    width: Math.min(1220, Math.max(820, window.innerWidth * 0.82)),
+    height: Math.min(860, Math.max(520, window.innerHeight * 0.82))
+  };
+}
+
+function clampKnowledgeGraphWindowPosition(nextX: number, nextY: number): { x: number; y: number } {
+  const margin = 8;
+  const { width, height } = getKnowledgeGraphWindowSize();
+  const maxX = Math.max(margin, window.innerWidth - width - margin);
+  const maxY = Math.max(margin, window.innerHeight - height - margin);
+
+  return {
+    x: Math.min(Math.max(nextX, margin), maxX),
+    y: Math.min(Math.max(nextY, margin), maxY)
+  };
+}
+
+function ensureKnowledgeGraphWindowInViewport() {
+  if (!showKnowledgeGraphModal.value) return;
+  knowledgeGraphWindowPosition.value = clampKnowledgeGraphWindowPosition(
+    knowledgeGraphWindowPosition.value.x,
+    knowledgeGraphWindowPosition.value.y
+  );
+}
+
+function initializeKnowledgeGraphWindowIfNeeded() {
+  if (hasInitializedKnowledgeGraphWindow.value) return;
+  const size = getKnowledgeGraphWindowSize();
+  knowledgeGraphWindowPosition.value = clampKnowledgeGraphWindowPosition(
+    (window.innerWidth - size.width) / 2,
+    (window.innerHeight - size.height) / 2
+  );
+  hasInitializedKnowledgeGraphWindow.value = true;
+}
+
+function startKnowledgeGraphDrag(event: MouseEvent) {
+  if (event.button !== 0) return;
+  const target = event.target as HTMLElement | null;
+  if (!target) return;
+  if (target.closest('.knowledge-graph-actions')) return;
+  if (target.closest('button')) return;
+  event.preventDefault();
+
+  knowledgeGraphWindowDrag.value = {
+    active: true,
+    offsetX: event.clientX - knowledgeGraphWindowPosition.value.x,
+    offsetY: event.clientY - knowledgeGraphWindowPosition.value.y
+  };
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'move';
+}
+
+function handleKnowledgeGraphWindowDrag(event: MouseEvent) {
+  if (!knowledgeGraphWindowDrag.value.active) return;
+  knowledgeGraphWindowPosition.value = clampKnowledgeGraphWindowPosition(
+    event.clientX - knowledgeGraphWindowDrag.value.offsetX,
+    event.clientY - knowledgeGraphWindowDrag.value.offsetY
+  );
+}
+
+function stopKnowledgeGraphWindowDrag() {
+  if (!knowledgeGraphWindowDrag.value.active) return;
+  knowledgeGraphWindowDrag.value.active = false;
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+}
 
 const randomizeKnowledgeGraphLayout = () => {
   if (!knowledgeGraphData.value) return;
   const { nodePositions: _np, viewState: _vs, ...rest } = knowledgeGraphData.value;
   knowledgeGraphData.value = { ...rest };
-  clearKgLayoutLocalStorage(getKnowledgeGraphDocKey());
+  const selected = selectedKnowledgeGraphEntryKey.value
+    ? findGraphEntryByKey(selectedKnowledgeGraphEntryKey.value)
+    : null;
+  if (selected?.source === 'saved' && selected.fullPath) {
+    return;
+  }
+  clearKgLayoutLocalStorage(getKnowledgeGraphLayoutStorageKey());
   kgLayoutRandomizeKey.value += 1;
 };
+
+function getKnowledgeGraphScopeId(): string {
+  return activeDocumentId.value || 'untitled';
+}
+
+function getKnowledgeGraphDocumentTitle(): string {
+  const filePath = currentFilePath.value || (props.document as { filePath?: string } | null)?.filePath || '';
+  const fileName = filePath.split(/[/\\]/).pop();
+  return title.value || props.document?.title || fileName || '未命名文档';
+}
+
+function buildKnowledgeGraphEntryKey(source: KnowledgeGraphEntrySource, graphType: KnowledgeGraphEntryType, id: string): string {
+  return `${source}:${graphType}:${id}`;
+}
+
+function formatKnowledgeGraphListTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function convertAiGraphToKnowledgeGraph(aiGraph: {
+  nodes: Array<{
+    id: string;
+    label: string;
+    entityType?: string;
+    description?: string;
+    primaryAnchor?: unknown;
+    evidenceCount?: number;
+    evidencePreview?: unknown[];
+  }>;
+  edges: Array<{ source: string; target: string; relationType?: string; description?: string; id?: string }>;
+}): KnowledgeGraph {
+  const nodes = aiGraph.nodes.map(node => ({
+    id: node.id,
+    label: node.label,
+    type: 'link' as const,
+    ...(node.entityType ? { entityType: node.entityType } : {}),
+    ...(node.description ? { description: node.description } : {}),
+    ...(node.primaryAnchor ? { primaryAnchor: node.primaryAnchor } : {}),
+    ...(typeof node.evidenceCount === 'number' ? { evidenceCount: node.evidenceCount } : {}),
+    ...(Array.isArray(node.evidencePreview) ? { evidencePreview: node.evidencePreview } : {})
+  }));
+  const edges = aiGraph.edges.map((edge, index) => ({
+    source: edge.source,
+    target: edge.target,
+    relation: edge.relationType || edge.description || `关系-${index + 1}`,
+    ...(edge.id ? { id: edge.id } : {}),
+    ...(edge.relationType ? { relationType: edge.relationType } : {}),
+    ...(edge.description ? { description: edge.description } : {})
+  }));
+  return { nodes, edges };
+}
+
+function findGraphEntryByKey(entryKey: string): KnowledgeGraphEntry | null {
+  const tempEntry = unsavedGraphEntries.value.find(item => item.entryKey === entryKey);
+  if (tempEntry) return tempEntry;
+  return savedGraphEntries.value.find(item => item.entryKey === entryKey) || null;
+}
+
+const selectedKnowledgeGraphIsTemp = computed(() => {
+  const key = selectedKnowledgeGraphEntryKey.value;
+  if (!key) return false;
+  const e = findGraphEntryByKey(key);
+  return e?.source === 'temp';
+});
+
+/** 将当前已保存图谱写入磁盘（含节点坐标与视角）；仅应在切换显示内容时调用；临时与样例不落盘 */
+async function flushKnowledgeGraphToDisk(
+  layoutScopeOverride?: string,
+  entryKeyOverride?: string | null
+): Promise<void> {
+  try {
+    knowledgeGraphViewRef.value?.syncPendingViewportToParent?.();
+    await nextTick();
+    const key = selectedKnowledgeGraphEntryKey.value;
+    const entry = key ? findGraphEntryByKey(key) : null;
+    if (!entry?.fullPath || !knowledgeGraphData.value?.nodes?.length) return;
+    if (isSampleMode.value) return;
+    if (entry.source !== 'saved') return;
+
+    const layoutPayload = loadKgLayoutPayloadForGraph(layoutScopeOverride, entryKeyOverride);
+    const graphToSave = {
+      ...mergeKgPositionSources(
+        knowledgeGraphData.value,
+        knowledgeGraphData.value.nodePositions,
+        layoutPayload?.nodePositions ?? null
+      ),
+      ...(knowledgeGraphData.value.viewState ? { viewState: knowledgeGraphData.value.viewState } : {})
+    };
+
+    const path = await knowledgeGraphService.resolveKnowledgeGraphPath(entry.fullPath);
+    await knowledgeGraphService.writeGraphData(path, toRaw(graphToSave) as KnowledgeGraph);
+    entry.graph = graphToSave;
+    entry.updatedAt = new Date().toISOString();
+    knowledgeGraphData.value = graphToSave;
+    const flushKey = key;
+    await loadSavedKnowledgeGraphEntries();
+    if (flushKey) {
+      const synced = findGraphEntryByKey(flushKey);
+      if (synced?.source === 'saved') {
+        synced.graph = graphToSave;
+        synced.updatedAt = entry.updatedAt;
+      }
+    }
+  } catch (e) {
+    console.warn('[知识图谱] 自动保存失败', e);
+  }
+}
+
+async function setActiveKnowledgeGraph(entry: KnowledgeGraphEntry | null): Promise<void> {
+  const prevKey = selectedKnowledgeGraphEntryKey.value;
+  const nextKey = entry?.entryKey ?? null;
+  if (prevKey && (nextKey !== prevKey || !entry)) {
+    await flushKnowledgeGraphToDisk();
+  }
+
+  if (!entry || !entry.graph) {
+    knowledgeGraphData.value = null;
+    selectedKnowledgeGraphEntryKey.value = null;
+    return;
+  }
+
+  knowledgeGraphData.value = entry.graph;
+  selectedKnowledgeGraphEntryKey.value = entry.entryKey;
+  knowledgeGraphMode.value = entry.graphType === 'ai' ? 'ai' : 'markdown';
+  isSampleMode.value = false;
+  knowledgeGraphError.value = '';
+  activeKnowledgeGraphLoadKey.value = `${getKnowledgeGraphScopeId()}#${entry.entryKey}#${Date.now()}`;
+  lastOpenedGraphByDoc.value[getKnowledgeGraphScopeId()] = entry.entryKey;
+}
+
+async function selectKnowledgeGraphEntry(entryKey: string): Promise<void> {
+  if (entryKey === selectedKnowledgeGraphEntryKey.value && showKnowledgeGraphModal.value) {
+    await flushKnowledgeGraphToDisk();
+  }
+  const entry = findGraphEntryByKey(entryKey);
+  if (!entry) return;
+
+  if (entry.source === 'saved' && entry.fullPath && !entry.graph) {
+    try {
+      const loaded = await knowledgeGraphService.readGraph(entry.fullPath);
+      entry.graph = loaded.graph;
+    } catch (e) {
+      knowledgeGraphError.value = e instanceof Error ? e.message : '读取知识图谱失败';
+      return;
+    }
+  }
+  if (entry.graph) {
+    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, entryKey);
+    /** 与手动保存一致：内存坐标优先于 localStorage，避免 overlay 覆盖刚拖动的位置 */
+    const merged = mergeKgPositionSources(
+      entry.graph,
+      entry.graph.nodePositions,
+      layoutPayload?.nodePositions ?? null
+    );
+    const vs = merged.viewState ?? layoutPayload?.viewState;
+    entry.graph = vs ? { ...merged, viewState: vs } : merged;
+  }
+  await setActiveKnowledgeGraph(entry);
+}
+
+async function loadSavedKnowledgeGraphEntries(): Promise<void> {
+  knowledgeGraphListLoading.value = true;
+  try {
+    const scopeId = getKnowledgeGraphScopeId();
+    const allGraphs = await knowledgeGraphService.listGraphs();
+    const scoped = allGraphs
+      .filter(item => (item.documentId || '') === scopeId)
+      .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+
+    savedGraphEntries.value = scoped.map(item => ({
+      entryKey: buildKnowledgeGraphEntryKey('saved', item.graphType === 'ai' ? 'ai' : 'heading', item.id),
+      source: 'saved',
+      graphType: item.graphType === 'ai' ? 'ai' : 'heading',
+      title: item.title,
+      updatedAt: item.updatedAt || item.createdAt,
+      fullPath: item.fullPath
+    }));
+  } catch (e) {
+    knowledgeGraphError.value = e instanceof Error ? e.message : '加载图谱列表失败';
+  } finally {
+    knowledgeGraphListLoading.value = false;
+  }
+}
+
+watch(
+  () => activeDocumentId.value,
+  async (newId, oldId) => {
+    if (oldId === undefined || newId === oldId) return;
+    const oldEntryKey = selectedKnowledgeGraphEntryKey.value;
+    await flushKnowledgeGraphToDisk(oldId, oldEntryKey);
+  }
+);
+
+/** 每文档、每类型至多 1 份：写入即覆盖对应槽（标题 / AI 各一条） */
+function upsertTempGraph(graphType: KnowledgeGraphEntryType, graph: KnowledgeGraph, title: string): KnowledgeGraphEntry {
+  const base: TempKnowledgeGraphEntry = {
+    entryKey: buildKnowledgeGraphEntryKey('temp', graphType, getKnowledgeGraphScopeId()),
+    graphType,
+    title,
+    updatedAt: new Date().toISOString(),
+    graph
+  };
+  if (graphType === 'heading') {
+    headingTempGraphByDoc.value[getKnowledgeGraphScopeId()] = base;
+  } else {
+    aiTempGraphByDoc.value[getKnowledgeGraphScopeId()] = base;
+  }
+  return { ...base, source: 'temp' };
+}
 
 const generateHeadingKnowledgeGraph = async () => {
   isKnowledgeGraphRendering.value = true;
@@ -2629,17 +3178,15 @@ const generateHeadingKnowledgeGraph = async () => {
       return;
     }
 
-    const resolvedDocumentId = props.document?.id || currentFilePath.value || undefined;
-    const filePath = currentFilePath.value || (props.document as { filePath?: string } | null)?.filePath || '';
-    const fileName = filePath.split(/[/\\]/).pop();
-    const resolvedTitle = title.value || props.document?.title || fileName || '未命名文档';
-
     const extracted = extractKnowledgeGraph(fullContent, {
-      documentId: resolvedDocumentId,
-      documentTitle: resolvedTitle
+      documentId: getKnowledgeGraphScopeId(),
+      documentTitle: getKnowledgeGraphDocumentTitle()
     });
-    const layoutPayload = loadKgLayoutPayloadFromLocalStorage(getKnowledgeGraphDocKey());
-    knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(extracted, layoutPayload);
+    const tempEntryKey = buildKnowledgeGraphEntryKey('temp', 'heading', getKnowledgeGraphScopeId());
+    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, tempEntryKey);
+    const graph = mergeKgStoragePayloadIntoGraph(extracted, layoutPayload);
+    const entry = upsertTempGraph('heading', graph, '标题图谱 (临时)');
+    await setActiveKnowledgeGraph(entry);
   } catch (e) {
     knowledgeGraphData.value = null;
     knowledgeGraphError.value = e instanceof Error ? e.message : '生成标题图谱失败';
@@ -2648,15 +3195,101 @@ const generateHeadingKnowledgeGraph = async () => {
   }
 };
 
-const switchKnowledgeGraphMode = (mode: 'markdown' | 'ai') => {
-  knowledgeGraphMode.value = mode;
-};
+/** 顶部标签：离开样例视图后切换模式（标题页无缓存时自动生成标题图谱） */
+async function onClickKnowledgeGraphModeTab(mode: 'markdown' | 'ai') {
+  if (isSampleMode.value) {
+    isSampleMode.value = false;
+  }
+  await switchKnowledgeGraphMode(mode);
+}
+
+/** 点击侧栏固定槽位：有则打开对应临时图，无则切模式并触发生成/空状态 */
+async function onKnowledgeGraphTempSlotClick(kind: 'heading' | 'ai') {
+  if (isSampleMode.value) {
+    isSampleMode.value = false;
+  }
+  const scopeId = getKnowledgeGraphScopeId();
+  if (kind === 'heading') {
+    const e = headingTempGraphByDoc.value[scopeId];
+    if (e) {
+      await selectKnowledgeGraphEntry(e.entryKey);
+      return;
+    }
+    await onClickKnowledgeGraphModeTab('markdown');
+    return;
+  }
+  const ai = aiTempGraphByDoc.value[scopeId];
+  if (ai) {
+    await selectKnowledgeGraphEntry(ai.entryKey);
+    return;
+  }
+  await onClickKnowledgeGraphModeTab('ai');
+}
+
+async function switchKnowledgeGraphMode(mode: 'markdown' | 'ai') {
+  isSampleMode.value = false;
+  const scopeId = getKnowledgeGraphScopeId();
+  const target = mode === 'ai' ? aiTempGraphByDoc.value[scopeId] : headingTempGraphByDoc.value[scopeId];
+  if (target) {
+    await setActiveKnowledgeGraph({ ...target, source: 'temp' });
+    return;
+  }
+
+  if (mode === 'markdown') {
+    const savedHeading = savedGraphEntries.value.find(item => item.graphType === 'heading');
+    if (savedHeading) {
+      await selectKnowledgeGraphEntry(savedHeading.entryKey);
+      return;
+    }
+    knowledgeGraphMode.value = 'markdown';
+    await generateHeadingKnowledgeGraph();
+    return;
+  }
+
+  // AI：仅展示临时槽；已保存的 AI 图谱只从左侧「已保存」列表点开，避免顶栏误进历史文件
+  knowledgeGraphMode.value = 'ai';
+  knowledgeGraphData.value = null;
+  knowledgeGraphError.value = '';
+  selectedKnowledgeGraphEntryKey.value = null;
+}
 
 const buildAiKnowledgeGraph = async () => {
   if (!activeDocumentId.value) return;
+  isKnowledgeGraphRendering.value = true;
+  knowledgeGraphError.value = '';
   knowledgeGraphMode.value = 'ai';
-  await nextTick();
-  aiDocumentGraphPanelRef.value?.buildGraph();
+  aiGraphBuildProgress.value = 0;
+  aiGraphBuildLabel.value = '准备中…';
+  try {
+    const aiGraph = await aiDocumentGraphService.buildDocumentKnowledgeGraph(activeDocumentId.value, {
+      onProgress: (ev) => {
+        if (ev.phase === 'chunks') {
+          const { current, total } = ev;
+          aiGraphBuildProgress.value =
+            total > 0 ? Math.min(92, Math.round((current / total) * 88)) : 0;
+          aiGraphBuildLabel.value =
+            total > 0 ? `正在分析正文片段 ${current}/${total}` : '正在分析正文…';
+        } else if (ev.phase === 'merge') {
+          aiGraphBuildProgress.value = 94;
+          aiGraphBuildLabel.value = '合并实体与关系…';
+        } else if (ev.phase === 'persist') {
+          aiGraphBuildProgress.value = 98;
+          aiGraphBuildLabel.value = '写入并加载图谱…';
+        }
+      }
+    });
+    aiGraphBuildProgress.value = 100;
+    aiGraphBuildLabel.value = '完成';
+    const graph = convertAiGraphToKnowledgeGraph(aiGraph);
+    const entry = upsertTempGraph('ai', graph, 'AI 图谱 (临时)');
+    await setActiveKnowledgeGraph(entry);
+  } catch (e) {
+    knowledgeGraphError.value = e instanceof Error ? e.message : '生成 AI 知识图谱失败';
+  } finally {
+    isKnowledgeGraphRendering.value = false;
+    aiGraphBuildProgress.value = 0;
+    aiGraphBuildLabel.value = '';
+  }
 };
 
 // 知识图谱相关方法
@@ -2666,10 +3299,34 @@ const openKnowledgeGraph = () => {
   knowledgeGraphError.value = '';
   isSampleMode.value = false;
   knowledgeGraphData.value = null;
-  void generateHeadingKnowledgeGraph();
+  initializeKnowledgeGraphWindowIfNeeded();
+  nextTick(() => {
+    ensureKnowledgeGraphWindowInViewport();
+  });
+  void (async () => {
+    await loadSavedKnowledgeGraphEntries();
+    const scopeId = getKnowledgeGraphScopeId();
+    const lastOpened = lastOpenedGraphByDoc.value[scopeId];
+    if (lastOpened) {
+      await selectKnowledgeGraphEntry(lastOpened);
+      if (knowledgeGraphData.value) return;
+    }
+    const headingTemp = headingTempGraphByDoc.value[scopeId];
+    if (headingTemp) {
+      await selectKnowledgeGraphEntry(headingTemp.entryKey);
+      if (knowledgeGraphData.value) return;
+    }
+    const firstSaved = savedGraphEntries.value[0];
+    if (firstSaved) {
+      await selectKnowledgeGraphEntry(firstSaved.entryKey);
+      if (knowledgeGraphData.value) return;
+    }
+    await generateHeadingKnowledgeGraph();
+  })();
 };
 
-const showSampleGraph = () => {
+const showSampleGraph = async () => {
+  await flushKnowledgeGraphToDisk();
   knowledgeGraphMode.value = 'markdown';
   knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(
     sampleKnowledgeGraph,
@@ -2679,67 +3336,56 @@ const showSampleGraph = () => {
   isSampleMode.value = true;
 };
 
-const closeKnowledgeGraph = () => {
+const closeKnowledgeGraph = async () => {
+  await flushKnowledgeGraphToDisk();
   showKnowledgeGraphModal.value = false;
-  knowledgeGraphData.value = null;
   knowledgeGraphError.value = '';
-  knowledgeGraphMode.value = 'markdown';
   isSampleMode.value = false;
+  stopKnowledgeGraphWindowDrag();
 };
 
 const saveKnowledgeGraph = async () => {
   try {
-    const docKeyForLayout = () =>
-      isSampleMode.value ? 'sample' : props.document?.id || currentFilePath.value || 'untitled';
+    const selected = selectedKnowledgeGraphEntryKey.value
+      ? findGraphEntryByKey(selectedKnowledgeGraphEntryKey.value)
+      : null;
+    if (!selected || !selected.graph) {
+      knowledgeGraphError.value = '当前没有可保存的图谱';
+      return;
+    }
 
-    if (isSampleMode.value && knowledgeGraphData.value) {
-      const graphToSave = {
-        ...mergeKgPositionSources(
-          knowledgeGraphData.value,
-          knowledgeGraphData.value.nodePositions,
-          loadKgLayoutFromLocalStorage('sample')
-        ),
-        ...(knowledgeGraphData.value.viewState
-          ? { viewState: knowledgeGraphData.value.viewState }
-          : {})
-      };
-      await knowledgeGraphService.saveGraph({
-        title: '样例：数据结构知识图谱',
-        documentId: null,
-        documentTitle: null,
-        graph: graphToSave
-      });
-      knowledgeGraphError.value = '';
-      return;
-    }
-    const fullContent = getContent();
-    if (!fullContent || !fullContent.trim()) {
-      knowledgeGraphError.value = '当前文档为空，无法保存知识图谱';
-      return;
-    }
-    const titleToUse = title.value || '未命名图谱';
-    const documentId = props.document?.id ?? null;
-    const documentTitle = title.value || (props.document?.title ?? null);
-    const graphWithOccurrences = extractKnowledgeGraph(fullContent, {
-      documentId: documentId ?? undefined,
-      documentTitle: documentTitle ?? undefined
-    });
+    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, selectedKnowledgeGraphEntryKey.value);
     const graphToSave = {
       ...mergeKgPositionSources(
-        graphWithOccurrences,
-        knowledgeGraphData.value?.nodePositions,
-        loadKgLayoutFromLocalStorage(docKeyForLayout())
+        selected.graph,
+        selected.graph.nodePositions,
+        layoutPayload?.nodePositions ?? null
       ),
-      ...(knowledgeGraphData.value?.viewState
-        ? { viewState: knowledgeGraphData.value.viewState }
+      ...(selected.graph.viewState
+        ? { viewState: selected.graph.viewState }
         : {})
     };
-    await knowledgeGraphService.saveGraph({
-      title: titleToUse,
-      documentId,
-      documentTitle,
+
+    const savedInfo = await knowledgeGraphService.saveGraph({
+      title: selected.source === 'temp'
+        ? `${getKnowledgeGraphDocumentTitle()} - ${selected.graphType === 'ai' ? 'AI 图谱' : '标题图谱'}`
+        : selected.title,
+      documentId: getKnowledgeGraphScopeId(),
+      documentTitle: getKnowledgeGraphDocumentTitle(),
+      graphType: selected.graphType,
       graph: graphToSave
     });
+
+    if (selected.source === 'temp') {
+      if (selected.graphType === 'heading') {
+        delete headingTempGraphByDoc.value[getKnowledgeGraphScopeId()];
+      } else {
+        delete aiTempGraphByDoc.value[getKnowledgeGraphScopeId()];
+      }
+    }
+
+    await loadSavedKnowledgeGraphEntries();
+    await selectKnowledgeGraphEntry(buildKnowledgeGraphEntryKey('saved', selected.graphType, savedInfo.id));
     knowledgeGraphError.value = '';
   } catch (e) {
     knowledgeGraphError.value = e instanceof Error ? e.message : '保存知识图谱失败';
@@ -2769,7 +3415,7 @@ const getDefaultFileName = (): string => {
   // 优先使用当前文件路径的文件名
   if (currentFilePath.value) {
     const pathParts = currentFilePath.value.split(/[/\\]/);
-    const fileName = pathParts[pathParts.length - 1];
+    const fileName = pathParts[pathParts.length - 1] || '未命名文档';
     // 移除扩展名
     return fileName.replace(/\.(md|markdown|txt)$/i, '');
   }
@@ -4293,11 +4939,12 @@ const addSelectionAsFragment = async () => {
     const title = selectedText.substring(0, 30) + (selectedText.length > 30 ? '...' : '');
     
     const documentContext = getDocumentContext();
+    const stableSourceDocumentId = documentContext.filePath || documentContext.documentId;
     const fragment = await fragmentUseCase.createFragment({
       title,
       nodes: nodes.map(n => n.toJSON ? n.toJSON() : n),
       tags: [],
-      sourceDocumentId: documentContext.documentId,
+      sourceDocumentId: stableSourceDocumentId,
       sourceFilePath: documentContext.filePath
     });
     
@@ -4801,28 +5448,225 @@ defineExpose({
 
 /* 知识图谱模态框 */
 .knowledge-graph-modal {
+  background: var(--bg-primary, #ffffff);
+  border-radius: 10px;
   box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
+  padding: 12px;
+  overflow: hidden;
+}
+.knowledge-graph-floating-layer {
+  pointer-events: none;
+  background: transparent;
+  z-index: 1300;
+}
+.knowledge-graph-floating-window {
+  pointer-events: auto;
+  position: fixed;
+  width: min(1220px, 84vw);
+  height: min(860px, 84vh);
+  min-width: 760px;
+  min-height: 460px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  resize: both;
+}
+.knowledge-graph-floating-window::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, transparent 0 38%, var(--border-primary) 38% 48%, transparent 48% 62%, var(--border-primary) 62% 72%, transparent 72%);
 }
 .knowledge-graph-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 4px 2px;
+}
+.knowledge-graph-header-draggable {
+  cursor: move;
 }
 .knowledge-graph-header h3 {
   margin: 0;
   font-size: 1.1rem;
+  user-select: none;
+  flex-shrink: 0;
+}
+.knowledge-graph-header-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+  cursor: default;
+}
+.kg-mode-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-secondary, #f4f5f7);
+  border-radius: 10px;
+  border: 1px solid var(--border-primary);
+}
+.kg-mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, #666);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+.kg-mode-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+}
+.kg-mode-tab.active {
+  background: var(--bg-brand-light, #e8f4ff);
+  color: var(--brand-primary, #1890ff);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(24, 144, 255, 0.15);
+}
+.kg-mode-tab-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.kg-toolbar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-primary);
+  flex-shrink: 0;
 }
 .knowledge-graph-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: default;
 }
 .knowledge-graph-actions .sample-btn {
   padding: 6px 12px;
   font-size: 0.85rem;
+}
+.knowledge-graph-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  overflow: hidden;
+}
+.knowledge-graph-list {
+  width: 240px;
+  min-width: 220px;
+  max-width: 320px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  padding: 10px;
+  overflow-y: auto;
+}
+.knowledge-graph-list-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.knowledge-graph-list-group {
+  margin-bottom: 10px;
+}
+.knowledge-graph-list-group-title {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.knowledge-graph-list-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.knowledge-graph-list-item:hover {
+  background: var(--bg-hover);
+}
+.knowledge-graph-list-item.active {
+  background: var(--bg-brand-light, #e8f0ff);
+}
+.knowledge-graph-list-item.kg-temp-slot--empty {
+  border: 1px dashed var(--border-primary);
+  background: var(--bg-secondary, #f9fafb);
+  opacity: 0.96;
+}
+.knowledge-graph-list-item.kg-temp-slot--empty:hover {
+  opacity: 1;
+  background: var(--bg-hover, #f0f4ff);
+}
+.knowledge-graph-list-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.knowledge-graph-list-item-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.knowledge-graph-list-item-meta {
+  margin-top: 2px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+.knowledge-graph-list-badge {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.35;
+}
+.knowledge-graph-list-badge.temp {
+  color: #f08a00;
+  background: #fff3df;
+}
+.knowledge-graph-list-badge.ai {
+  color: #5b4fd9;
+  background: #efedff;
+}
+.knowledge-graph-list-badge.heading {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+.knowledge-graph-list-loading,
+.knowledge-graph-list-empty {
+  padding: 10px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.knowledge-graph-main-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .knowledge-graph-sample-hint {
   font-size: 0.85rem;
@@ -4840,6 +5684,44 @@ defineExpose({
 .knowledge-graph-modal .close-btn:hover {
   color: var(--text-primary);
 }
+.knowledge-graph-ai-building {
+  flex: 1;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px 24px;
+  box-sizing: border-box;
+}
+.knowledge-graph-ai-building-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.kg-progress-track {
+  width: min(420px, 86%);
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg-secondary, #e8eaed);
+  overflow: hidden;
+  border: 1px solid var(--border-primary);
+}
+.kg-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-primary, #1890ff), #40a9ff);
+  transition: width 0.25s ease;
+}
+.kg-progress-hint {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  min-height: 1.25em;
+}
+
 .knowledge-graph-loading,
 .knowledge-graph-error {
   padding: 24px;
@@ -4854,6 +5736,67 @@ defineExpose({
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.knowledge-graph-ai-placeholder {
+  flex: 1;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px 24px;
+  box-sizing: border-box;
+}
+
+.knowledge-graph-ai-placeholder-text {
+  margin: 0;
+  max-width: 400px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.kg-ai-generate-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 8px;
+  background: var(--brand-primary, #1890ff);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.kg-ai-generate-primary-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.kg-ai-generate-primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kg-ai-generate-star {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.knowledge-graph-empty-hint {
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .modal-overlay {

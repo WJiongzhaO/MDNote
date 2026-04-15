@@ -777,11 +777,13 @@ function createWindow() {
   });
 
   // 将渲染进程的控制台输出重定向到主进程终端
+  // Chromium / Electron：level 为 0 verbose、1 info、2 warning、3 error（旧代码把 1 错标成 Error，导致 console.log 像报错）
   win.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    const prefix = level === 1 ? '[Renderer Error]' :
-                   level === 2 ? '[Renderer Warning]' :
-                   level === 3 ? '[Renderer Info]' :
-                   level === 4 ? '[Renderer Debug]' : '[Renderer Log]';
+    const prefix =
+      level === 0 ? '[Renderer Verbose]' :
+      level === 1 ? '[Renderer Info]' :
+      level === 2 ? '[Renderer Warning]' :
+      level === 3 ? '[Renderer Error]' : '[Renderer Log]';
 
     console.log(`${prefix} ${message}`);
     if (line) {

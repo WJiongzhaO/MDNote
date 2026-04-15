@@ -1009,7 +1009,8 @@ const handleCreateFragment = async () => {
     // 在创建片段前，尝试从父组件获取最新的上下文
     // 通过emit事件请求上下文，或者直接从全局状态获取
     let context = {
-      sourceDocumentId: currentDocumentContext.value.documentId,
+      // 外部文档优先使用稳定 filePath，避免 external-xxx 会话重启后失配
+      sourceDocumentId: currentDocumentContext.value.filePath || currentDocumentContext.value.documentId,
       sourceFilePath: currentDocumentContext.value.filePath,
     }
 

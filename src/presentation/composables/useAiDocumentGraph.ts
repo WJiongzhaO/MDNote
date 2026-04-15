@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import type { BuildDocumentKnowledgeGraphOptions } from '../../application/services/ai-document-graph.service';
 import type { AiGraphBuildStatus, AiKnowledgeGraph } from '../../domain/types/ai-knowledge-graph.types';
 
 export interface AiDocumentGraphState {
@@ -9,7 +10,10 @@ export interface AiDocumentGraphState {
 
 export interface AiDocumentGraphService {
   getDocumentGraphState(docId: string): Promise<AiDocumentGraphState>;
-  buildDocumentKnowledgeGraph(docId: string): Promise<AiKnowledgeGraph>;
+  buildDocumentKnowledgeGraph(
+    docId: string,
+    options?: BuildDocumentKnowledgeGraphOptions
+  ): Promise<AiKnowledgeGraph>;
 }
 
 const emptyGraph = { nodes: [], edges: [] } as AiKnowledgeGraph;

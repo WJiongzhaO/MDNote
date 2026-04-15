@@ -79,6 +79,7 @@ import { normalizeAiGraphExtraction } from '../../domain/services/ai-graph-norma
 import { splitMarkdownIntoGraphChunks } from '../../domain/services/ai-graph-chunker.service'
 import { ChatOpenAI } from '@langchain/openai'
 import { LLMGraphTransformer } from '@langchain/community/experimental/graph_transformers/llm'
+import { createChineseLlmGraphPromptTemplate } from '../../infrastructure/ai-graph/ai-graph-llm-chinese-prompt'
 
 type WindowWithElectronAiGraphBridge = Window & {
   electronAPI?: {
@@ -103,7 +104,7 @@ function hasElectronAiGraphBridge(): boolean {
 class InMemoryAiGraphProviderGateway implements AiGraphProviderGateway {
   private config: AiGraphProviderConfig | null = {
     providerName: 'dashscope',
-    apiKey: 'sk-05832c2651bc4447b9a3ba5e3541590e',
+    apiKey: 'sk-4374007fa14a4a748a13812ff60903b7',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     model: 'qwen-plus',
     temperature: 0.1,
@@ -148,8 +149,12 @@ class RealDocumentGraphExtractor {
       model: config.model,
       temperature: config.temperature ?? 0.1
     });
-    const transformer = new LLMGraphTransformer({ llm: model as never });
-    return new LangChainLlmGraphTransformerExtractor(transformer as never);
+    const transformer = new LLMGraphTransformer({
+      llm: model as never,
+      prompt: createChineseLlmGraphPromptTemplate(),
+      fallbackRelationshipType: '关联',
+    })
+    return new LangChainLlmGraphTransformerExtractor(transformer as never)
   }
 
   async extractChunk(
