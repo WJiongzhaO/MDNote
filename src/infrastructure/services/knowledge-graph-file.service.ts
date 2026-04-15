@@ -9,6 +9,7 @@ export interface KnowledgeGraphInfo {
   updatedAt?: string;
   documentId?: string | null;
   documentTitle?: string | null;
+  graphType?: 'heading' | 'ai';
 }
 
 export interface KnowledgeGraphFile {
@@ -18,6 +19,7 @@ export interface KnowledgeGraphFile {
   documentTitle?: string | null;
   createdAt: string;
   updatedAt?: string;
+  graphType?: 'heading' | 'ai';
   graph: KnowledgeGraph;
 }
 
@@ -169,6 +171,7 @@ export class FileSystemKnowledgeGraphService {
     title: string;
     documentId?: string | null;
     documentTitle?: string | null;
+    graphType?: 'heading' | 'ai';
     graph: KnowledgeGraph;
   }): Promise<KnowledgeGraphInfo> {
     const root = await this.ensureGraphsDirExists();
@@ -190,6 +193,7 @@ export class FileSystemKnowledgeGraphService {
       documentTitle: payload.documentTitle ?? null,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
+      graphType: payload.graphType,
       graph: payload.graph
     };
 
@@ -203,7 +207,8 @@ export class FileSystemKnowledgeGraphService {
       createdAt: fileContent.createdAt,
       updatedAt: fileContent.updatedAt,
       documentId: fileContent.documentId,
-      documentTitle: fileContent.documentTitle
+      documentTitle: fileContent.documentTitle,
+      graphType: fileContent.graphType
     };
   }
 
@@ -246,7 +251,8 @@ export class FileSystemKnowledgeGraphService {
           createdAt: parsed.createdAt,
           updatedAt: parsed.updatedAt,
           documentId: parsed.documentId ?? null,
-          documentTitle: parsed.documentTitle ?? null
+          documentTitle: parsed.documentTitle ?? null,
+          graphType: parsed.graphType
         });
       } catch {
         // 单个文件解析失败时忽略，避免影响整体列表
@@ -326,7 +332,8 @@ export class FileSystemKnowledgeGraphService {
       createdAt: file.createdAt,
       updatedAt: file.updatedAt,
       documentId: file.documentId ?? null,
-      documentTitle: file.documentTitle ?? null
+      documentTitle: file.documentTitle ?? null,
+      graphType: file.graphType
     };
   }
 

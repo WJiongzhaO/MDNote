@@ -36,6 +36,10 @@ export const TYPES = {
   KnowledgeHealthService: Symbol.for('KnowledgeHealthService'),
   ExportUseCases: Symbol.for('ExportUseCases'),
   VaultUseCases: Symbol.for('VaultUseCases'),
+  AiGraphRepository: Symbol.for('AiGraphRepository'),
+  AiGraphMetadataRepository: Symbol.for('AiGraphMetadataRepository'),
+  AiGraphSettingsService: Symbol.for('AiGraphSettingsService'),
+  AiDocumentGraphService: Symbol.for('AiDocumentGraphService'),
 
   // 编辑器工具栏相关
   FormatEditorService: Symbol.for('FormatEditorService'),

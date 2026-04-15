@@ -85,6 +85,544 @@ if (!fs.existsSync(dataPath)) {
   fs.mkdirSync(dataPath, { recursive: true });
 }
 
+const AI_GRAPH_SCHEMA_STATEMENTS = [
+  'CREATE NODE TABLE IF NOT EXISTS Document(docId STRING PRIMARY KEY, title STRING, contentHash STRING, updatedAt STRING);',
+  'CREATE NODE TABLE IF NOT EXISTS Entity(entityId STRING PRIMARY KEY, name STRING, normalizedName STRING, type STRING, description STRING, createdAt STRING, updatedAt STRING);',
+  'CREATE REL TABLE IF NOT EXISTS MENTIONS(FROM Document TO Entity, sourceDocId STRING, sourceChunkId STRING, anchorJson STRING);',
+  'CREATE REL TABLE IF NOT EXISTS RELATES(FROM Entity TO Entity, relationId STRING, relationType STRING, description STRING, sourceDocId STRING, sourceChunkId STRING);'
+];
+
+let kuzuModule = null;
+let aiGraphRepoState = null;
+let aiGraphRepoLock = Promise.resolve(null);
+const SHOULD_USE_KUZU_AI_GRAPH = process.env.MDNOTE_USE_KUZU === '1';
+
+function getKuzuModule() {
+  if (!kuzuModule) {
+    kuzuModule = require('kuzu');
+  }
+
+  return kuzuModule;
+}
+
+function getAiGraphDbPath() {
+  return path.normalize(path.join(getDataPath(), '.mdnote-ai-graph', 'graph.kuzu'));
+}
+
+function escapeAiGraphCypherString(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+function readAiGraphRowValue(row, key) {
+  if (row && typeof row === 'object' && key in row) {
+    return row[key];
+  }
+
+  return undefined;
+}
+
+function asAiGraphString(value) {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function parseAiGraphAnchors(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function collectAiGraphRows(resultPromise) {
+  const result = await resultPromise;
+  const rows = [];
+
+  while (result.hasNext()) {
+    rows.push(await result.getNext());
+  }
+
+  return rows;
+}
+
+function assertAiGraphNonEmptyString(value, fieldName) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`[ai-graph] ${fieldName} must be a non-empty string.`);
+  }
+
+  return value;
+}
+
+function assertAiGraphArray(value, fieldName) {
+  if (!Array.isArray(value)) {
+    throw new Error(`[ai-graph] ${fieldName} must be an array.`);
+  }
+
+  return value;
+}
+
+function sanitizeAiGraphContribution(contribution) {
+  if (!contribution || typeof contribution !== 'object') {
+    throw new Error('[ai-graph] contribution must be an object.');
+  }
+
+  const entities = assertAiGraphArray(contribution.entities, 'entities').map((entity, index) => {
+    if (!entity || typeof entity !== 'object') {
+      throw new Error(`[ai-graph] entities[${index}] must be an object.`);
+    }
+
+    return {
+      entityId: assertAiGraphNonEmptyString(entity.entityId, `entities[${index}].entityId`),
+      name: assertAiGraphNonEmptyString(entity.name, `entities[${index}].name`),
+      normalizedName: assertAiGraphNonEmptyString(entity.normalizedName, `entities[${index}].normalizedName`),
+      type: assertAiGraphNonEmptyString(entity.type, `entities[${index}].type`),
+      description: typeof entity.description === 'string' ? entity.description : '',
+      sourceChunkId: assertAiGraphNonEmptyString(entity.sourceChunkId, `entities[${index}].sourceChunkId`),
+      anchors: Array.isArray(entity.anchors) ? entity.anchors : []
+    };
+  });
+
+  const relations = assertAiGraphArray(contribution.relations, 'relations').map((relation, index) => {
+    if (!relation || typeof relation !== 'object') {
+      throw new Error(`[ai-graph] relations[${index}] must be an object.`);
+    }
+
+    return {
+      relationId: assertAiGraphNonEmptyString(relation.relationId, `relations[${index}].relationId`),
+      sourceEntityId: assertAiGraphNonEmptyString(relation.sourceEntityId, `relations[${index}].sourceEntityId`),
+      targetEntityId: assertAiGraphNonEmptyString(relation.targetEntityId, `relations[${index}].targetEntityId`),
+      type: assertAiGraphNonEmptyString(relation.type, `relations[${index}].type`),
+      description: typeof relation.description === 'string' ? relation.description : '',
+      sourceChunkId: assertAiGraphNonEmptyString(relation.sourceChunkId, `relations[${index}].sourceChunkId`)
+    };
+  });
+
+  return {
+    docId: assertAiGraphNonEmptyString(contribution.docId, 'docId'),
+    title: typeof contribution.title === 'string' ? contribution.title : '',
+    contentHash: typeof contribution.contentHash === 'string' ? contribution.contentHash : '',
+    entities,
+    relations
+  };
+}
+
+function sanitizeAiGraphQuery(query) {
+  const input = query && typeof query === 'object' ? query : {};
+  const parsedLimit = Number(input.limit);
+  const parsedMaxHops = Number(input.maxHops);
+
+  return {
+    seedDocId: typeof input.seedDocId === 'string' && input.seedDocId.trim().length > 0 ? input.seedDocId : undefined,
+    seedNodeId: typeof input.seedNodeId === 'string' && input.seedNodeId.trim().length > 0 ? input.seedNodeId : undefined,
+    keyword: typeof input.keyword === 'string' && input.keyword.trim().length > 0 ? input.keyword : undefined,
+    maxHops: Number.isFinite(parsedMaxHops) ? Math.max(1, Math.trunc(parsedMaxHops)) : 1,
+    limit: Number.isFinite(parsedLimit) ? Math.max(1, Math.trunc(parsedLimit)) : 100
+  };
+}
+
+function createInMemoryAiGraphRepository() {
+  const documents = new Map();
+  const mentionsByDoc = new Map();
+  const relationsByDoc = new Map();
+  const entityCatalog = new Map();
+
+  return {
+    async close() {
+      // no-op
+    },
+    async replaceDocumentContribution(contribution) {
+      const now = new Date().toISOString();
+      documents.set(contribution.docId, {
+        docId: contribution.docId,
+        title: contribution.title || '',
+        contentHash: contribution.contentHash || '',
+        updatedAt: now
+      });
+
+      mentionsByDoc.set(
+        contribution.docId,
+        contribution.entities.map(entity => {
+          const nextEntity = {
+            entityId: entity.entityId,
+            name: entity.name,
+            normalizedName: entity.normalizedName,
+            type: entity.type,
+            description: entity.description || '',
+            updatedAt: now
+          };
+          const previous = entityCatalog.get(entity.entityId);
+          entityCatalog.set(entity.entityId, {
+            ...previous,
+            ...nextEntity,
+            createdAt: previous?.createdAt || now
+          });
+
+          return {
+            entityId: entity.entityId,
+            sourceChunkId: entity.sourceChunkId,
+            anchors: Array.isArray(entity.anchors) ? entity.anchors : []
+          };
+        })
+      );
+
+      relationsByDoc.set(
+        contribution.docId,
+        contribution.relations.map(relation => ({
+          relationId: relation.relationId,
+          sourceEntityId: relation.sourceEntityId,
+          targetEntityId: relation.targetEntityId,
+          type: relation.type,
+          description: relation.description || '',
+          sourceChunkId: relation.sourceChunkId
+        }))
+      );
+    },
+    async getDocumentGraph(docId) {
+      if (!documents.has(docId)) {
+        return null;
+      }
+
+      const mentions = mentionsByDoc.get(docId) || [];
+      const relations = relationsByDoc.get(docId) || [];
+      const nodes = mentions.map(mention => {
+        const entity = entityCatalog.get(mention.entityId) || {
+          name: mention.entityId,
+          type: 'Entity',
+          description: ''
+        };
+        const anchors = mention.anchors || [];
+        return {
+          id: mention.entityId,
+          label: entity.name || mention.entityId,
+          entityType: entity.type || 'Entity',
+          description: entity.description || '',
+          primaryAnchor: anchors[0],
+          evidenceCount: anchors.length,
+          evidencePreview: anchors.slice(0, 3)
+        };
+      });
+
+      return {
+        nodes,
+        edges: relations.map(relation => ({
+          id: relation.relationId,
+          source: relation.sourceEntityId,
+          target: relation.targetEntityId,
+          relationType: relation.type || 'RELATED_TO',
+          description: relation.description || ''
+        }))
+      };
+    },
+    async getGlobalGraph(query) {
+      const allMentions = Array.from(mentionsByDoc.values()).flat();
+      const allRelations = Array.from(relationsByDoc.values()).flat();
+      const seededByDoc = query.seedDocId ? new Set((mentionsByDoc.get(query.seedDocId) || []).map(item => item.entityId)) : null;
+
+      let nodeCandidates = allMentions
+        .map(mention => mention.entityId)
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .map(entityId => {
+          const entity = entityCatalog.get(entityId) || {
+            name: entityId,
+            type: 'Entity',
+            description: ''
+          };
+          return {
+            id: entityId,
+            label: entity.name || entityId,
+            entityType: entity.type || 'Entity',
+            description: entity.description || '',
+            evidenceCount: 0,
+            evidencePreview: []
+          };
+        });
+
+      if (seededByDoc) {
+        nodeCandidates = nodeCandidates.filter(node => seededByDoc.has(node.id));
+      }
+
+      if (query.seedNodeId) {
+        nodeCandidates = nodeCandidates.filter(node => node.id === query.seedNodeId);
+      }
+
+      if (query.keyword) {
+        const keyword = query.keyword.toLowerCase();
+        nodeCandidates = nodeCandidates.filter(node =>
+          node.label.toLowerCase().includes(keyword)
+          || (node.description || '').toLowerCase().includes(keyword)
+        );
+      }
+
+      const nodes = nodeCandidates.slice(0, Math.max(1, query.limit));
+      const nodeSet = new Set(nodes.map(node => node.id));
+      const edges = allRelations
+        .map(relation => ({
+          id: relation.relationId,
+          source: relation.sourceEntityId,
+          target: relation.targetEntityId,
+          relationType: relation.type || 'RELATED_TO',
+          description: relation.description || ''
+        }))
+        .filter(edge => nodeSet.has(edge.source) && nodeSet.has(edge.target))
+        .slice(0, Math.max(1, query.limit));
+
+      return { nodes, edges };
+    },
+    async getNodeEvidence(nodeId) {
+      const entity = entityCatalog.get(nodeId);
+      if (!entity) {
+        return null;
+      }
+
+      const anchors = [];
+      for (const mentions of mentionsByDoc.values()) {
+        for (const mention of mentions) {
+          if (mention.entityId === nodeId && Array.isArray(mention.anchors)) {
+            anchors.push(...mention.anchors);
+          }
+        }
+      }
+
+      return {
+        nodeId,
+        label: entity.name || nodeId,
+        anchors
+      };
+    }
+  };
+}
+
+function createAiGraphRepository(dbPath) {
+  if (!SHOULD_USE_KUZU_AI_GRAPH) {
+    console.warn('[Main Process] AI graph is running with in-memory repository. Set MDNOTE_USE_KUZU=1 to enable kuzu backend.');
+    return createInMemoryAiGraphRepository();
+  }
+
+  const kuzu = getKuzuModule();
+  const db = new kuzu.Database(dbPath);
+  const connection = new kuzu.Connection(db);
+  const ready = (async () => {
+    for (const statement of AI_GRAPH_SCHEMA_STATEMENTS) {
+      await connection.query(statement);
+    }
+  })();
+
+  return {
+    dbPath,
+    async close() {
+      try {
+        await connection.close();
+      } catch (error) {
+        console.warn('[Main Process] Failed to close AI graph connection:', error);
+      }
+
+      try {
+        await db.close();
+      } catch (error) {
+        console.warn('[Main Process] Failed to close AI graph database:', error);
+      }
+    },
+    async replaceDocumentContribution(contribution) {
+      await ready;
+      const now = new Date().toISOString();
+      const escapedDocId = escapeAiGraphCypherString(contribution.docId);
+      const escapedTitle = escapeAiGraphCypherString(contribution.title);
+      const escapedContentHash = escapeAiGraphCypherString(contribution.contentHash);
+
+      await connection.query(`MATCH (d:Document)-[m:MENTIONS]->() WHERE m.sourceDocId = '${escapedDocId}' DELETE m;`);
+      await connection.query(`MATCH ()-[r:RELATES]->() WHERE r.sourceDocId = '${escapedDocId}' DELETE r;`);
+      await connection.query(`MERGE (d:Document {docId: '${escapedDocId}'}) SET d.title = '${escapedTitle}', d.contentHash = '${escapedContentHash}', d.updatedAt = '${now}';`);
+
+      for (const entity of contribution.entities) {
+        const escapedEntityId = escapeAiGraphCypherString(entity.entityId);
+        const escapedName = escapeAiGraphCypherString(entity.name);
+        const escapedNormalizedName = escapeAiGraphCypherString(entity.normalizedName);
+        const escapedType = escapeAiGraphCypherString(entity.type);
+        const escapedDescription = escapeAiGraphCypherString(entity.description || '');
+        const escapedSourceChunkId = escapeAiGraphCypherString(entity.sourceChunkId);
+        const anchorJson = escapeAiGraphCypherString(JSON.stringify(entity.anchors));
+
+        await connection.query(
+          `MERGE (e:Entity {entityId: '${escapedEntityId}'}) SET e.name = '${escapedName}', e.normalizedName = '${escapedNormalizedName}', e.type = '${escapedType}', e.description = '${escapedDescription}', e.updatedAt = '${now}', e.createdAt = COALESCE(e.createdAt, '${now}');`
+        );
+        await connection.query(
+          `MATCH (d:Document {docId: '${escapedDocId}'}), (e:Entity {entityId: '${escapedEntityId}'}) CREATE (d)-[:MENTIONS {sourceDocId: '${escapedDocId}', sourceChunkId: '${escapedSourceChunkId}', anchorJson: '${anchorJson}'}]->(e);`
+        );
+      }
+
+      for (const relation of contribution.relations) {
+        const escapedSourceEntityId = escapeAiGraphCypherString(relation.sourceEntityId);
+        const escapedTargetEntityId = escapeAiGraphCypherString(relation.targetEntityId);
+        const escapedRelationId = escapeAiGraphCypherString(relation.relationId);
+        const escapedRelationType = escapeAiGraphCypherString(relation.type);
+        const escapedDescription = escapeAiGraphCypherString(relation.description || '');
+        const escapedSourceChunkId = escapeAiGraphCypherString(relation.sourceChunkId);
+
+        await connection.query(
+          `MATCH (source:Entity {entityId: '${escapedSourceEntityId}'}), (target:Entity {entityId: '${escapedTargetEntityId}'}) CREATE (source)-[:RELATES {relationId: '${escapedRelationId}', relationType: '${escapedRelationType}', description: '${escapedDescription}', sourceDocId: '${escapedDocId}', sourceChunkId: '${escapedSourceChunkId}'}]->(target);`
+        );
+      }
+    },
+    async getDocumentGraph(docId) {
+      await ready;
+      const escapedDocId = escapeAiGraphCypherString(docId);
+      const nodeRows = await collectAiGraphRows(
+        connection.query(
+          `MATCH (d:Document {docId: '${escapedDocId}'})-[m:MENTIONS]->(e:Entity) RETURN e.entityId AS id, e.name AS label, e.type AS entityType, e.description AS description, m.anchorJson AS anchorJson;`
+        )
+      );
+
+      const edgeRows = await collectAiGraphRows(
+        connection.query(
+          `MATCH (source:Entity)-[r:RELATES {sourceDocId: '${escapedDocId}'}]->(target:Entity) RETURN r.relationId AS id, source.entityId AS source, target.entityId AS target, r.relationType AS relationType, r.description AS description;`
+        )
+      );
+
+      const nodes = nodeRows.map(row => {
+        const anchors = parseAiGraphAnchors(readAiGraphRowValue(row, 'anchorJson'));
+        return {
+          id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
+          label: asAiGraphString(readAiGraphRowValue(row, 'label')) || '',
+          entityType: asAiGraphString(readAiGraphRowValue(row, 'entityType')) || 'Entity',
+          description: asAiGraphString(readAiGraphRowValue(row, 'description')),
+          primaryAnchor: anchors[0],
+          evidenceCount: anchors.length,
+          evidencePreview: anchors.slice(0, 3)
+        };
+      });
+
+      const edges = edgeRows.map(row => ({
+        id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
+        source: asAiGraphString(readAiGraphRowValue(row, 'source')) || '',
+        target: asAiGraphString(readAiGraphRowValue(row, 'target')) || '',
+        relationType: asAiGraphString(readAiGraphRowValue(row, 'relationType')) || 'RELATED_TO',
+        description: asAiGraphString(readAiGraphRowValue(row, 'description'))
+      }));
+
+      const hasDocument = await collectAiGraphRows(
+        connection.query(`MATCH (d:Document {docId: '${escapedDocId}'}) RETURN d.docId AS docId LIMIT 1;`)
+      );
+
+      if (hasDocument.length === 0) {
+        return null;
+      }
+
+      return { nodes, edges };
+    },
+    async getGlobalGraph(query) {
+      await ready;
+      const limit = Math.max(1, query.limit);
+      const nodeRows = await collectAiGraphRows(
+        connection.query(`MATCH (e:Entity) RETURN e.entityId AS id, e.name AS label, e.type AS entityType, e.description AS description LIMIT ${limit};`)
+      );
+
+      const selectedNodeIds = nodeRows.map(row => asAiGraphString(readAiGraphRowValue(row, 'id')) || '');
+      const nodeSet = new Set(selectedNodeIds);
+      const edgeRows = await collectAiGraphRows(
+        connection.query(`MATCH (source:Entity)-[r:RELATES]->(target:Entity) RETURN r.relationId AS id, source.entityId AS source, target.entityId AS target, r.relationType AS relationType, r.description AS description LIMIT ${limit};`)
+      );
+
+      return {
+        nodes: nodeRows.map(row => ({
+          id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
+          label: asAiGraphString(readAiGraphRowValue(row, 'label')) || '',
+          entityType: asAiGraphString(readAiGraphRowValue(row, 'entityType')) || 'Entity',
+          description: asAiGraphString(readAiGraphRowValue(row, 'description')),
+          evidenceCount: 0,
+          evidencePreview: []
+        })),
+        edges: edgeRows
+          .map(row => ({
+            id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
+            source: asAiGraphString(readAiGraphRowValue(row, 'source')) || '',
+            target: asAiGraphString(readAiGraphRowValue(row, 'target')) || '',
+            relationType: asAiGraphString(readAiGraphRowValue(row, 'relationType')) || 'RELATED_TO',
+            description: asAiGraphString(readAiGraphRowValue(row, 'description'))
+          }))
+          .filter(edge => nodeSet.has(edge.source) && nodeSet.has(edge.target))
+      };
+    },
+    async getNodeEvidence(nodeId) {
+      await ready;
+      const escapedNodeId = escapeAiGraphCypherString(nodeId);
+      const rows = await collectAiGraphRows(
+        connection.query(
+          `MATCH (:Document)-[m:MENTIONS]->(e:Entity {entityId: '${escapedNodeId}'}) RETURN e.entityId AS nodeId, e.name AS label, m.anchorJson AS anchorJson;`
+        )
+      );
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      const anchors = rows.flatMap(row => parseAiGraphAnchors(readAiGraphRowValue(row, 'anchorJson')));
+      return {
+        nodeId: asAiGraphString(readAiGraphRowValue(rows[0], 'nodeId')) || nodeId,
+        label: asAiGraphString(readAiGraphRowValue(rows[0], 'label')) || nodeId,
+        anchors
+      };
+    }
+  };
+}
+
+function queueAiGraphRepositoryWork(work) {
+  const queued = aiGraphRepoLock.catch(() => null).then(work);
+  aiGraphRepoLock = queued.then(() => null, () => null);
+  return queued;
+}
+
+async function closeAiGraphRepositoryState(state) {
+  if (!state || !state.repository || typeof state.repository.close !== 'function') {
+    return;
+  }
+
+  await state.repository.close();
+}
+
+async function getAiGraphRepository() {
+  const dbPath = getAiGraphDbPath();
+  if (aiGraphRepoState && aiGraphRepoState.dbPath === dbPath) {
+    return aiGraphRepoState.repository;
+  }
+
+  const state = await queueAiGraphRepositoryWork(async () => {
+    if (aiGraphRepoState && aiGraphRepoState.dbPath === dbPath) {
+      return aiGraphRepoState;
+    }
+
+    const previousState = aiGraphRepoState;
+    aiGraphRepoState = null;
+    if (previousState) {
+      await closeAiGraphRepositoryState(previousState);
+    }
+
+    await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
+    const nextState = {
+      dbPath,
+      repository: createAiGraphRepository(dbPath)
+    };
+    aiGraphRepoState = nextState;
+    return nextState;
+  });
+
+  return state.repository;
+}
+
+async function disposeAiGraphRepository() {
+  await queueAiGraphRepositoryWork(async () => {
+    const previousState = aiGraphRepoState;
+    aiGraphRepoState = null;
+    if (previousState) {
+      await closeAiGraphRepositoryState(previousState);
+    }
+    return null;
+  });
+}
+
 // 创建原生菜单
 function createMenu() {
   const template = [
@@ -232,18 +770,20 @@ function createWindow() {
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
           "style-src 'self' 'unsafe-inline'; " +
           "font-src 'self' data:; " +
-          "connect-src 'self' app: file:;"
+          "connect-src 'self' app: file: http://localhost:5173 ws://localhost:5173 https: wss:;"
         ]
       }
     });
   });
 
   // 将渲染进程的控制台输出重定向到主进程终端
+  // Chromium / Electron：level 为 0 verbose、1 info、2 warning、3 error（旧代码把 1 错标成 Error，导致 console.log 像报错）
   win.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    const prefix = level === 1 ? '[Renderer Error]' :
-                   level === 2 ? '[Renderer Warning]' :
-                   level === 3 ? '[Renderer Info]' :
-                   level === 4 ? '[Renderer Debug]' : '[Renderer Log]';
+    const prefix =
+      level === 0 ? '[Renderer Verbose]' :
+      level === 1 ? '[Renderer Info]' :
+      level === 2 ? '[Renderer Warning]' :
+      level === 3 ? '[Renderer Error]' : '[Renderer Log]';
 
     console.log(`${prefix} ${message}`);
     if (line) {
@@ -699,6 +1239,8 @@ ipcMain.handle('file:set-custom-data-path', async (_event, customPath) => {
       fs.mkdirSync(dataPath, { recursive: true });
     }
 
+    await disposeAiGraphRepository();
+
     console.log('[Main Process] Custom data path set successfully:', customPath);
     return { success: true, path: customPath };
   } catch (error) {
@@ -721,6 +1263,8 @@ ipcMain.handle('file:reset-data-path', async () => {
     if (!fs.existsSync(dataPath)) {
       fs.mkdirSync(dataPath, { recursive: true });
     }
+
+    await disposeAiGraphRepository();
 
     return { success: true, path: dataPath };
   } catch (error) {
@@ -811,6 +1355,48 @@ ipcMain.handle('file:normalize-path', async (_event, p) => {
   return path.normalize(p);
 });
 
+// ==================== AI 图谱 IPC 处理器 ====================
+ipcMain.handle('ai-graph:replace-document-contribution', async (_event, contribution) => {
+  try {
+    const repo = await getAiGraphRepository();
+    await repo.replaceDocumentContribution(sanitizeAiGraphContribution(contribution));
+    return true;
+  } catch (error) {
+    console.error('[Main Process] Error replacing AI graph document contribution:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('ai-graph:get-document-graph', async (_event, docId) => {
+  try {
+    const repo = await getAiGraphRepository();
+    return await repo.getDocumentGraph(assertAiGraphNonEmptyString(docId, 'docId'));
+  } catch (error) {
+    console.error('[Main Process] Error loading AI graph document graph:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('ai-graph:get-global-graph', async (_event, query) => {
+  try {
+    const repo = await getAiGraphRepository();
+    return await repo.getGlobalGraph(sanitizeAiGraphQuery(query));
+  } catch (error) {
+    console.error('[Main Process] Error loading AI graph global graph:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('ai-graph:get-node-evidence', async (_event, nodeId) => {
+  try {
+    const repo = await getAiGraphRepository();
+    return await repo.getNodeEvidence(assertAiGraphNonEmptyString(nodeId, 'nodeId'));
+  } catch (error) {
+    console.error('[Main Process] Error loading AI graph node evidence:', error);
+    throw error;
+  }
+});
+
 // 读取目录内容
 ipcMain.handle('file:read-directory', async (event, dirPath) => {
   try {
@@ -821,7 +1407,7 @@ ipcMain.handle('file:read-directory', async (event, dirPath) => {
     const items = fs.readdirSync(rootDir, { withFileTypes: true });
     const result = [];
 
-    const systemDirs = ['.vault', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+    const systemDirs = ['.vault', '.mdnote-ai-graph', 'fragments', 'variables', 'templates', 'exports', 'archive'];
     const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
 
     for (const item of items) {

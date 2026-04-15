@@ -145,6 +145,20 @@ export class DocumentUseCases {
   }
 
   async renderMarkdown(content: string, documentId?: string, variables?: Record<string, any>, fileCache?: any): Promise<string> {
+    let renderVariables = variables;
+    let referenceCache = fileCache;
+
+    // 向后兼容旧调用方式：第三个参数直接传 fileCache
+    if (
+      referenceCache === undefined &&
+      renderVariables &&
+      typeof renderVariables === 'object' &&
+      Array.isArray((renderVariables as any).references)
+    ) {
+      referenceCache = renderVariables;
+      renderVariables = undefined;
+    }
+
     // 如果有documentId，先解析引用标志并替换为片段内容
     let processedContent = content;
     if (documentId && !documentId.startsWith('fragment:')) {
@@ -161,7 +175,11 @@ export class DocumentUseCases {
             : documentId;
 
           // 如果提供了文件缓存，使用缓存以提高性能
-          processedContent = await this.referenceResolver.resolveReferences(content, actualDocId, fileCache);
+          processedContent = await this.referenceResolver.resolveReferences(
+            content,
+            actualDocId,
+            referenceCache,
+          );
         } catch (error) {
           console.error('Error resolving fragment references:', error);
           // 出错时使用原始内容
@@ -170,7 +188,7 @@ export class DocumentUseCases {
     }
 
     // 转换为HTML（传递变量）
-    let html = await this.markdownProcessor.processMarkdown(processedContent, variables || {});
+    let html = await this.markdownProcessor.processMarkdown(processedContent, renderVariables || {});
 
     // 如果有documentId，处理图片路径（转换为app://协议）
     if (documentId) {

@@ -1,6 +1,7 @@
 import { TYPES } from '../container/container.types'
 import type { ServiceContainer } from '../container/service-container.interface'
 import type { DocumentRepository } from '../../domain/repositories/document.repository.interface'
+import type { DocumentReader } from '../../domain/repositories/document.repository.interface'
 import type { FolderRepository } from '../../domain/repositories/folder.repository.interface'
 import type { VaultRepository } from '../../domain/repositories/vault.repository.interface'
 import { MarkdownProcessor } from '../../domain/services/markdown-processor.domain.service'
@@ -61,9 +62,170 @@ import { TextFileOpenerStrategy } from '../../domain/services/text-file-opener.s
 import { JsonFileOpenerStrategy } from '../../domain/services/json-file-opener.strategy'
 import { ImageFileOpenerStrategy } from '../../domain/services/image-file-opener.strategy'
 import { FileOpenerManager } from '../../domain/services/file-opener-manager.service'
+import { InMemoryAiGraphRepository } from '../../infrastructure/ai-graph/in-memory-ai-graph.repository'
+import { IpcAiGraphRepository } from '../../infrastructure/ai-graph/ipc-ai-graph.repository'
+import { LocalStorageAiGraphMetadataRepository } from '../../infrastructure/ai-graph/local-storage-ai-graph-metadata.repository'
+import { AiGraphSettingsService } from '../../application/services/ai-graph-settings.service'
+import { AiDocumentGraphService } from '../../application/services/ai-document-graph.service'
+import { LangChainLlmGraphTransformerExtractor } from '../../infrastructure/ai-graph/langchain-llm-graph-transformer-extractor'
+import type { AiGraphRepository } from '../../domain/repositories/ai-graph.repository.interface'
+import type { AiGraphMetadataRepository } from '../../domain/repositories/ai-graph-metadata.repository.interface'
+import type {
+  AiGraphProviderConnectionResult,
+  AiGraphProviderGateway,
+} from '../../domain/services/ai-graph-provider.service'
+import type { AiGraphEntity, AiGraphProviderConfig, AiGraphRelation, AiKnowledgeGraph } from '../../domain/types/ai-knowledge-graph.types'
+import { normalizeAiGraphExtraction } from '../../domain/services/ai-graph-normalizer.service'
+import { splitMarkdownIntoGraphChunks } from '../../domain/services/ai-graph-chunker.service'
+import { ChatOpenAI } from '@langchain/openai'
+import { LLMGraphTransformer } from '@langchain/community/experimental/graph_transformers/llm'
+import { createChineseLlmGraphPromptTemplate } from '../../infrastructure/ai-graph/ai-graph-llm-chinese-prompt'
+
+type WindowWithElectronAiGraphBridge = Window & {
+  electronAPI?: {
+    aiGraph?: Partial<Pick<AiGraphRepository, 'replaceDocumentContribution' | 'getDocumentGraph' | 'getGlobalGraph' | 'getNodeEvidence'>>
+  }
+}
+
+function hasElectronAiGraphBridge(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const aiGraph = (window as WindowWithElectronAiGraphBridge).electronAPI?.aiGraph
+
+  return !!aiGraph
+    && typeof aiGraph.replaceDocumentContribution === 'function'
+    && typeof aiGraph.getDocumentGraph === 'function'
+    && typeof aiGraph.getGlobalGraph === 'function'
+    && typeof aiGraph.getNodeEvidence === 'function'
+}
+
+class InMemoryAiGraphProviderGateway implements AiGraphProviderGateway {
+  private config: AiGraphProviderConfig | null = {
+    providerName: 'dashscope',
+    apiKey: 'sk-4374007fa14a4a748a13812ff60903b7',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-plus',
+    temperature: 0.1,
+    maxTokens: 2048,
+  }
+
+  async load(): Promise<Partial<AiGraphProviderConfig> | null> {
+    return this.config
+  }
+
+  async save(config: AiGraphProviderConfig): Promise<void> {
+    this.config = config
+  }
+
+  async testConnection(): Promise<AiGraphProviderConnectionResult> {
+    return { success: true }
+  }
+}
+
+class MockDocumentGraphExtractor {
+  async buildForDocument(
+    docId: string,
+    config: AiGraphProviderConfig,
+  ): Promise<{ title: string; entities: AiGraphEntity[]; relations: AiGraphRelation[]; graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
+    return {
+      title: docId,
+      entities: [],
+      relations: [],
+      graph: { nodes: [], edges: [] },
+      contentHash: `mock-${docId}`,
+      provider: config.providerName,
+      model: config.model,
+    }
+  }
+}
+
+class RealDocumentGraphExtractor {
+  private createExtractor(config: AiGraphProviderConfig): LangChainLlmGraphTransformerExtractor {
+    const model = new ChatOpenAI({
+      apiKey: config.apiKey,
+      configuration: { baseURL: config.baseUrl },
+      model: config.model,
+      temperature: config.temperature ?? 0.1
+    });
+    const transformer = new LLMGraphTransformer({
+      llm: model as never,
+      prompt: createChineseLlmGraphPromptTemplate(),
+      fallbackRelationshipType: '关联',
+    })
+    return new LangChainLlmGraphTransformerExtractor(transformer as never)
+  }
+
+  async extractChunk(
+    chunk: {
+      chunkId: string;
+      docId: string;
+      markdown: string;
+      headingPath: string[];
+      startOffset: number;
+      endOffset: number;
+    },
+    config: AiGraphProviderConfig,
+  ): Promise<{ entities: { name: string; type: string; description?: string; metadata?: Record<string, unknown> }[]; relations: { source: string; target: string; type: string; name?: string; description?: string; metadata?: Record<string, unknown> }[] }> {
+    const extractor = this.createExtractor(config);
+    return extractor.extractChunk(chunk, config);
+  }
+
+  async buildForDocument(
+    docId: string,
+    config: AiGraphProviderConfig,
+  ): Promise<{ title: string; entities: AiGraphEntity[]; relations: AiGraphRelation[]; graph: AiKnowledgeGraph; contentHash: string; provider: string; model: string }> {
+    const extractor = this.createExtractor(config);
+    const markdown = `# ${docId}\n${docId}`;
+    const extracted = await extractor.extractChunk({
+      chunkId: `${docId}:chunk:0`,
+      docId,
+      markdown,
+      headingPath: [docId],
+      startOffset: 0,
+      endOffset: markdown.length
+    }, config);
+    const normalized = normalizeAiGraphExtraction({
+      docId,
+      chunkId: `${docId}:chunk:0`,
+      entities: extracted.entities,
+      relations: extracted.relations
+    });
+    return {
+      title: docId,
+      entities: normalized.entities,
+      relations: normalized.relations,
+      graph: {
+        nodes: normalized.entities.map(entity => ({
+          id: entity.entityId,
+          label: entity.name,
+          entityType: entity.type,
+          description: entity.description,
+          primaryAnchor: entity.anchors[0],
+          evidenceCount: entity.anchors.length,
+          evidencePreview: entity.anchors.slice(0, 3)
+        })),
+        edges: normalized.relations.map(relation => ({
+          id: relation.relationId,
+          source: relation.sourceEntityId,
+          target: relation.targetEntityId,
+          relationType: relation.type,
+          description: relation.description
+        }))
+      },
+      contentHash: `real-${docId}`,
+      provider: config.providerName,
+      model: config.model
+    }
+  }
+}
 
 export class ApplicationModule {
   static configure(container: ServiceContainer): void {
+    const aiGraphProviderGateway = new InMemoryAiGraphProviderGateway()
+    const documentGraphExtractor = new RealDocumentGraphExtractor()
+
     container
       .bind<DocumentRepository>(TYPES.DocumentRepository)
       .toConstantValue(StorageAdapter.createDocumentRepository())
@@ -152,6 +314,34 @@ export class ApplicationModule {
       .toSingleton(FileSystemVaultRegistryRepository)
 
     container.bind<VaultUseCases>(TYPES.VaultUseCases).toSingleton(VaultUseCases)
+
+    container.bind<AiGraphRepository>(TYPES.AiGraphRepository).toDynamicValue(() =>
+      hasElectronAiGraphBridge()
+        ? new IpcAiGraphRepository()
+        : new InMemoryAiGraphRepository()
+    )
+
+    container
+      .bind<AiGraphMetadataRepository>(TYPES.AiGraphMetadataRepository)
+      .toSingleton(LocalStorageAiGraphMetadataRepository)
+
+    container
+      .bind<AiGraphSettingsService>(TYPES.AiGraphSettingsService)
+      .toDynamicValue(() => new AiGraphSettingsService(aiGraphProviderGateway))
+
+    container
+      .bind<AiDocumentGraphService>(TYPES.AiDocumentGraphService)
+      .toDynamicValue(ctx => new AiDocumentGraphService({
+        metadataRepo: ctx.get(TYPES.AiGraphMetadataRepository) as AiGraphMetadataRepository,
+        graphRepo: ctx.get(TYPES.AiGraphRepository) as AiGraphRepository,
+        settingsGateway: aiGraphProviderGateway,
+        extractor: documentGraphExtractor,
+        documentRepo: ctx.get(TYPES.DocumentRepository) as DocumentReader,
+        chunker: {
+          splitMarkdown: (markdown: string, docId: string) =>
+            splitMarkdownIntoGraphChunks(markdown, docId),
+        },
+      }))
 
     container
       .bind<FragmentReferenceParser>(TYPES.FragmentReferenceParser)

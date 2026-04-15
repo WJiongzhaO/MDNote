@@ -1,4 +1,15 @@
 import { Application } from '../../core/application';
+import type { KgNodeOccurrence } from '../../domain/services/knowledge-graph-extractor';
+
+type AiAnchorLike = {
+  anchorId?: string;
+  docId?: string;
+  chunkId?: string;
+  blockId?: string;
+  startOffset?: number;
+  endOffset?: number;
+  anchorType?: 'range' | 'block';
+};
 
 /**
  * 读取文档全文，供知识图谱「按片段跳转」在文中查找 {{ref:...}}。
@@ -23,4 +34,35 @@ export async function readDocumentTextForKnowledgeJump(documentId: string): Prom
   } catch {
     return null;
   }
+}
+
+export async function readDocumentTextForAiAnchorJump(documentId: string): Promise<string | null> {
+  return readDocumentTextForKnowledgeJump(documentId);
+}
+
+export function getAiAnchorOccurrence(anchor?: AiAnchorLike): KgNodeOccurrence | null {
+  if (
+    !anchor?.docId ||
+    !Number.isFinite(anchor.startOffset) ||
+    !Number.isFinite(anchor.endOffset)
+  ) {
+    return null;
+  }
+
+  return {
+    documentId: anchor.docId,
+    start: Number(anchor.startOffset),
+    end: Number(anchor.endOffset)
+  };
+}
+
+export function resolveAiGraphJumpTarget(anchors: AiAnchorLike[]): AiAnchorLike | null {
+  const rangeAnchor = anchors.find(
+    anchor => anchor.anchorType === 'range' && typeof anchor.startOffset === 'number'
+  );
+  if (rangeAnchor) {
+    return rangeAnchor;
+  }
+
+  return anchors.find(anchor => anchor.anchorType === 'block') ?? null;
 }

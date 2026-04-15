@@ -22,6 +22,8 @@ export function useKnowledgeFragments(vaultId: MaybeRef<string> = 'default') {
   const application = Application.getInstance()
   const initFragmentUseCases = async (vid: string) => {
     try {
+      // 与 ApplicationService.initialize 一致：不要对 vaultId 做 trim/改写，否则
+      // `.mdnote-fragments-${vaultId}` 会与历史目录不一致，表现为「库空了/错库」
       await application.getApplicationService().initialize(vid)
       fragmentUseCases.value = application.getKnowledgeFragmentUseCases()
     } catch (err) {
@@ -34,7 +36,6 @@ export function useKnowledgeFragments(vaultId: MaybeRef<string> = 'default') {
     () => unref(vaultId),
     async (newVaultId, oldVaultId) => {
       if (newVaultId === oldVaultId) return
-      console.log(`[useKnowledgeFragments] vaultId changed from ${oldVaultId} to ${newVaultId}`)
       currentVaultId.value = newVaultId
       await initFragmentUseCases(newVaultId)
       await loadFragments()

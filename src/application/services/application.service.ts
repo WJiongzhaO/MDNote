@@ -13,6 +13,9 @@ import { KnowledgeFragmentUseCases } from '../usecases/knowledge-fragment.usecas
 import type { FragmentCategoryUseCases } from '../usecases/fragment-category.usecases'
 import { KnowledgeHealthService } from './knowledge-health.service'
 import type { RecommendationService } from './recommendation.service'
+import { AiDocumentGraphService } from './ai-document-graph.service'
+import { AiGlobalGraphService } from './ai-global-graph.service'
+import { AiGraphSettingsService } from './ai-graph-settings.service'
 
 @injectable()
 export class ApplicationService {
@@ -148,6 +151,19 @@ export class ApplicationService {
   getRecommendationService(): RecommendationService {
     return InversifyContainer.getInstance().get<RecommendationService>(TYPES.RecommendationService)
   }
+
+  getAiDocumentGraphService(): AiDocumentGraphService {
+    return InversifyContainer.getInstance().get<AiDocumentGraphService>(TYPES.AiDocumentGraphService)
+  }
+
+  getAiGlobalGraphService(): AiGlobalGraphService {
+    return InversifyContainer.getInstance().get<AiGlobalGraphService>(TYPES.AiGlobalGraphService as never)
+  }
+
+  getAiGraphSettingsService(): AiGraphSettingsService {
+    return InversifyContainer.getInstance().get<AiGraphSettingsService>(TYPES.AiGraphSettingsService)
+  }
+
   getLegacyMarkdownProcessor(): MarkdownProcessor {
     return this.markdownProcessor
   }

@@ -85,9 +85,11 @@
           </div>
         </div>
         <KnowledgeGraphView
+          ref="kgMainGraphViewRef"
           :key="knowledgeGraphViewKey"
           class="kg-main-graph-view"
           :graph="activeKnowledgeGraph"
+          :current-vault-id="vaultId"
           :graph-load-key="knowledgeGraphViewKey"
           :layout-randomize-key="kgSidebarLayoutRandomizeKey"
           :render-markdown="renderMarkdown"
@@ -109,6 +111,7 @@
         <MarkdownEditor
           v-else
           :document="currentDocument"
+          :vault-id="vaultId"
           :render-markdown="renderMarkdown"
           @update-document="handleUpdateDocument"
           ref="markdownEditorRef"
@@ -266,7 +269,7 @@ const knowledgeGraphViewKey = computed(
 )
 
 let kgAutoSaveTimer: ReturnType<typeof setTimeout> | null = null
-const KG_AUTO_SAVE_DEBOUNCE_MS = 900
+const KG_AUTO_SAVE_DEBOUNCE_MS = 400
 
 function clearKgAutoSaveTimer() {
   if (kgAutoSaveTimer != null) {
@@ -275,9 +278,34 @@ function clearKgAutoSaveTimer() {
   }
 }
 
-// 当前知识库ID
+const kgMainGraphViewRef = ref<InstanceType<typeof KnowledgeGraphView> | null>(null)
+
+/** 切换图谱/换文档/离开侧栏前：视口防抖未到期时先同步到内存，再立即写入当前 JSON */
+async function flushKgSidebarGraphToDiskNow(): Promise<void> {
+  kgMainGraphViewRef.value?.syncPendingViewportToParent?.()
+  await nextTick()
+  clearKgAutoSaveTimer()
+  const path = activeKnowledgeGraphPath.value
+  const graph = activeKnowledgeGraph.value
+  if (!path || !graph?.nodes?.length) return
+  try {
+    const { FileSystemKnowledgeGraphService } = await import(
+      '../../infrastructure/services/knowledge-graph-file.service'
+    )
+    const service = new FileSystemKnowledgeGraphService()
+    const resolvedPath = await service.resolveKnowledgeGraphPath(path)
+    await service.writeGraphData(resolvedPath, toRaw(graph) as KnowledgeGraph)
+  } catch (e) {
+    console.warn('[知识图谱] 切换前保存失败', e)
+  }
+}
+
+// 当前知识库ID（优先路由；缺失时由 onMounted 结合注册表回填）
+const resolvedVaultId = ref('default')
 const vaultId = computed(() => {
-  return (route.query.vaultId as string) || 'default'
+  const fromRoute = (route.query.vaultId as string | undefined)?.trim()
+  if (fromRoute) return fromRoute
+  return resolvedVaultId.value || 'default'
 })
 
 // 模板创建对话框状态
@@ -405,7 +433,8 @@ const handleSwitchSidebar = async (type: SidebarType) => {
 }
 
 /** 离开知识图谱模式时清空，避免「列表无选中但主区仍显示上次图谱」 */
-function clearKnowledgeGraphSession() {
+async function clearKnowledgeGraphSession() {
+  await flushKgSidebarGraphToDiskNow()
   clearKgAutoSaveTimer()
   activeKnowledgeGraph.value = null
   activeKnowledgeGraphPath.value = null
@@ -414,7 +443,7 @@ function clearKnowledgeGraphSession() {
 }
 
 const handleSelectKnowledgeGraph = async (info: any) => {
-  clearKgAutoSaveTimer()
+  await flushKgSidebarGraphToDiskNow()
   const seq = ++kgSelectRequestSeq
   try {
     const { FileSystemKnowledgeGraphService } = await import(
@@ -520,7 +549,7 @@ const handleKnowledgeGraphLayoutUpdate = (graph: KnowledgeGraph) => {
 }
 
 const handleKnowledgeGraphDeleted = () => {
-  clearKnowledgeGraphSession()
+  void clearKnowledgeGraphSession()
 }
 
 const handleKnowledgeGraphJumpTo = async (payload: {
@@ -532,6 +561,7 @@ const handleKnowledgeGraphJumpTo = async (payload: {
   if (payload.documentId === 'sample-doc') {
     return
   }
+  await flushKgSidebarGraphToDiskNow()
   activeSidebar.value = null
   if (currentDocument.value?.id !== payload.documentId) {
     await loadDocument(payload.documentId)
@@ -766,10 +796,10 @@ const handleSelectDocument = async (id: string) => {
   updateFragmentSidebarContext()
 }
 
-// 监听侧边栏切换：离开知识图谱时清空会话（图谱 JSON 仅手动保存写盘）；切换回文件夹时恢复路径
+// 监听侧边栏切换：离开知识图谱时先落盘再清空会话；切换回文件夹时恢复路径
 watch(activeSidebar, async (newType, oldType) => {
   if (oldType === 'knowledge-graphs' && newType !== 'knowledge-graphs') {
-    clearKnowledgeGraphSession()
+    await clearKnowledgeGraphSession()
   }
   // 只有当从其他侧边栏切换到文件夹时才恢复
   if (newType === 'folders' && oldType !== 'folders' && lastOpenedFolderPath.value) {
@@ -786,6 +816,14 @@ watch(activeSidebar, async (newType, oldType) => {
     }, 100)
   }
 })
+
+watch(
+  () => currentDocument.value?.id,
+  async (newId, oldId) => {
+    if (oldId === undefined || newId === oldId) return
+    await flushKgSidebarGraphToDiskNow()
+  },
+)
 
 const handleUpdateDocument = async (id: string, title: string, content: string) => {
   await updateDocument({
@@ -815,7 +853,54 @@ onMounted(async () => {
   const electronAPI = (window as any).electronAPI
 
   const vaultPath = route.query.vaultPath as string | undefined
-  const vaultId = route.query.vaultId as string | undefined
+  const queryVaultId = (route.query.vaultId as string | undefined)?.trim()
+  let effectiveVaultId = queryVaultId || ''
+  const normalizePath = (p?: string) => (p || '').replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase()
+
+  if (!effectiveVaultId) {
+    try {
+      const registry = await electronAPI?.vaultRegistry?.getRegistry?.()
+      const vaults = Array.isArray(registry?.vaults) ? registry.vaults : []
+      if (vaultPath) {
+        const targetPath = normalizePath(vaultPath)
+        const byPath = vaults.find((v: { id?: string; path?: string }) => normalizePath(v?.path) === targetPath)
+        if (byPath?.id) {
+          effectiveVaultId = String(byPath.id)
+        }
+      }
+      if (!effectiveVaultId && registry?.lastOpenedVaultId) {
+        effectiveVaultId = String(registry.lastOpenedVaultId)
+      }
+    } catch (error) {
+      console.warn('[NewAppLayout] Resolve vaultId from registry failed:', error)
+    }
+  }
+
+  if (effectiveVaultId) {
+    resolvedVaultId.value = effectiveVaultId
+    // 回写 URL，保证所有依赖 route.query.vaultId 的链路拿到一致值
+    const currentQueryVaultId = (route.query.vaultId as string | undefined)?.trim()
+    if (currentQueryVaultId !== effectiveVaultId) {
+      void router.replace({
+        query: {
+          ...route.query,
+          vaultId: effectiveVaultId
+        }
+      })
+    }
+  }
+
+  console.log('[NewAppLayout] Vault context resolved', {
+    queryVaultId: queryVaultId || '(empty)',
+    effectiveVaultId: effectiveVaultId || '(empty)',
+    vaultPath: vaultPath || '(empty)'
+  })
+
+  try {
+    await Application.getInstance().getApplicationService().initialize(vaultId.value)
+  } catch (error) {
+    console.error('[NewAppLayout] ApplicationService initialize with vaultId failed:', error)
+  }
 
   if (vaultPath) {
     dataPath.value = vaultPath

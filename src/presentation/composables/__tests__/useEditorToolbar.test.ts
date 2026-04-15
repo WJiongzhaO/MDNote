@@ -1,568 +1,495 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ref, computed } from 'vue';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { ref, defineComponent, h, nextTick } from 'vue';
+import { mount } from '@vue/test-utils';
 import { useEditorToolbar } from '../useEditorToolbar';
 import { EditorToolbarUseCase } from '@/application/usecases/editor/editor-toolbar.usecase';
 import { TYPES } from '@/core/container/container.types';
+import EditorToolbar from '@/presentation/components/editor/toolbar/EditorToolbar.vue';
 
-// Mock the DI container
 vi.mock('../useInjection', () => ({
   useInjection: vi.fn((token) => {
     if (token === TYPES.EditorToolbarUseCase) {
-      const useCase = new EditorToolbarUseCase(
-        vi.fn() as any,
-        vi.fn() as any
-      );
-      // 添加真实的实现方法用于测试
+      const useCase = new EditorToolbarUseCase(vi.fn() as any, vi.fn() as any);
+
       useCase.applyFormat = vi.fn((request: any, type: string) => {
-        const mockResults: Record<string, any> = {
-          bold: { content: '**' + request.selection.text + '**', newCursorPosition: 10 },
-          italic: { content: '*' + request.selection.text + '*', newCursorPosition: 8 },
-          heading: { content: '# ' + request.content, newCursorPosition: request.content.length + 2 },
-        };
-        return mockResults[type] || { content: request.content, newCursorPosition: 0 };
+        if (!request?.selection) {
+          throw new Error('missing selection');
+        }
+
+        switch (type) {
+          case 'bold':
+            return {
+              content:
+                request.content.slice(0, request.selection.start) +
+                `**${request.selection.text}**` +
+                request.content.slice(request.selection.end),
+              newCursorPosition: request.selection.start + request.selection.text.length + 4,
+            };
+          case 'italic':
+            return {
+              content:
+                request.content.slice(0, request.selection.start) +
+                `*${request.selection.text}*` +
+                request.content.slice(request.selection.end),
+              newCursorPosition: request.selection.start + request.selection.text.length + 2,
+            };
+          case 'heading': {
+            const level = request.data?.level ?? 1;
+            return {
+              content: `${'#'.repeat(level)} ${request.content}`,
+              newCursorPosition: request.content.length + level + 1,
+            };
+          }
+          default:
+            throw new Error(`Unsupported format: ${type}`);
+        }
       });
+
       useCase.insertContent = vi.fn((request: any, type: string) => {
-        const mockResults: Record<string, any> = {
-          link: { content: '[link](https://)', newCursorPosition: 16 },
-          ul: { content: '\n- item\n', newCursorPosition: 8 },
-        };
-        return mockResults[type] || { content: request.content, newCursorPosition: 0 };
+        switch (type) {
+          case 'link':
+            return { content: `${request.content}[link](https://)`, newCursorPosition: request.content.length + 16 };
+          case 'ul':
+            return { content: `${request.content}\n- item\n`, newCursorPosition: request.content.length + 8 };
+          default:
+            throw new Error(`Unsupported insert: ${type}`);
+        }
       });
+
       return useCase;
     }
+
     return null;
   })
 }));
 
 describe('useEditorToolbar Composable', () => {
-  // 创建模拟的编辑器元素
-  const createMockEditor = () => {
+  const createEditor = (html = 'hello world') => {
     const editor = document.createElement('div');
     editor.contentEditable = 'true';
-    editor.innerHTML = 'hello world';
+    editor.innerHTML = html;
     document.body.appendChild(editor);
     return editor;
   };
 
-  // 创建模拟的选区
-  const createMockSelection = (text: string, startOffset = 0, endOffset = text.length) => {
-    const range = document.createRange();
+  const clearSelection = () => {
     const selection = window.getSelection();
+    selection?.removeAllRanges();
+  };
 
-    if (!selection) {
-      throw new Error('Selection not available');
+  const selectTextInEditor = (editor: HTMLDivElement, start: number, end: number) => {
+    const textNode = editor.firstChild;
+    if (!(textNode instanceof Text)) {
+      throw new Error('editor firstChild is not a text node');
     }
 
-    // 简化的选区创建（实际测试中可能需要更复杂的DOM结构）
-    const textNode = document.createTextNode(text);
-    range.setStart(textNode, startOffset);
-    range.setEnd(textNode, endOffset);
+    const selection = window.getSelection();
+    if (!selection) {
+      throw new Error('Selection unavailable');
+    }
 
+    const range = document.createRange();
+    range.setStart(textNode, start);
+    range.setEnd(textNode, end);
     selection.removeAllRanges();
     selection.addRange(range);
+    return range;
+  };
 
-    return { range, selection };
+  const selectNodeContents = (node: Node) => {
+    const selection = window.getSelection();
+    if (!selection) {
+      throw new Error('Selection unavailable');
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return range;
+  };
+
+  const mountToolbarHost = (options?: { editor?: HTMLDivElement | null; content?: string }) => {
+    const editorRef = ref<HTMLDivElement | null>(options?.editor ?? null);
+    const contentRef = ref(options?.content ?? 'hello world');
+    let api!: ReturnType<typeof useEditorToolbar>;
+
+    const Host = defineComponent({
+      setup() {
+        api = useEditorToolbar(editorRef, contentRef);
+        return () => h('div');
+      }
+    });
+
+    const wrapper = mount(Host);
+    return { wrapper, editorRef, contentRef, api };
   };
 
   beforeEach(() => {
-    // 清理DOM
     document.body.innerHTML = '';
+    clearSelection();
+  });
+
+  afterEach(() => {
+    clearSelection();
+    vi.restoreAllMocks();
   });
 
   describe('初始化', () => {
     it('应该初始化响应式状态', () => {
-      const editorRef = ref(null);
-      const contentRef = ref('test content');
+      const { wrapper, api } = mountToolbarHost({ content: 'test content' });
 
-      const { isActive, blockType, hasSelection, selectionText } = useEditorToolbar(
-        editorRef,
-        contentRef
-      );
+      expect(api.isActive).toBeDefined();
+      expect(api.blockType).toBeDefined();
+      expect(api.hasSelection).toBeDefined();
+      expect(api.selectionText).toBeDefined();
+      expect(api.hasSelection.value).toBe(false);
+      expect(api.selectionText.value).toBe('');
 
-      // 验证状态存在
-      expect(isActive).toBeDefined();
-      expect(blockType).toBeDefined();
-      expect(hasSelection).toBeDefined();
-      expect(selectionText).toBeDefined();
-
-      // 验证初始值
-      expect(hasSelection.value).toBe(false);
-      expect(selectionText.value).toBe('');
+      wrapper.unmount();
     });
 
     it('应该提供必要的方法', () => {
-      const editorRef = ref(null);
-      const contentRef = ref('test content');
+      const { wrapper, api } = mountToolbarHost({ content: 'test content' });
 
-      const { applyFormat, insertContent, updateSelectionState, getCursorPosition } = useEditorToolbar(
-        editorRef,
-        contentRef
-      );
+      expect(api.applyFormat).toBeDefined();
+      expect(api.insertContent).toBeDefined();
+      expect(api.updateSelectionState).toBeDefined();
+      expect(api.getCursorPosition).toBeDefined();
 
-      expect(applyFormat).toBeDefined();
-      expect(insertContent).toBeDefined();
-      expect(updateSelectionState).toBeDefined();
-      expect(getCursorPosition).toBeDefined();
+      wrapper.unmount();
     });
   });
 
   describe('格式检测', () => {
     it('应该检测加粗格式', () => {
-      const editor = createMockEditor();
-      editor.innerHTML = '<strong>bold text</strong>';
-      const editorRef = ref(editor);
-      const contentRef = ref('bold text');
+      const editor = createEditor('<strong>bold text</strong>');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'bold text' });
 
-      const { isActive, updateSelectionState } = useEditorToolbar(editorRef, contentRef);
+      selectNodeContents(editor.firstChild!);
+      api.updateSelectionState();
 
-      // 创建选区并更新状态
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection && editor.firstChild) {
-        range.selectNodeContents(editor.firstChild);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        updateSelectionState();
-
-        expect(isActive.bold.value).toBe(true);
-      }
+      expect(api.isActive.bold).toBe(true);
+      wrapper.unmount();
     });
 
     it('应该检测斜体格式', () => {
-      const editor = createMockEditor();
-      editor.innerHTML = '<em>italic text</em>';
-      const editorRef = ref(editor);
-      const contentRef = ref('italic text');
+      const editor = createEditor('<em>italic text</em>');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'italic text' });
 
-      const { isActive, updateSelectionState } = useEditorToolbar(editorRef, contentRef);
+      selectNodeContents(editor.firstChild!);
+      api.updateSelectionState();
 
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection && editor.firstChild) {
-        range.selectNodeContents(editor.firstChild);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        updateSelectionState();
-
-        expect(isActive.italic.value).toBe(true);
-      }
+      expect(api.isActive.italic).toBe(true);
+      wrapper.unmount();
     });
 
     it('应该检测删除线格式', () => {
-      const editor = createMockEditor();
-      editor.innerHTML = '<s>strikethrough</s>';
-      const editorRef = ref(editor);
-      const contentRef = ref('strikethrough');
+      const editor = createEditor('<s>strikethrough</s>');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'strikethrough' });
 
-      const { isActive, updateSelectionState } = useEditorToolbar(editorRef, contentRef);
+      selectNodeContents(editor.firstChild!);
+      api.updateSelectionState();
 
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection && editor.firstChild) {
-        range.selectNodeContents(editor.firstChild);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        updateSelectionState();
-
-        expect(isActive.strikethrough.value).toBe(true);
-      }
+      expect(api.isActive.strikethrough).toBe(true);
+      wrapper.unmount();
     });
 
     it('应该检测代码格式', () => {
-      const editor = createMockEditor();
-      editor.innerHTML = '<code>code</code>';
-      const editorRef = ref(editor);
-      const contentRef = ref('code');
+      const editor = createEditor('<code>code</code>');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'code' });
 
-      const { isActive, updateSelectionState } = useEditorToolbar(editorRef, contentRef);
+      selectNodeContents(editor.firstChild!);
+      api.updateSelectionState();
 
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection && editor.firstChild) {
-        range.selectNodeContents(editor.firstChild);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        updateSelectionState();
-
-        expect(isActive.code.value).toBe(true);
-      }
+      expect(api.isActive.code).toBe(true);
+      wrapper.unmount();
     });
 
     it('应该检测块级元素类型', () => {
-      const editor = createMockEditor();
-      editor.innerHTML = '<h1>Heading</h1>';
-      const editorRef = ref(editor);
-      const contentRef = ref('Heading');
+      const editor = createEditor('<h1>Heading</h1>');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'Heading' });
 
-      const { blockType, updateSelectionState } = useEditorToolbar(editorRef, contentRef);
+      selectNodeContents(editor.firstChild!);
+      api.updateSelectionState();
 
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection && editor.firstChild) {
-        range.selectNodeContents(editor.firstChild);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        updateSelectionState();
-
-        expect(blockType.value).toBe('h1');
-      }
+      expect(api.blockType.value).toBe('h1');
+      wrapper.unmount();
     });
 
     it('应该默认检测段落类型', () => {
-      const editor = createMockEditor();
-      editor.innerHTML = '<p>Paragraph</p>';
-      const editorRef = ref(editor);
-      const contentRef = ref('Paragraph');
+      const editor = createEditor('<p>Paragraph</p>');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'Paragraph' });
 
-      const { blockType, updateSelectionState } = useEditorToolbar(editorRef, contentRef);
+      selectNodeContents(editor.firstChild!);
+      api.updateSelectionState();
 
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection && editor.firstChild) {
-        range.selectNodeContents(editor.firstChild);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        updateSelectionState();
-
-        expect(blockType.value).toBe('p');
-      }
+      expect(api.blockType.value).toBe('p');
+      wrapper.unmount();
     });
   });
 
   describe('格式化应用', () => {
     it('应该应用加粗格式', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('hello world');
+      const editor = createEditor('hello world');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'hello world' });
 
-      const { applyFormat } = useEditorToolbar(editorRef, contentRef);
+      selectTextInEditor(editor, 0, 5);
+      api.updateSelectionState();
+      await api.applyFormat('bold');
 
-      // 创建选区
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection) {
-        const textNode = editor.firstChild || document.createTextNode('hello world');
-        range.setStart(textNode, 0);
-        range.setEnd(textNode, 5);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        await applyFormat('bold');
-
-        // 验证内容被更新
-        expect(contentRef.value).toContain('**');
-      }
+      expect(contentRef.value).toBe('**hello** world');
+      wrapper.unmount();
     });
 
     it('应该应用斜体格式', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('hello world');
+      const editor = createEditor('hello world');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'hello world' });
 
-      const { applyFormat } = useEditorToolbar(editorRef, contentRef);
+      selectTextInEditor(editor, 0, 5);
+      api.updateSelectionState();
+      await api.applyFormat('italic');
 
-      await applyFormat('italic');
-
-      expect(contentRef.value).toContain('*');
+      expect(contentRef.value).toBe('*hello* world');
+      wrapper.unmount();
     });
 
     it('应该应用标题格式', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('hello world');
+      const editor = createEditor('hello world');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'hello world' });
 
-      const { applyFormat } = useEditorToolbar(editorRef, contentRef);
+      selectTextInEditor(editor, 0, 5);
+      api.updateSelectionState();
+      await api.applyFormat('heading', { level: 2 });
 
-      await applyFormat('heading', { level: 2 });
-
-      expect(contentRef.value).toContain('##');
+      expect(contentRef.value).toBe('## hello world');
+      wrapper.unmount();
     });
   });
 
   describe('内容插入', () => {
     it('应该插入链接', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('test content');
+      const editor = createEditor('test content');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'test content' });
 
-      const { insertContent } = useEditorToolbar(editorRef, contentRef);
+      await api.insertContent('link');
 
-      await insertContent('link');
-
-      expect(contentRef.value).toContain('[');
-      expect(contentRef.value).toContain(']');
-      expect(contentRef.value).toContain('(');
-      expect(contentRef.value).toContain(')');
+      expect(contentRef.value).toContain('[link](https://)');
+      wrapper.unmount();
     });
 
     it('应该插入无序列表', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('test content');
+      const editor = createEditor('test content');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'test content' });
 
-      const { insertContent } = useEditorToolbar(editorRef, contentRef);
+      await api.insertContent('ul');
 
-      await insertContent('ul');
-
-      expect(contentRef.value).toContain('-');
+      expect(contentRef.value).toContain('- item');
+      wrapper.unmount();
     });
   });
 
   describe('光标位置计算', () => {
     it('应该获取光标位置', () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('test content');
+      const editor = createEditor('test content');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'test content' });
 
-      const { getCursorPosition } = useEditorToolbar(editorRef, contentRef);
+      selectTextInEditor(editor, 2, 4);
+      const position = api.getCursorPosition();
 
-      const position = getCursorPosition();
-
-      expect(position).toBeDefined();
-      expect(typeof position.start).toBe('number');
-      expect(typeof position.end).toBe('number');
+      expect(position).toEqual({ start: 2, end: 4 });
+      wrapper.unmount();
     });
 
     it('应该处理无选区的情况', () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('test content');
+      const editor = createEditor('test content');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'test content' });
 
-      // 清除选区
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-      }
+      clearSelection();
+      const position = api.getCursorPosition();
 
-      const { getCursorPosition } = useEditorToolbar(editorRef, contentRef);
-
-      const position = getCursorPosition();
-
-      expect(position.start).toBe(0);
-      expect(position.end).toBe(0);
+      expect(position.start).toBe('test content'.length);
+      expect(position.end).toBe('test content'.length);
+      wrapper.unmount();
     });
   });
 
   describe('状态重置', () => {
     it('应该在选区移出编辑器时重置状态', () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('test content');
+      const editor = createEditor('<strong>selected</strong>');
+      const { wrapper, api } = mountToolbarHost({ editor, content: 'selected' });
 
-      const { hasSelection, selectionText, isActive, updateSelectionState } = useEditorToolbar(
-        editorRef,
-        contentRef
-      );
+      selectNodeContents(editor.firstChild!);
+      api.updateSelectionState();
+      expect(api.hasSelection.value).toBe(true);
 
-      // 设置初始状态
-      const selection = window.getSelection();
-      if (selection) {
-        const range = document.createRange();
-        const textNode = document.createTextNode('selected');
-        range.selectNodeContents(textNode);
+      clearSelection();
+      api.updateSelectionState();
 
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-
-      updateSelectionState();
-
-      // 清除选区
-      if (selection) {
-        selection.removeAllRanges();
-      }
-
-      updateSelectionState();
-
-      expect(hasSelection.value).toBe(false);
-      expect(selectionText.value).toBe('');
-      expect(isActive.bold.value).toBe(false);
+      expect(api.hasSelection.value).toBe(false);
+      expect(api.selectionText.value).toBe('');
+      expect(api.isActive.bold).toBe(false);
+      wrapper.unmount();
     });
   });
 
   describe('响应式行为', () => {
     it('应该响应编辑器引用变化', () => {
-      const editorRef = ref<HTMLDivElement | null>(null);
-      const contentRef = ref('test content');
+      const { wrapper, api, editorRef } = mountToolbarHost({ editor: null, content: 'test content' });
 
-      const { getCursorPosition } = useEditorToolbar(editorRef, contentRef);
+      expect(api.getCursorPosition()).toEqual({ start: 0, end: 0 });
 
-      // 初始状态
-      let position = getCursorPosition();
-      expect(position.start).toBe(0);
-
-      // 更新编辑器引用
-      const editor = createMockEditor();
-      editorRef.value = editor;
-
-      position = getCursorPosition();
-      expect(position).toBeDefined();
+      editorRef.value = createEditor('test content');
+      expect(api.getCursorPosition()).toBeDefined();
+      wrapper.unmount();
     });
 
-    it('应该响应内容变化', () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('initial content');
+    it('应该在内容变化后基于新内容执行格式化', async () => {
+      const editor = createEditor('updated content');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'initial content' });
 
-      const { applyFormat } = useEditorToolbar(editorRef, contentRef);
+      contentRef.value = 'updated content';
+      editor.textContent = 'updated content';
+      selectTextInEditor(editor, 0, 7);
+      api.updateSelectionState();
+      await api.applyFormat('bold');
 
-      const initialContent = contentRef.value;
-
-      applyFormat('bold');
-
-      // 内容应该被修改
-      expect(contentRef.value).not.toBe(initialContent);
+      expect(contentRef.value).toBe('**updated** content');
+      wrapper.unmount();
     });
   });
 
   describe('错误处理', () => {
     it('应该处理格式化错误', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('test content');
-
-      const { applyFormat } = useEditorToolbar(editorRef, contentRef);
-
-      // Mock console.error to avoid cluttering test output
+      const editor = createEditor('test content');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'test content' });
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      // 尝试应用无效格式（应该被捕获并记录错误）
-      await applyFormat('invalid' as any);
+      selectTextInEditor(editor, 0, 4);
+      api.updateSelectionState();
+      await api.applyFormat('invalid' as any);
 
       expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(contentRef.value).toBe('test content');
+      wrapper.unmount();
     });
 
     it('应该处理插入错误', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('test content');
-
-      const { insertContent } = useEditorToolbar(editorRef, contentRef);
-
+      const editor = createEditor('test content');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'test content' });
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      await insertContent('invalid' as any);
+      await api.insertContent('invalid' as any);
 
       expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(contentRef.value).toBe('test content');
+      wrapper.unmount();
     });
   });
 
   describe('边缘情况', () => {
     it('应该处理空编辑器', () => {
-      const editorRef = ref<HTMLDivElement | null>(null);
-      const contentRef = ref('');
+      const { wrapper, api } = mountToolbarHost({ editor: null, content: '' });
 
-      const { getCursorPosition } = useEditorToolbar(editorRef, contentRef);
-
-      const position = getCursorPosition();
-
-      expect(position.start).toBe(0);
-      expect(position.end).toBe(0);
+      expect(api.getCursorPosition()).toEqual({ start: 0, end: 0 });
+      wrapper.unmount();
     });
 
     it('应该处理空内容', () => {
-      const editor = createMockEditor();
-      editor.innerHTML = '';
-      const editorRef = ref(editor);
-      const contentRef = ref('');
+      const editor = createEditor('');
+      const { wrapper, api } = mountToolbarHost({ editor, content: '' });
 
-      const { updateSelectionState } = useEditorToolbar(editorRef, contentRef);
-
-      // 不应该抛出错误
-      expect(() => updateSelectionState()).not.toThrow();
+      expect(() => api.updateSelectionState()).not.toThrow();
+      wrapper.unmount();
     });
 
     it('应该处理包含特殊字符的内容', () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('你好🌍世界\n\t\r');
+      const editor = createEditor('你好🌍世界\n\t\r');
+      const { wrapper, api } = mountToolbarHost({ editor, content: '你好🌍世界\n\t\r' });
 
-      const { updateSelectionState } = useEditorToolbar(editorRef, contentRef);
-
-      expect(() => updateSelectionState()).not.toThrow();
+      expect(() => api.updateSelectionState()).not.toThrow();
+      wrapper.unmount();
     });
 
     it('应该处理超长内容', () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
       const longText = 'a'.repeat(100000);
-      const contentRef = ref(longText);
+      const editor = createEditor(longText);
+      const { wrapper, api } = mountToolbarHost({ editor, content: longText });
 
-      const { updateSelectionState } = useEditorToolbar(editorRef, contentRef);
-
-      expect(() => updateSelectionState()).not.toThrow();
+      expect(() => api.updateSelectionState()).not.toThrow();
+      wrapper.unmount();
     });
   });
 
   describe('生命周期', () => {
     it('应该在挂载时添加选区监听器', () => {
       const addEventListenerSpy = vi.spyOn(document, 'addEventListener');
-
-      const editorRef = ref(null);
-      const contentRef = ref('test');
-
-      useEditorToolbar(editorRef, contentRef);
+      const { wrapper } = mountToolbarHost({ content: 'test' });
 
       expect(addEventListenerSpy).toHaveBeenCalledWith('selectionchange', expect.any(Function));
-
-      addEventListenerSpy.mockRestore();
+      wrapper.unmount();
     });
+  });
 
-    // 注意：在测试环境中验证组件卸载时的清理比较困难，
-    // 因为 onUnmounted 钩子需要在组件实际卸载时才会触发
+  describe('toolbar graph 入口兼容性', () => {
+    it('应该保留并触发 open-knowledge-graph 事件', async () => {
+      const host = defineComponent({
+        components: { EditorToolbar },
+        setup() {
+          const editor = ref<HTMLDivElement | null>(document.createElement('div'));
+          const content = ref('test content');
+          return { editor, content };
+        },
+        render() {
+          return h(EditorToolbar, {
+            editor: this.editor,
+            content: this.content,
+            onOpenKnowledgeGraph: (...args: unknown[]) => this.$emit('open-knowledge-graph', ...args),
+          });
+        }
+      });
+
+      const wrapper = mount(host);
+      const graphButton = wrapper.find('button[title="知识图谱"]');
+
+      expect(graphButton.exists()).toBe(true);
+      await graphButton.trigger('click');
+      expect(wrapper.emitted('open-knowledge-graph')).toHaveLength(1);
+    });
   });
 
   describe('集成场景', () => {
     it('应该完整执行格式化流程', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('hello world');
+      const editor = createEditor('hello world');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'hello world' });
 
-      const { applyFormat, updateSelectionState } = useEditorToolbar(editorRef, contentRef);
+      selectTextInEditor(editor, 0, 5);
+      api.updateSelectionState();
+      await api.applyFormat('bold');
 
-      // 1. 创建选区
-      const range = document.createRange();
-      const selection = window.getSelection();
-      if (selection) {
-        const textNode = editor.firstChild || document.createTextNode('hello world');
-        range.setStart(textNode, 0);
-        range.setEnd(textNode, 5);
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        // 2. 更新选区状态
-        updateSelectionState();
-
-        // 3. 应用格式
-        await applyFormat('bold');
-
-        // 4. 验证结果
-        expect(contentRef.value).toContain('**');
-      }
+      expect(contentRef.value).toBe('**hello** world');
+      wrapper.unmount();
     });
 
     it('应该处理多次格式化操作', async () => {
-      const editor = createMockEditor();
-      const editorRef = ref(editor);
-      const contentRef = ref('text');
+      const editor = createEditor('text');
+      const { wrapper, api, contentRef } = mountToolbarHost({ editor, content: 'text' });
 
-      const { applyFormat } = useEditorToolbar(editorRef, contentRef);
-
-      await applyFormat('bold');
+      selectTextInEditor(editor, 0, 4);
+      api.updateSelectionState();
+      await api.applyFormat('bold');
       const afterBold = contentRef.value;
 
-      await applyFormat('italic');
+      editor.textContent = afterBold;
+      await nextTick();
+      selectTextInEditor(editor, 0, afterBold.length);
+      api.updateSelectionState();
+      await api.applyFormat('italic');
       const afterItalic = contentRef.value;
 
       expect(afterBold).not.toBe(afterItalic);
+      expect(afterItalic).toContain('*');
+      wrapper.unmount();
     });
   });
 });
