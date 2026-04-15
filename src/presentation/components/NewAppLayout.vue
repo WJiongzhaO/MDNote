@@ -49,7 +49,11 @@
       <!-- 知识图谱主视图 -->
       <div v-if="activeSidebar === 'knowledge-graphs'" class="knowledge-graph-main">
         <div
-          v-if="activeKnowledgeGraph && activeKnowledgeGraph.nodes && activeKnowledgeGraph.nodes.length > 0"
+          v-if="
+            activeKnowledgeGraph &&
+            activeKnowledgeGraph.nodes &&
+            activeKnowledgeGraph.nodes.length > 0
+          "
           class="kg-main-toolbar"
         >
           <span class="kg-main-toolbar-title">知识图谱</span>
@@ -916,8 +920,8 @@ onMounted(async () => {
   const existingDocs = await documentUseCases.getAllDocuments()
   if (existingDocs.length === 0) {
     await createDocument({
-      title: '欢迎使用 MD Note',
-      content: `# 欢迎使用 MD Note
+      title: '欢迎使用 知枢',
+      content: `# 欢迎使用 知枢
 
 这是一个支持文件夹管理的 Markdown 笔记应用。
 

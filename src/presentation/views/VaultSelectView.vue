@@ -1,7 +1,7 @@
 <template>
   <div class="vault-select-view">
     <div class="vault-select-header">
-      <h1 class="title">MD Note</h1>
+      <h1 class="title">知枢</h1>
       <p class="subtitle">选择或创建知识库</p>
     </div>
 
