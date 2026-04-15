@@ -1,6 +1,6 @@
-# MD Note
+# 知枢（Zhishu）
 
-一个现代化的 Markdown 笔记应用程序，基于 Vue 3 和 Electron 构建，提供本地文件系统存储和强大的编辑功能。
+一个现代化的 Markdown 知识管理应用，基于 Vue 3 和 Electron 构建，提供本地文件系统存储和强大的编辑功能。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
@@ -14,24 +14,30 @@
 - **📊 图表绘制** - 内置 Mermaid 图表支持
 - **📁 文件夹管理** - 完整的文件夹创建、重命名和删除功能
 - **💾 本地存储** - 基于 Electron 的本地文件系统存储
-- **📄 文档导出** - 支持 Word 文档 (.docx) 格式导出
+- **📄 文档导出** - 支持 Html与Pdf 格式导出
 - **🔒 数据安全** - DOMPurify XSS 防护和内容过滤
 - **🌙 现代界面** - 响应式设计和用户友好的界面
 - **⚡ 高性能** - 基于现代前端技术栈的快速响应
+- **🧠 知识片段管理** - 支持知识片段的创建、分类、推荐和引用
+- **🕸️ 知识图谱** - 可视化知识关联，支持节点跳转和布局调整
+- **💚 知识健康度** - 自动检测知识片段的引用情况，评估健康状态
 
 ## 🛠️ 技术栈
 
 ### 前端
+
 - **Vue 3.5.12** - 渐进式 JavaScript 框架
 - **Vue Router 4.6.4** - 官方路由管理器
 - **Vite 5.4.8** - 现代前端构建工具
 - **TypeScript 5.6.2** - 类型安全的 JavaScript 超集
 
 ### 后端/桌面
+
 - **Electron 30.0.0** - 跨平台桌面应用框架
 - **Node.js 20+** - JavaScript 运行时
 
 ### 核心功能库
+
 - **Marked 17.0.1** - Markdown 解析器
 - **KaTeX 0.16.11** - 数学公式渲染引擎
 - **Mermaid 11.4.1** - 图表绘制库
@@ -39,6 +45,7 @@
 - **Docxtemplater 3.67.5** - Word 文档生成
 
 ### 开发和测试
+
 - **Vitest 2.1.4** - 单元测试框架
 - **Playwright 1.49.0** - 端到端测试框架
 - **ESLint 9.13.0** - 代码质量检查
@@ -156,6 +163,7 @@ npm run test:unit -- --coverage
 行内公式：$E = mc^2$
 
 块级公式：
+
 $$
 \int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
 $$
@@ -165,7 +173,7 @@ $$
 
 内置 Mermaid 图表支持：
 
-```markdown
+````markdown
 ```mermaid
 graph TD
     A[开始] --> B{条件判断}
@@ -173,6 +181,7 @@ graph TD
     B -->|否| D[结束]
     C --> D
 ```
+````
 
 ### 文件夹管理
 
@@ -185,21 +194,46 @@ graph TD
 
 支持导出为 Word 文档 (.docx) 格式，保持格式和样式。
 
+### 知识片段管理
+
+- **片段创建** - 将文档中的内容提取为可复用的知识片段
+- **分类体系** - 支持多级分类管理知识片段
+- **智能推荐** - 基于标签、关键词、分类等多维度推荐相关片段
+- **引用关联** - 支持在文档中引用知识片段，建立知识关联图谱
+- **片段健康度** - 自动检测片段的引用情况，标识孤立片段
+
+### 知识图谱
+
+- **可视化展示** - 以节点和边的形式展示知识片段之间的关联
+- **节点跳转** - 点击图谱节点可直接跳转到对应文档或知识片段
+- **布局调整** - 支持手动调整节点位置，自动保存布局
+- **导入导出** - 可将图谱保存为独立的 JSON 文件
+
+### 知识健康度
+
+- **健康评分** - 从引用数、关联度等维度综合评估片段健康状态
+- **风险标识** - 自动标识孤立片段、未被引用片段等风险项
+- **影响分析** - 分析删除或修改片段对其他知识的影响
+- **批量检测** - 支持批量检测整个知识库的健康状况
+
 ## 🏗️ 架构设计
 
 项目采用 **领域驱动设计 (DDD)** 架构，分为三个主要层次：
 
 ### 1. 领域层 (Domain Layer)
+
 - 包含核心业务逻辑和业务规则
 - 定义实体、值对象和聚合根
 - 提供领域服务和仓储接口
 
 ### 2. 应用层 (Application Layer)
+
 - 协调领域对象完成应用程序功能
 - 实现用例和业务流程
 - 处理事务和外部接口
 
 ### 3. 基础设施层 (Infrastructure Layer)
+
 - 提供技术实现细节
 - 实现仓储接口和外部服务集成
 - 处理数据持久化和通信
@@ -250,6 +284,7 @@ npm run electron:build
 ### Electron 配置
 
 主要配置文件：`main.js`
+
 - 窗口大小和行为设置
 - 开发模式配置
 - IPC 通信处理
@@ -257,6 +292,7 @@ npm run electron:build
 ### Vite 配置
 
 主要配置文件：`vite.config.ts`
+
 - 开发服务器设置
 - 构建优化配置
 - 插件配置
@@ -272,6 +308,7 @@ npm run electron:build
 ### 常见问题
 
 1. **Electron 应用无法启动**
+
    ```bash
    # 确保依赖已正确安装
    npm install
@@ -282,12 +319,14 @@ npm run electron:build
    ```
 
 2. **开发服务器端口冲突**
+
    ```bash
    # 修改 Vite 配置中的端口
    # 或停止占用端口的其他应用
    ```
 
 3. **构建失败**
+
    ```bash
    # 检查 Node.js 版本
    node --version  # 应该 >= 20.0.0
@@ -349,6 +388,7 @@ npm run electron:build
 ```
 
 类型包括：
+
 - `feat`: 新功能
 - `fix`: 修复 bug
 - `docs`: 文档更新
@@ -373,9 +413,6 @@ npm run electron:build
 - **Vue.js devtools** - 用于 Vue 应用调试
 - **React Developer Tools** - 如果需要调试 React 组件
 
-## 📄 许可证
-
-本项目采用 [MIT 许可证](LICENSE)。
 
 ## 🙏 致谢
 
@@ -390,9 +427,8 @@ npm run electron:build
 
 ## 📞 联系方式
 
-- 项目主页：[GitHub Repository]
-- 问题反馈：[GitHub Issues]
-- 邮箱：[your-email@example.com]
+- 项目主页：[[GitHub Repository](https://github.com/WJiongzhaO/MDNote)]
+- 邮箱：[2353819@tongji.edu.cn]
 
 ---
 

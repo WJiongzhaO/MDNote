@@ -49,7 +49,11 @@
       <!-- 知识图谱主视图 -->
       <div v-if="activeSidebar === 'knowledge-graphs'" class="knowledge-graph-main">
         <div
-          v-if="activeKnowledgeGraph && activeKnowledgeGraph.nodes && activeKnowledgeGraph.nodes.length > 0"
+          v-if="
+            activeKnowledgeGraph &&
+            activeKnowledgeGraph.nodes &&
+            activeKnowledgeGraph.nodes.length > 0
+          "
           class="kg-main-toolbar"
         >
           <span class="kg-main-toolbar-title">知识图谱</span>
@@ -916,10 +920,10 @@ onMounted(async () => {
   const existingDocs = await documentUseCases.getAllDocuments()
   if (existingDocs.length === 0) {
     await createDocument({
-      title: '欢迎使用 MD Note',
-      content: `# 欢迎使用 MD Note
+      title: '欢迎使用 知枢',
+      content: `# 欢迎使用 知枢
 
-这是一个支持文件夹管理的 Markdown 笔记应用。
+这是一个现代化的 Markdown 知识管理应用。
 
 ## 特性
 
@@ -929,13 +933,16 @@ onMounted(async () => {
 - 🔍 **搜索功能** - 快速找到您需要的文档
 - 📁 **文件夹支持** - 支持嵌套文件夹管理文档
 - 💾 **本地存储** - 所有数据自动保存在用户本地文件系统
+- 🧠 **知识片段** - 提取、管理和复用知识片段
+- 🔗 **智能推荐** - 基于标签和上下文推荐相关知识
 
 ## 使用方法
 
 1. 从 File 菜单打开本地文件夹
 2. 在文件树中浏览和编辑文件
 3. 右键点击可以新建文件或文件夹
-4. 所有更改都会自动保存
+4. 使用侧边栏管理知识片段
+5. 所有更改都会自动保存
 
 ---
 
