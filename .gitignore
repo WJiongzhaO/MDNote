@@ -43,3 +43,6 @@ data/
 release/
 
 .worktrees/
+
+# Documentation folder
+docs/
