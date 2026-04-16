@@ -1,329 +1,300 @@
 // main.js
-const { app, BrowserWindow, ipcMain, Menu, dialog, protocol, shell } = require('electron')
-const path = require('node:path')
-const fs = require('node:fs')
+const { app, BrowserWindow, ipcMain, Menu, dialog, protocol, shell } = require('electron');
+const path = require('node:path');
+const fs = require('node:fs');
 
 // 使用 electron-is-dev@2.0.0（CommonJS 版本）
-const isDev = require('electron-is-dev')
+const isDev = require('electron-is-dev');
 
 // 设置数据存储目录
-const userDataPath = app.getPath('userData')
-const configPath = path.join(userDataPath, 'config.json')
+const userDataPath = app.getPath('userData');
+const configPath = path.join(userDataPath, 'config.json');
 
 // 读取配置文件
 function loadConfig() {
   try {
     if (fs.existsSync(configPath)) {
-      const configData = fs.readFileSync(configPath, 'utf8')
-      return JSON.parse(configData)
+      const configData = fs.readFileSync(configPath, 'utf8');
+      return JSON.parse(configData);
     }
   } catch (error) {
-    console.error('Error loading config:', error)
+    console.error('Error loading config:', error);
   }
-  return {}
+  return {};
 }
 
 // 保存配置文件
 function saveConfig(config) {
   try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8')
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
   } catch (error) {
-    console.error('Error saving config:', error)
+    console.error('Error saving config:', error);
   }
 }
 
 // 获取项目数据存储目录（支持自定义路径，随项目切换）
 function getDataPath() {
-  const config = loadConfig()
+  const config = loadConfig();
   if (config.customDataPath && fs.existsSync(config.customDataPath)) {
-    return config.customDataPath
+    return config.customDataPath;
   }
 
   // 如果是生产环境（已打包），使用app同级目录
   if (!isDev) {
     // app.getAppPath() 在打包后返回 app.asar 的路径
     // 我们需要获取 app.asar 的父目录，然后创建 data 文件夹
-    const appPath = app.getAppPath()
+    const appPath = app.getAppPath();
     // 如果是 asar 包，需要获取 asar 文件的目录
-    let basePath
+    let basePath;
     if (appPath.endsWith('.asar')) {
-      basePath = path.dirname(appPath)
+      basePath = path.dirname(appPath);
     } else if (appPath.includes('.asar')) {
       // 如果路径包含 .asar，提取 .asar 之前的路径
-      const asarIndex = appPath.indexOf('.asar')
-      basePath = path.dirname(appPath.substring(0, asarIndex + 5))
+      const asarIndex = appPath.indexOf('.asar');
+      basePath = path.dirname(appPath.substring(0, asarIndex + 5));
     } else {
       // 开发环境或非 asar 打包
-      basePath = path.dirname(appPath)
+      basePath = path.dirname(appPath);
     }
-    return path.join(basePath, 'MDNoteData')
+    return path.join(basePath, 'MDNoteData');
   }
 
   // 开发环境：使用用户数据目录
-  return path.join(userDataPath, 'data')
+  return path.join(userDataPath, 'data');
 }
 
 // 获取应该自动打开的文件夹（优先使用项目数据路径，否则使用上次打开的文件夹）
 function getAutoOpenFolder() {
-  const config = loadConfig()
+  const config = loadConfig();
   // 优先使用项目数据路径（customDataPath）
   if (config.customDataPath && fs.existsSync(config.customDataPath)) {
-    return config.customDataPath
+    return config.customDataPath;
   }
   // 否则使用上次打开的文件夹
   if (config.lastOpenedFolder && fs.existsSync(config.lastOpenedFolder)) {
-    return config.lastOpenedFolder
+    return config.lastOpenedFolder;
   }
-  return null
+  return null;
 }
 
 // 初始化数据路径
-let dataPath = getDataPath()
+let dataPath = getDataPath();
 
 // 确保数据目录存在
 if (!fs.existsSync(dataPath)) {
-  fs.mkdirSync(dataPath, { recursive: true })
+  fs.mkdirSync(dataPath, { recursive: true });
 }
 
 const AI_GRAPH_SCHEMA_STATEMENTS = [
   'CREATE NODE TABLE IF NOT EXISTS Document(docId STRING PRIMARY KEY, title STRING, contentHash STRING, updatedAt STRING);',
   'CREATE NODE TABLE IF NOT EXISTS Entity(entityId STRING PRIMARY KEY, name STRING, normalizedName STRING, type STRING, description STRING, createdAt STRING, updatedAt STRING);',
   'CREATE REL TABLE IF NOT EXISTS MENTIONS(FROM Document TO Entity, sourceDocId STRING, sourceChunkId STRING, anchorJson STRING);',
-  'CREATE REL TABLE IF NOT EXISTS RELATES(FROM Entity TO Entity, relationId STRING, relationType STRING, description STRING, sourceDocId STRING, sourceChunkId STRING);',
-]
+  'CREATE REL TABLE IF NOT EXISTS RELATES(FROM Entity TO Entity, relationId STRING, relationType STRING, description STRING, sourceDocId STRING, sourceChunkId STRING);'
+];
 
-let kuzuModule = null
-let aiGraphRepoState = null
-let aiGraphRepoLock = Promise.resolve(null)
-const SHOULD_USE_KUZU_AI_GRAPH = process.env.MDNOTE_USE_KUZU === '1'
+let kuzuModule = null;
+let aiGraphRepoState = null;
+let aiGraphRepoLock = Promise.resolve(null);
+const SHOULD_USE_KUZU_AI_GRAPH = process.env.MDNOTE_USE_KUZU === '1';
 
 function getKuzuModule() {
   if (!kuzuModule) {
-    kuzuModule = require('kuzu')
+    kuzuModule = require('kuzu');
   }
 
-  return kuzuModule
+  return kuzuModule;
 }
 
 function getAiGraphDbPath() {
-  return path.normalize(path.join(getDataPath(), '.mdnote-ai-graph', 'graph.kuzu'))
+  return path.normalize(path.join(getDataPath(), '.mdnote-ai-graph', 'graph.kuzu'));
 }
 
 function escapeAiGraphCypherString(value) {
-  return String(value).replace(/'/g, "''")
+  return String(value).replace(/'/g, "''");
 }
 
 function readAiGraphRowValue(row, key) {
   if (row && typeof row === 'object' && key in row) {
-    return row[key]
+    return row[key];
   }
 
-  return undefined
+  return undefined;
 }
 
 function asAiGraphString(value) {
-  return typeof value === 'string' ? value : undefined
+  return typeof value === 'string' ? value : undefined;
 }
 
 function parseAiGraphAnchors(value) {
   if (typeof value !== 'string' || value.trim().length === 0) {
-    return []
+    return [];
   }
 
   try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed : []
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return []
+    return [];
   }
 }
 
 async function collectAiGraphRows(resultPromise) {
-  const result = await resultPromise
-  const rows = []
+  const result = await resultPromise;
+  const rows = [];
 
   while (result.hasNext()) {
-    rows.push(await result.getNext())
+    rows.push(await result.getNext());
   }
 
-  return rows
+  return rows;
 }
 
 function assertAiGraphNonEmptyString(value, fieldName) {
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`[ai-graph] ${fieldName} must be a non-empty string.`)
+    throw new Error(`[ai-graph] ${fieldName} must be a non-empty string.`);
   }
 
-  return value
+  return value;
 }
 
 function assertAiGraphArray(value, fieldName) {
   if (!Array.isArray(value)) {
-    throw new Error(`[ai-graph] ${fieldName} must be an array.`)
+    throw new Error(`[ai-graph] ${fieldName} must be an array.`);
   }
 
-  return value
+  return value;
 }
 
 function sanitizeAiGraphContribution(contribution) {
   if (!contribution || typeof contribution !== 'object') {
-    throw new Error('[ai-graph] contribution must be an object.')
+    throw new Error('[ai-graph] contribution must be an object.');
   }
 
   const entities = assertAiGraphArray(contribution.entities, 'entities').map((entity, index) => {
     if (!entity || typeof entity !== 'object') {
-      throw new Error(`[ai-graph] entities[${index}] must be an object.`)
+      throw new Error(`[ai-graph] entities[${index}] must be an object.`);
     }
 
     return {
       entityId: assertAiGraphNonEmptyString(entity.entityId, `entities[${index}].entityId`),
       name: assertAiGraphNonEmptyString(entity.name, `entities[${index}].name`),
-      normalizedName: assertAiGraphNonEmptyString(
-        entity.normalizedName,
-        `entities[${index}].normalizedName`,
-      ),
+      normalizedName: assertAiGraphNonEmptyString(entity.normalizedName, `entities[${index}].normalizedName`),
       type: assertAiGraphNonEmptyString(entity.type, `entities[${index}].type`),
       description: typeof entity.description === 'string' ? entity.description : '',
-      sourceChunkId: assertAiGraphNonEmptyString(
-        entity.sourceChunkId,
-        `entities[${index}].sourceChunkId`,
-      ),
-      anchors: Array.isArray(entity.anchors) ? entity.anchors : [],
+      sourceChunkId: assertAiGraphNonEmptyString(entity.sourceChunkId, `entities[${index}].sourceChunkId`),
+      anchors: Array.isArray(entity.anchors) ? entity.anchors : []
+    };
+  });
+
+  const relations = assertAiGraphArray(contribution.relations, 'relations').map((relation, index) => {
+    if (!relation || typeof relation !== 'object') {
+      throw new Error(`[ai-graph] relations[${index}] must be an object.`);
     }
-  })
 
-  const relations = assertAiGraphArray(contribution.relations, 'relations').map(
-    (relation, index) => {
-      if (!relation || typeof relation !== 'object') {
-        throw new Error(`[ai-graph] relations[${index}] must be an object.`)
-      }
-
-      return {
-        relationId: assertAiGraphNonEmptyString(
-          relation.relationId,
-          `relations[${index}].relationId`,
-        ),
-        sourceEntityId: assertAiGraphNonEmptyString(
-          relation.sourceEntityId,
-          `relations[${index}].sourceEntityId`,
-        ),
-        targetEntityId: assertAiGraphNonEmptyString(
-          relation.targetEntityId,
-          `relations[${index}].targetEntityId`,
-        ),
-        type: assertAiGraphNonEmptyString(relation.type, `relations[${index}].type`),
-        description: typeof relation.description === 'string' ? relation.description : '',
-        sourceChunkId: assertAiGraphNonEmptyString(
-          relation.sourceChunkId,
-          `relations[${index}].sourceChunkId`,
-        ),
-      }
-    },
-  )
+    return {
+      relationId: assertAiGraphNonEmptyString(relation.relationId, `relations[${index}].relationId`),
+      sourceEntityId: assertAiGraphNonEmptyString(relation.sourceEntityId, `relations[${index}].sourceEntityId`),
+      targetEntityId: assertAiGraphNonEmptyString(relation.targetEntityId, `relations[${index}].targetEntityId`),
+      type: assertAiGraphNonEmptyString(relation.type, `relations[${index}].type`),
+      description: typeof relation.description === 'string' ? relation.description : '',
+      sourceChunkId: assertAiGraphNonEmptyString(relation.sourceChunkId, `relations[${index}].sourceChunkId`)
+    };
+  });
 
   return {
     docId: assertAiGraphNonEmptyString(contribution.docId, 'docId'),
     title: typeof contribution.title === 'string' ? contribution.title : '',
     contentHash: typeof contribution.contentHash === 'string' ? contribution.contentHash : '',
     entities,
-    relations,
-  }
+    relations
+  };
 }
 
 function sanitizeAiGraphQuery(query) {
-  const input = query && typeof query === 'object' ? query : {}
-  const parsedLimit = Number(input.limit)
-  const parsedMaxHops = Number(input.maxHops)
+  const input = query && typeof query === 'object' ? query : {};
+  const parsedLimit = Number(input.limit);
+  const parsedMaxHops = Number(input.maxHops);
 
   return {
-    seedDocId:
-      typeof input.seedDocId === 'string' && input.seedDocId.trim().length > 0
-        ? input.seedDocId
-        : undefined,
-    seedNodeId:
-      typeof input.seedNodeId === 'string' && input.seedNodeId.trim().length > 0
-        ? input.seedNodeId
-        : undefined,
-    keyword:
-      typeof input.keyword === 'string' && input.keyword.trim().length > 0
-        ? input.keyword
-        : undefined,
+    seedDocId: typeof input.seedDocId === 'string' && input.seedDocId.trim().length > 0 ? input.seedDocId : undefined,
+    seedNodeId: typeof input.seedNodeId === 'string' && input.seedNodeId.trim().length > 0 ? input.seedNodeId : undefined,
+    keyword: typeof input.keyword === 'string' && input.keyword.trim().length > 0 ? input.keyword : undefined,
     maxHops: Number.isFinite(parsedMaxHops) ? Math.max(1, Math.trunc(parsedMaxHops)) : 1,
-    limit: Number.isFinite(parsedLimit) ? Math.max(1, Math.trunc(parsedLimit)) : 100,
-  }
+    limit: Number.isFinite(parsedLimit) ? Math.max(1, Math.trunc(parsedLimit)) : 100
+  };
 }
 
 function createInMemoryAiGraphRepository() {
-  const documents = new Map()
-  const mentionsByDoc = new Map()
-  const relationsByDoc = new Map()
-  const entityCatalog = new Map()
+  const documents = new Map();
+  const mentionsByDoc = new Map();
+  const relationsByDoc = new Map();
+  const entityCatalog = new Map();
 
   return {
     async close() {
       // no-op
     },
     async replaceDocumentContribution(contribution) {
-      const now = new Date().toISOString()
+      const now = new Date().toISOString();
       documents.set(contribution.docId, {
         docId: contribution.docId,
         title: contribution.title || '',
         contentHash: contribution.contentHash || '',
-        updatedAt: now,
-      })
+        updatedAt: now
+      });
 
       mentionsByDoc.set(
         contribution.docId,
-        contribution.entities.map((entity) => {
+        contribution.entities.map(entity => {
           const nextEntity = {
             entityId: entity.entityId,
             name: entity.name,
             normalizedName: entity.normalizedName,
             type: entity.type,
             description: entity.description || '',
-            updatedAt: now,
-          }
-          const previous = entityCatalog.get(entity.entityId)
+            updatedAt: now
+          };
+          const previous = entityCatalog.get(entity.entityId);
           entityCatalog.set(entity.entityId, {
             ...previous,
             ...nextEntity,
-            createdAt: previous?.createdAt || now,
-          })
+            createdAt: previous?.createdAt || now
+          });
 
           return {
             entityId: entity.entityId,
             sourceChunkId: entity.sourceChunkId,
-            anchors: Array.isArray(entity.anchors) ? entity.anchors : [],
-          }
-        }),
-      )
+            anchors: Array.isArray(entity.anchors) ? entity.anchors : []
+          };
+        })
+      );
 
       relationsByDoc.set(
         contribution.docId,
-        contribution.relations.map((relation) => ({
+        contribution.relations.map(relation => ({
           relationId: relation.relationId,
           sourceEntityId: relation.sourceEntityId,
           targetEntityId: relation.targetEntityId,
           type: relation.type,
           description: relation.description || '',
-          sourceChunkId: relation.sourceChunkId,
-        })),
-      )
+          sourceChunkId: relation.sourceChunkId
+        }))
+      );
     },
     async getDocumentGraph(docId) {
       if (!documents.has(docId)) {
-        return null
+        return null;
       }
 
-      const mentions = mentionsByDoc.get(docId) || []
-      const relations = relationsByDoc.get(docId) || []
-      const nodes = mentions.map((mention) => {
+      const mentions = mentionsByDoc.get(docId) || [];
+      const relations = relationsByDoc.get(docId) || [];
+      const nodes = mentions.map(mention => {
         const entity = entityCatalog.get(mention.entityId) || {
           name: mention.entityId,
           type: 'Entity',
-          description: '',
-        }
-        const anchors = mention.anchors || []
+          description: ''
+        };
+        const anchors = mention.anchors || [];
         return {
           id: mention.entityId,
           label: entity.name || mention.entityId,
@@ -331,90 +302,87 @@ function createInMemoryAiGraphRepository() {
           description: entity.description || '',
           primaryAnchor: anchors[0],
           evidenceCount: anchors.length,
-          evidencePreview: anchors.slice(0, 3),
-        }
-      })
+          evidencePreview: anchors.slice(0, 3)
+        };
+      });
 
       return {
         nodes,
-        edges: relations.map((relation) => ({
+        edges: relations.map(relation => ({
           id: relation.relationId,
           source: relation.sourceEntityId,
           target: relation.targetEntityId,
           relationType: relation.type || 'RELATED_TO',
-          description: relation.description || '',
-        })),
-      }
+          description: relation.description || ''
+        }))
+      };
     },
     async getGlobalGraph(query) {
-      const allMentions = Array.from(mentionsByDoc.values()).flat()
-      const allRelations = Array.from(relationsByDoc.values()).flat()
-      const seededByDoc = query.seedDocId
-        ? new Set((mentionsByDoc.get(query.seedDocId) || []).map((item) => item.entityId))
-        : null
+      const allMentions = Array.from(mentionsByDoc.values()).flat();
+      const allRelations = Array.from(relationsByDoc.values()).flat();
+      const seededByDoc = query.seedDocId ? new Set((mentionsByDoc.get(query.seedDocId) || []).map(item => item.entityId)) : null;
 
       let nodeCandidates = allMentions
-        .map((mention) => mention.entityId)
+        .map(mention => mention.entityId)
         .filter((value, index, arr) => arr.indexOf(value) === index)
-        .map((entityId) => {
+        .map(entityId => {
           const entity = entityCatalog.get(entityId) || {
             name: entityId,
             type: 'Entity',
-            description: '',
-          }
+            description: ''
+          };
           return {
             id: entityId,
             label: entity.name || entityId,
             entityType: entity.type || 'Entity',
             description: entity.description || '',
             evidenceCount: 0,
-            evidencePreview: [],
-          }
-        })
+            evidencePreview: []
+          };
+        });
 
       if (seededByDoc) {
-        nodeCandidates = nodeCandidates.filter((node) => seededByDoc.has(node.id))
+        nodeCandidates = nodeCandidates.filter(node => seededByDoc.has(node.id));
       }
 
       if (query.seedNodeId) {
-        nodeCandidates = nodeCandidates.filter((node) => node.id === query.seedNodeId)
+        nodeCandidates = nodeCandidates.filter(node => node.id === query.seedNodeId);
       }
 
       if (query.keyword) {
-        const keyword = query.keyword.toLowerCase()
-        nodeCandidates = nodeCandidates.filter(
-          (node) =>
-            node.label.toLowerCase().includes(keyword) ||
-            (node.description || '').toLowerCase().includes(keyword),
-        )
+        const keyword = query.keyword.toLowerCase();
+        nodeCandidates = nodeCandidates.filter(node =>
+          node.label.toLowerCase().includes(keyword)
+          || (node.description || '').toLowerCase().includes(keyword)
+        );
       }
 
-      const nodes = nodeCandidates.slice(0, Math.max(1, query.limit))
-      const nodeSet = new Set(nodes.map((node) => node.id))
+      const nodes = nodeCandidates.slice(0, Math.max(1, query.limit));
+      const nodeSet = new Set(nodes.map(node => node.id));
       const edges = allRelations
-        .map((relation) => ({
+        .map(relation => ({
           id: relation.relationId,
           source: relation.sourceEntityId,
           target: relation.targetEntityId,
           relationType: relation.type || 'RELATED_TO',
-          description: relation.description || '',
+          description: relation.description || ''
         }))
-        .filter((edge) => nodeSet.has(edge.source) && nodeSet.has(edge.target))
-        .slice(0, Math.max(1, query.limit))
+        .filter(edge => nodeSet.has(edge.source) && nodeSet.has(edge.target))
+        .slice(0, Math.max(1, query.limit));
 
-      return { nodes, edges }
+      return { nodes, edges };
     },
     async getNodeEvidence(nodeId) {
-      const entity = entityCatalog.get(nodeId)
+      const entity = entityCatalog.get(nodeId);
       if (!entity) {
-        return null
+        return null;
       }
 
-      const anchors = []
+      const anchors = [];
       for (const mentions of mentionsByDoc.values()) {
         for (const mention of mentions) {
           if (mention.entityId === nodeId && Array.isArray(mention.anchors)) {
-            anchors.push(...mention.anchors)
+            anchors.push(...mention.anchors);
           }
         }
       }
@@ -422,108 +390,100 @@ function createInMemoryAiGraphRepository() {
       return {
         nodeId,
         label: entity.name || nodeId,
-        anchors,
-      }
-    },
-  }
+        anchors
+      };
+    }
+  };
 }
 
 function createAiGraphRepository(dbPath) {
   if (!SHOULD_USE_KUZU_AI_GRAPH) {
-    console.warn(
-      '[Main Process] AI graph is running with in-memory repository. Set MDNOTE_USE_KUZU=1 to enable kuzu backend.',
-    )
-    return createInMemoryAiGraphRepository()
+    console.warn('[Main Process] AI graph is running with in-memory repository. Set MDNOTE_USE_KUZU=1 to enable kuzu backend.');
+    return createInMemoryAiGraphRepository();
   }
 
-  const kuzu = getKuzuModule()
-  const db = new kuzu.Database(dbPath)
-  const connection = new kuzu.Connection(db)
+  const kuzu = getKuzuModule();
+  const db = new kuzu.Database(dbPath);
+  const connection = new kuzu.Connection(db);
   const ready = (async () => {
     for (const statement of AI_GRAPH_SCHEMA_STATEMENTS) {
-      await connection.query(statement)
+      await connection.query(statement);
     }
-  })()
+  })();
 
   return {
     dbPath,
     async close() {
       try {
-        await connection.close()
+        await connection.close();
       } catch (error) {
-        console.warn('[Main Process] Failed to close AI graph connection:', error)
+        console.warn('[Main Process] Failed to close AI graph connection:', error);
       }
 
       try {
-        await db.close()
+        await db.close();
       } catch (error) {
-        console.warn('[Main Process] Failed to close AI graph database:', error)
+        console.warn('[Main Process] Failed to close AI graph database:', error);
       }
     },
     async replaceDocumentContribution(contribution) {
-      await ready
-      const now = new Date().toISOString()
-      const escapedDocId = escapeAiGraphCypherString(contribution.docId)
-      const escapedTitle = escapeAiGraphCypherString(contribution.title)
-      const escapedContentHash = escapeAiGraphCypherString(contribution.contentHash)
+      await ready;
+      const now = new Date().toISOString();
+      const escapedDocId = escapeAiGraphCypherString(contribution.docId);
+      const escapedTitle = escapeAiGraphCypherString(contribution.title);
+      const escapedContentHash = escapeAiGraphCypherString(contribution.contentHash);
 
-      await connection.query(
-        `MATCH (d:Document)-[m:MENTIONS]->() WHERE m.sourceDocId = '${escapedDocId}' DELETE m;`,
-      )
-      await connection.query(
-        `MATCH ()-[r:RELATES]->() WHERE r.sourceDocId = '${escapedDocId}' DELETE r;`,
-      )
-      await connection.query(
-        `MERGE (d:Document {docId: '${escapedDocId}'}) SET d.title = '${escapedTitle}', d.contentHash = '${escapedContentHash}', d.updatedAt = '${now}';`,
-      )
+      await connection.query(`MATCH (d:Document)-[m:MENTIONS]->() WHERE m.sourceDocId = '${escapedDocId}' DELETE m;`);
+      await connection.query(`MATCH ()-[r:RELATES]->() WHERE r.sourceDocId = '${escapedDocId}' DELETE r;`);
+      await connection.query(`MERGE (d:Document {docId: '${escapedDocId}'}) SET d.title = '${escapedTitle}', d.contentHash = '${escapedContentHash}', d.updatedAt = '${now}';`);
 
       for (const entity of contribution.entities) {
-        const escapedEntityId = escapeAiGraphCypherString(entity.entityId)
-        const escapedName = escapeAiGraphCypherString(entity.name)
-        const escapedNormalizedName = escapeAiGraphCypherString(entity.normalizedName)
-        const escapedType = escapeAiGraphCypherString(entity.type)
-        const escapedDescription = escapeAiGraphCypherString(entity.description || '')
-        const escapedSourceChunkId = escapeAiGraphCypherString(entity.sourceChunkId)
-        const anchorJson = escapeAiGraphCypherString(JSON.stringify(entity.anchors))
+        const escapedEntityId = escapeAiGraphCypherString(entity.entityId);
+        const escapedName = escapeAiGraphCypherString(entity.name);
+        const escapedNormalizedName = escapeAiGraphCypherString(entity.normalizedName);
+        const escapedType = escapeAiGraphCypherString(entity.type);
+        const escapedDescription = escapeAiGraphCypherString(entity.description || '');
+        const escapedSourceChunkId = escapeAiGraphCypherString(entity.sourceChunkId);
+        const anchorJson = escapeAiGraphCypherString(JSON.stringify(entity.anchors));
 
         await connection.query(
-          `MERGE (e:Entity {entityId: '${escapedEntityId}'}) SET e.name = '${escapedName}', e.normalizedName = '${escapedNormalizedName}', e.type = '${escapedType}', e.description = '${escapedDescription}', e.updatedAt = '${now}', e.createdAt = COALESCE(e.createdAt, '${now}');`,
-        )
+          `MERGE (e:Entity {entityId: '${escapedEntityId}'}) SET e.name = '${escapedName}', e.normalizedName = '${escapedNormalizedName}', e.type = '${escapedType}', e.description = '${escapedDescription}', e.updatedAt = '${now}', e.createdAt = COALESCE(e.createdAt, '${now}');`
+        );
         await connection.query(
-          `MATCH (d:Document {docId: '${escapedDocId}'}), (e:Entity {entityId: '${escapedEntityId}'}) CREATE (d)-[:MENTIONS {sourceDocId: '${escapedDocId}', sourceChunkId: '${escapedSourceChunkId}', anchorJson: '${anchorJson}'}]->(e);`,
-        )
+          `MATCH (d:Document {docId: '${escapedDocId}'}), (e:Entity {entityId: '${escapedEntityId}'}) CREATE (d)-[:MENTIONS {sourceDocId: '${escapedDocId}', sourceChunkId: '${escapedSourceChunkId}', anchorJson: '${anchorJson}'}]->(e);`
+        );
       }
 
       for (const relation of contribution.relations) {
-        const escapedSourceEntityId = escapeAiGraphCypherString(relation.sourceEntityId)
-        const escapedTargetEntityId = escapeAiGraphCypherString(relation.targetEntityId)
-        const escapedRelationId = escapeAiGraphCypherString(relation.relationId)
-        const escapedRelationType = escapeAiGraphCypherString(relation.type)
-        const escapedDescription = escapeAiGraphCypherString(relation.description || '')
-        const escapedSourceChunkId = escapeAiGraphCypherString(relation.sourceChunkId)
+        const escapedSourceEntityId = escapeAiGraphCypherString(relation.sourceEntityId);
+        const escapedTargetEntityId = escapeAiGraphCypherString(relation.targetEntityId);
+        const escapedRelationId = escapeAiGraphCypherString(relation.relationId);
+        const escapedRelationType = escapeAiGraphCypherString(relation.type);
+        const escapedDescription = escapeAiGraphCypherString(relation.description || '');
+        const escapedSourceChunkId = escapeAiGraphCypherString(relation.sourceChunkId);
 
         await connection.query(
-          `MATCH (source:Entity {entityId: '${escapedSourceEntityId}'}), (target:Entity {entityId: '${escapedTargetEntityId}'}) CREATE (source)-[:RELATES {relationId: '${escapedRelationId}', relationType: '${escapedRelationType}', description: '${escapedDescription}', sourceDocId: '${escapedDocId}', sourceChunkId: '${escapedSourceChunkId}'}]->(target);`,
-        )
+          `MATCH (source:Entity {entityId: '${escapedSourceEntityId}'}), (target:Entity {entityId: '${escapedTargetEntityId}'}) CREATE (source)-[:RELATES {relationId: '${escapedRelationId}', relationType: '${escapedRelationType}', description: '${escapedDescription}', sourceDocId: '${escapedDocId}', sourceChunkId: '${escapedSourceChunkId}'}]->(target);`
+        );
       }
     },
     async getDocumentGraph(docId) {
-      await ready
-      const escapedDocId = escapeAiGraphCypherString(docId)
+      await ready;
+      const escapedDocId = escapeAiGraphCypherString(docId);
       const nodeRows = await collectAiGraphRows(
         connection.query(
-          `MATCH (d:Document {docId: '${escapedDocId}'})-[m:MENTIONS]->(e:Entity) RETURN e.entityId AS id, e.name AS label, e.type AS entityType, e.description AS description, m.anchorJson AS anchorJson;`,
-        ),
-      )
+          `MATCH (d:Document {docId: '${escapedDocId}'})-[m:MENTIONS]->(e:Entity) RETURN e.entityId AS id, e.name AS label, e.type AS entityType, e.description AS description, m.anchorJson AS anchorJson;`
+        )
+      );
 
       const edgeRows = await collectAiGraphRows(
         connection.query(
-          `MATCH (source:Entity)-[r:RELATES {sourceDocId: '${escapedDocId}'}]->(target:Entity) RETURN r.relationId AS id, source.entityId AS source, target.entityId AS target, r.relationType AS relationType, r.description AS description;`,
-        ),
-      )
+          `MATCH (source:Entity)-[r:RELATES {sourceDocId: '${escapedDocId}'}]->(target:Entity) RETURN r.relationId AS id, source.entityId AS source, target.entityId AS target, r.relationType AS relationType, r.description AS description;`
+        )
+      );
 
-      const nodes = nodeRows.map((row) => {
-        const anchors = parseAiGraphAnchors(readAiGraphRowValue(row, 'anchorJson'))
+      const nodes = nodeRows.map(row => {
+        const anchors = parseAiGraphAnchors(readAiGraphRowValue(row, 'anchorJson'));
         return {
           id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
           label: asAiGraphString(readAiGraphRowValue(row, 'label')) || '',
@@ -531,149 +491,136 @@ function createAiGraphRepository(dbPath) {
           description: asAiGraphString(readAiGraphRowValue(row, 'description')),
           primaryAnchor: anchors[0],
           evidenceCount: anchors.length,
-          evidencePreview: anchors.slice(0, 3),
-        }
-      })
+          evidencePreview: anchors.slice(0, 3)
+        };
+      });
 
-      const edges = edgeRows.map((row) => ({
+      const edges = edgeRows.map(row => ({
         id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
         source: asAiGraphString(readAiGraphRowValue(row, 'source')) || '',
         target: asAiGraphString(readAiGraphRowValue(row, 'target')) || '',
         relationType: asAiGraphString(readAiGraphRowValue(row, 'relationType')) || 'RELATED_TO',
-        description: asAiGraphString(readAiGraphRowValue(row, 'description')),
-      }))
+        description: asAiGraphString(readAiGraphRowValue(row, 'description'))
+      }));
 
       const hasDocument = await collectAiGraphRows(
-        connection.query(
-          `MATCH (d:Document {docId: '${escapedDocId}'}) RETURN d.docId AS docId LIMIT 1;`,
-        ),
-      )
+        connection.query(`MATCH (d:Document {docId: '${escapedDocId}'}) RETURN d.docId AS docId LIMIT 1;`)
+      );
 
       if (hasDocument.length === 0) {
-        return null
+        return null;
       }
 
-      return { nodes, edges }
+      return { nodes, edges };
     },
     async getGlobalGraph(query) {
-      await ready
-      const limit = Math.max(1, query.limit)
+      await ready;
+      const limit = Math.max(1, query.limit);
       const nodeRows = await collectAiGraphRows(
-        connection.query(
-          `MATCH (e:Entity) RETURN e.entityId AS id, e.name AS label, e.type AS entityType, e.description AS description LIMIT ${limit};`,
-        ),
-      )
+        connection.query(`MATCH (e:Entity) RETURN e.entityId AS id, e.name AS label, e.type AS entityType, e.description AS description LIMIT ${limit};`)
+      );
 
-      const selectedNodeIds = nodeRows.map(
-        (row) => asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
-      )
-      const nodeSet = new Set(selectedNodeIds)
+      const selectedNodeIds = nodeRows.map(row => asAiGraphString(readAiGraphRowValue(row, 'id')) || '');
+      const nodeSet = new Set(selectedNodeIds);
       const edgeRows = await collectAiGraphRows(
-        connection.query(
-          `MATCH (source:Entity)-[r:RELATES]->(target:Entity) RETURN r.relationId AS id, source.entityId AS source, target.entityId AS target, r.relationType AS relationType, r.description AS description LIMIT ${limit};`,
-        ),
-      )
+        connection.query(`MATCH (source:Entity)-[r:RELATES]->(target:Entity) RETURN r.relationId AS id, source.entityId AS source, target.entityId AS target, r.relationType AS relationType, r.description AS description LIMIT ${limit};`)
+      );
 
       return {
-        nodes: nodeRows.map((row) => ({
+        nodes: nodeRows.map(row => ({
           id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
           label: asAiGraphString(readAiGraphRowValue(row, 'label')) || '',
           entityType: asAiGraphString(readAiGraphRowValue(row, 'entityType')) || 'Entity',
           description: asAiGraphString(readAiGraphRowValue(row, 'description')),
           evidenceCount: 0,
-          evidencePreview: [],
+          evidencePreview: []
         })),
         edges: edgeRows
-          .map((row) => ({
+          .map(row => ({
             id: asAiGraphString(readAiGraphRowValue(row, 'id')) || '',
             source: asAiGraphString(readAiGraphRowValue(row, 'source')) || '',
             target: asAiGraphString(readAiGraphRowValue(row, 'target')) || '',
             relationType: asAiGraphString(readAiGraphRowValue(row, 'relationType')) || 'RELATED_TO',
-            description: asAiGraphString(readAiGraphRowValue(row, 'description')),
+            description: asAiGraphString(readAiGraphRowValue(row, 'description'))
           }))
-          .filter((edge) => nodeSet.has(edge.source) && nodeSet.has(edge.target)),
-      }
+          .filter(edge => nodeSet.has(edge.source) && nodeSet.has(edge.target))
+      };
     },
     async getNodeEvidence(nodeId) {
-      await ready
-      const escapedNodeId = escapeAiGraphCypherString(nodeId)
+      await ready;
+      const escapedNodeId = escapeAiGraphCypherString(nodeId);
       const rows = await collectAiGraphRows(
         connection.query(
-          `MATCH (:Document)-[m:MENTIONS]->(e:Entity {entityId: '${escapedNodeId}'}) RETURN e.entityId AS nodeId, e.name AS label, m.anchorJson AS anchorJson;`,
-        ),
-      )
+          `MATCH (:Document)-[m:MENTIONS]->(e:Entity {entityId: '${escapedNodeId}'}) RETURN e.entityId AS nodeId, e.name AS label, m.anchorJson AS anchorJson;`
+        )
+      );
 
       if (rows.length === 0) {
-        return null
+        return null;
       }
 
-      const anchors = rows.flatMap((row) =>
-        parseAiGraphAnchors(readAiGraphRowValue(row, 'anchorJson')),
-      )
+      const anchors = rows.flatMap(row => parseAiGraphAnchors(readAiGraphRowValue(row, 'anchorJson')));
       return {
         nodeId: asAiGraphString(readAiGraphRowValue(rows[0], 'nodeId')) || nodeId,
         label: asAiGraphString(readAiGraphRowValue(rows[0], 'label')) || nodeId,
-        anchors,
-      }
-    },
-  }
+        anchors
+      };
+    }
+  };
 }
 
 function queueAiGraphRepositoryWork(work) {
-  const queued = aiGraphRepoLock.catch(() => null).then(work)
-  aiGraphRepoLock = queued.then(
-    () => null,
-    () => null,
-  )
-  return queued
+  const queued = aiGraphRepoLock.catch(() => null).then(work);
+  aiGraphRepoLock = queued.then(() => null, () => null);
+  return queued;
 }
 
 async function closeAiGraphRepositoryState(state) {
   if (!state || !state.repository || typeof state.repository.close !== 'function') {
-    return
+    return;
   }
 
-  await state.repository.close()
+  await state.repository.close();
 }
 
 async function getAiGraphRepository() {
-  const dbPath = getAiGraphDbPath()
+  const dbPath = getAiGraphDbPath();
   if (aiGraphRepoState && aiGraphRepoState.dbPath === dbPath) {
-    return aiGraphRepoState.repository
+    return aiGraphRepoState.repository;
   }
 
   const state = await queueAiGraphRepositoryWork(async () => {
     if (aiGraphRepoState && aiGraphRepoState.dbPath === dbPath) {
-      return aiGraphRepoState
+      return aiGraphRepoState;
     }
 
-    const previousState = aiGraphRepoState
-    aiGraphRepoState = null
+    const previousState = aiGraphRepoState;
+    aiGraphRepoState = null;
     if (previousState) {
-      await closeAiGraphRepositoryState(previousState)
+      await closeAiGraphRepositoryState(previousState);
     }
 
-    await fs.promises.mkdir(path.dirname(dbPath), { recursive: true })
+    await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
     const nextState = {
       dbPath,
-      repository: createAiGraphRepository(dbPath),
-    }
-    aiGraphRepoState = nextState
-    return nextState
-  })
+      repository: createAiGraphRepository(dbPath)
+    };
+    aiGraphRepoState = nextState;
+    return nextState;
+  });
 
-  return state.repository
+  return state.repository;
 }
 
 async function disposeAiGraphRepository() {
   await queueAiGraphRepositoryWork(async () => {
-    const previousState = aiGraphRepoState
-    aiGraphRepoState = null
+    const previousState = aiGraphRepoState;
+    aiGraphRepoState = null;
     if (previousState) {
-      await closeAiGraphRepositoryState(previousState)
+      await closeAiGraphRepositoryState(previousState);
     }
-    return null
-  })
+    return null;
+  });
 }
 
 // 创建原生菜单
@@ -686,15 +633,15 @@ function createMenu() {
           label: 'New File',
           accelerator: 'CmdOrCtrl+N',
           click: (menuItem, browserWindow) => {
-            browserWindow.webContents.send('menu:new-file')
-          },
+            browserWindow.webContents.send('menu:new-file');
+          }
         },
         {
           label: 'New Folder',
           accelerator: 'CmdOrCtrl+Shift+N',
           click: (menuItem, browserWindow) => {
-            browserWindow.webContents.send('menu:new-folder')
-          },
+            browserWindow.webContents.send('menu:new-folder');
+          }
         },
         { type: 'separator' },
         {
@@ -705,41 +652,41 @@ function createMenu() {
               properties: ['openFile'],
               filters: [
                 { name: 'Markdown Files', extensions: ['md', 'markdown'] },
-                { name: 'All Files', extensions: ['*'] },
-              ],
-            })
+                { name: 'All Files', extensions: ['*'] }
+              ]
+            });
             if (!result.canceled && result.filePaths.length > 0) {
-              browserWindow.webContents.send('menu:open-file', result.filePaths[0])
+              browserWindow.webContents.send('menu:open-file', result.filePaths[0]);
             }
-          },
+          }
         },
         {
           label: 'Open Folder...',
           accelerator: 'CmdOrCtrl+Shift+O',
           click: async (menuItem, browserWindow) => {
             const result = await dialog.showOpenDialog(browserWindow, {
-              properties: ['openDirectory'],
-            })
+              properties: ['openDirectory']
+            });
             if (!result.canceled && result.filePaths.length > 0) {
               // 直接发送文件夹路径，不再次弹出对话框
-              browserWindow.webContents.send('menu:open-folder', result.filePaths[0])
+              browserWindow.webContents.send('menu:open-folder', result.filePaths[0]);
             }
-          },
+          }
         },
         { type: 'separator' },
         {
           label: 'Save',
           accelerator: 'CmdOrCtrl+S',
           click: (menuItem, browserWindow) => {
-            browserWindow.webContents.send('menu:save')
-          },
+            browserWindow.webContents.send('menu:save');
+          }
         },
         { type: 'separator' },
         {
           role: 'quit',
-          label: process.platform === 'darwin' ? 'Quit' : 'Exit',
-        },
-      ],
+          label: process.platform === 'darwin' ? 'Quit' : 'Exit'
+        }
+      ]
     },
     {
       label: 'Edit',
@@ -750,8 +697,8 @@ function createMenu() {
         { role: 'cut', label: 'Cut' },
         { role: 'copy', label: 'Copy' },
         { role: 'paste', label: 'Paste' },
-        { role: 'selectAll', label: 'Select All' },
-      ],
+        { role: 'selectAll', label: 'Select All' }
+      ]
     },
     {
       label: 'View',
@@ -764,15 +711,15 @@ function createMenu() {
         { role: 'zoomIn', label: 'Zoom In' },
         { role: 'zoomOut', label: 'Zoom Out' },
         { type: 'separator' },
-        { role: 'togglefullscreen', label: 'Toggle Full Screen' },
-      ],
+        { role: 'togglefullscreen', label: 'Toggle Full Screen' }
+      ]
     },
     {
       label: 'Window',
       submenu: [
         { role: 'minimize', label: 'Minimize' },
-        { role: 'close', label: 'Close' },
-      ],
+        { role: 'close', label: 'Close' }
+      ]
     },
     {
       label: 'Help',
@@ -784,19 +731,19 @@ function createMenu() {
               type: 'info',
               title: 'About MD Note',
               message: 'MD Note',
-              detail: 'A Markdown note-taking application',
-            })
-          },
-        },
-      ],
-    },
-  ]
+              detail: 'A Markdown note-taking application'
+            });
+          }
+        }
+      ]
+    }
+  ];
 
-  const menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(null)
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(null);
 }
 
-let mainWindow = null
+let mainWindow = null;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -807,578 +754,569 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // 设置 Content Security Policy 以减少安全警告
       webSecurity: true,
     },
-  })
+  });
 
-  // 设置 Content Security Policy - 使用更宽松的配置
+  // 设置 Content Security Policy
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: app: file:; " +
-            "img-src 'self' data: blob: app: file:; " +
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-            "style-src 'self' 'unsafe-inline'; " +
-            "font-src 'self' data:; " +
-            "connect-src 'self' app: file: http://localhost:* ws://localhost:* https://* wss://*;",
-        ],
-      },
-    })
-  })
+          "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: app:; " +
+          "img-src 'self' data: blob: app: file:; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "font-src 'self' data:; " +
+          "connect-src 'self' app: file: http://localhost:5173 ws://localhost:5173 https: wss: https://*.aliyuncs.com;"
+        ]
+      }
+    });
+  });
 
   // 将渲染进程的控制台输出重定向到主进程终端
   // Chromium / Electron：level 为 0 verbose、1 info、2 warning、3 error（旧代码把 1 错标成 Error，导致 console.log 像报错）
   win.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const prefix =
-      level === 0
-        ? '[Renderer Verbose]'
-        : level === 1
-          ? '[Renderer Info]'
-          : level === 2
-            ? '[Renderer Warning]'
-            : level === 3
-              ? '[Renderer Error]'
-              : '[Renderer Log]'
+      level === 0 ? '[Renderer Verbose]' :
+      level === 1 ? '[Renderer Info]' :
+      level === 2 ? '[Renderer Warning]' :
+      level === 3 ? '[Renderer Error]' : '[Renderer Log]';
 
-    console.log(`${prefix} ${message}`)
+    console.log(`${prefix} ${message}`);
     if (line) {
-      console.log(`    at ${sourceId}:${line}`)
+      console.log(`    at ${sourceId}:${line}`);
     }
-  })
+  });
 
   // 监听所有控制台消息，包括错误和警告
   win.webContents.on('did-finish-load', () => {
-    console.log('[Main Process] Window finished loading')
-  })
+    console.log('[Main Process] Window finished loading');
+  });
 
   win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    console.error('[Main Process] Failed to load:', errorCode, errorDescription, validatedURL)
-  })
+    console.error('[Main Process] Failed to load:', errorCode, errorDescription, validatedURL);
+  });
 
   // 监听渲染进程的未捕获异常
   win.webContents.on('render-process-gone', (event, details) => {
-    console.error('[Main Process] Render process gone:', details)
-  })
+    console.error('[Main Process] Render process gone:', details);
+  });
 
   if (isDev) {
-    win.loadURL('http://localhost:5173')
-    win.webContents.openDevTools()
+    win.loadURL('http://localhost:5173');
+    win.webContents.openDevTools();
   } else {
     // 生产环境：打包后 dist 目录在 app.asar 内部
     // __dirname 在打包后指向 app.asar
     // 所以直接使用 __dirname + dist/index.html
-    const indexPath = path.join(__dirname, 'dist', 'index.html')
-    console.log('[Main Process] Loading index.html from:', indexPath)
-    win.loadFile(indexPath)
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    console.log('[Main Process] Loading index.html from:', indexPath);
+    win.loadFile(indexPath);
     // 临时：打开开发者工具用于调试（正常版本应注释掉）
     //win.webContents.openDevTools();
   }
 
-  mainWindow = win
-  return win
+  mainWindow = win;
+  return win;
 }
 
 app.whenReady().then(() => {
-  createWindow()
+  createWindow();
 
   // 在 app 就绪后注册：避免旧进程未加载到新 handler；修改 main.js 后必须重启 Electron 主进程
   ipcMain.handle('fragment:open-storage-in-explorer', async (_event, fragmentId) => {
     try {
       if (!fragmentId || typeof fragmentId !== 'string') {
-        return { ok: false, error: '无效的片段 ID' }
+        return { ok: false, error: '无效的片段 ID' };
       }
-      const rel = path.join('fragments', 'assets', fragmentId)
-      const full = path.join(getDataPath(), rel)
-      await fs.promises.mkdir(full, { recursive: true })
-      const errMsg = await shell.openPath(full)
+      const rel = path.join('fragments', 'assets', fragmentId);
+      const full = path.join(getDataPath(), rel);
+      await fs.promises.mkdir(full, { recursive: true });
+      const errMsg = await shell.openPath(full);
       if (errMsg) {
-        return { ok: false, error: errMsg }
+        return { ok: false, error: errMsg };
       }
-      return { ok: true }
+      return { ok: true };
     } catch (error) {
-      console.error('[Main Process] fragment:open-storage-in-explorer', error)
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      console.error('[Main Process] fragment:open-storage-in-explorer', error);
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  })
+  });
 
   ipcMain.handle('fragment:open-fragments-json-dir-in-explorer', async (_event, vaultId) => {
     try {
-      const vid = typeof vaultId === 'string' && vaultId.trim() ? vaultId.trim() : 'default'
-      const dirName = `.mdnote-fragments-${vid}`
-      const full = path.join(getDataPath(), dirName)
-      await fs.promises.mkdir(full, { recursive: true })
-      const errMsg = await shell.openPath(full)
+      const vid = typeof vaultId === 'string' && vaultId.trim() ? vaultId.trim() : 'default';
+      const dirName = `.mdnote-fragments-${vid}`;
+      const full = path.join(getDataPath(), dirName);
+      await fs.promises.mkdir(full, { recursive: true });
+      const errMsg = await shell.openPath(full);
       if (errMsg) {
-        return { ok: false, error: errMsg }
+        return { ok: false, error: errMsg };
       }
-      return { ok: true }
+      return { ok: true };
     } catch (error) {
-      console.error('[Main Process] fragment:open-fragments-json-dir-in-explorer', error)
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      console.error('[Main Process] fragment:open-fragments-json-dir-in-explorer', error);
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  })
+  });
 
   // 自动打开文件夹（优先使用知识片段库文件夹，否则使用上次打开的文件夹）
-  const folderToOpen = getAutoOpenFolder()
+  const folderToOpen = getAutoOpenFolder();
   if (folderToOpen) {
     // 延迟发送，确保窗口已准备好
     setTimeout(() => {
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('app:restore-last-folder', folderToOpen)
+        mainWindow.webContents.send('app:restore-last-folder', folderToOpen);
       }
-    }, 500)
+    }, 500);
   }
 
   // 注册自定义协议来安全地提供本地文件
   protocol.registerFileProtocol('app', (request, callback) => {
     try {
       // request.url 格式: app://C:/path/to/file 或 app:///C:/path/to/file
-      let filePath = request.url.replace(/^app:\/\//, '')
+      let filePath = request.url.replace(/^app:\/\//, '');
 
       // 移除开头的斜杠（如果有多个）
-      filePath = filePath.replace(/^\/+/, '')
+      filePath = filePath.replace(/^\/+/, '');
 
       // 解码 URL 编码的路径（处理中文等特殊字符）
-      filePath = decodeURIComponent(filePath)
+      filePath = decodeURIComponent(filePath);
 
       // 处理路径：如果是绝对路径则直接使用，如果是相对路径则拼接到dataPath
       if (!path.isAbsolute(filePath)) {
         // 相对路径：拼接到dataPath
-        filePath = path.join(getDataPath(), filePath)
+        filePath = path.join(getDataPath(), filePath);
       }
 
       // 规范化路径（处理 .. 和 . 等）
-      filePath = path.normalize(filePath)
+      filePath = path.normalize(filePath);
 
       // 检查文件是否存在
       if (fs.existsSync(filePath)) {
-        callback({ path: filePath })
+        callback({ path: filePath });
       } else {
-        console.error('File not found:', filePath, 'Original URL:', request.url)
-        callback({ error: -6 }) // FILE_NOT_FOUND
+        console.error('File not found:', filePath, 'Original URL:', request.url);
+        callback({ error: -6 }); // FILE_NOT_FOUND
       }
     } catch (error) {
-      console.error('Error serving file:', error, 'URL:', request.url)
-      callback({ error: -6 })
+      console.error('Error serving file:', error, 'URL:', request.url);
+      callback({ error: -6 });
     }
-  })
+  });
 
-  createMenu()
+  createMenu();
   // createWindow() 已经在 app.whenReady() 中调用了，这里不需要再次调用
-})
+});
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  if (process.platform !== 'darwin') app.quit();
+});
 
 // 文件操作 IPC 处理
 ipcMain.handle('file:read', async (event, filename) => {
   try {
-    const filePath = path.join(getDataPath(), filename)
+    const filePath = path.join(getDataPath(), filename);
     if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, 'utf8')
-      return JSON.parse(data)
+      const data = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('Error reading file:', error)
-    throw error
+    console.error('Error reading file:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:write', async (event, filename, data) => {
   try {
-    const filePath = path.join(getDataPath(), filename)
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8')
-    return true
+    const filePath = path.join(getDataPath(), filename);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
   } catch (error) {
-    console.error('Error writing file:', error)
-    throw error
+    console.error('Error writing file:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:delete', async (event, filename) => {
   try {
-    const filePath = path.join(getDataPath(), filename)
+    const filePath = path.join(getDataPath(), filename);
     if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath)
-      return true
+      fs.unlinkSync(filePath);
+      return true;
     }
-    return false
+    return false;
   } catch (error) {
-    console.error('Error deleting file:', error)
-    throw error
+    console.error('Error deleting file:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:exists', async (event, filename) => {
   try {
-    const filePath = path.join(getDataPath(), filename)
-    return fs.existsSync(filePath)
+    const filePath = path.join(getDataPath(), filename);
+    return fs.existsSync(filePath);
   } catch (error) {
-    console.error('Error checking file existence:', error)
-    throw error
+    console.error('Error checking file existence:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:list', async (_event, _pattern = '*.json') => {
   try {
-    const files = fs.readdirSync(getDataPath())
-    return files.filter((file) => file.endsWith('.json'))
+    const files = fs.readdirSync(getDataPath());
+    return files.filter(file => file.endsWith('.json'));
   } catch (error) {
-    console.error('Error listing files:', error)
-    throw error
+    console.error('Error listing files:', error);
+    throw error;
   }
-})
+});
 
 // ==================== 知识片段资源 IPC（相对当前知识库 / 项目数据路径） ====================
 // 片段图片目录 fragments/assets/{id}、与 file:get-data-path 一致
 
 ipcMain.handle('fragment:mkdir', async (event, dirPath) => {
   try {
-    const fullPath = path.join(getDataPath(), dirPath)
-    console.log('[Main Process] fragment:mkdir path:', fullPath)
+    const fullPath = path.join(getDataPath(), dirPath);
+    console.log('[Main Process] fragment:mkdir path:', fullPath);
     if (!fs.existsSync(fullPath)) {
-      fs.mkdirSync(fullPath, { recursive: true })
+      fs.mkdirSync(fullPath, { recursive: true });
     }
-    return true
+    return true;
   } catch (error) {
-    console.error('Error creating fragment directory:', error)
-    throw error
+    console.error('Error creating fragment directory:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('fragment:copy', async (event, sourcePath, destPath) => {
   try {
-    const fullDestPath = path.join(getDataPath(), destPath)
-    console.log('[Main Process] fragment:copy', sourcePath, '->', fullDestPath)
+    const fullDestPath = path.join(getDataPath(), destPath);
+    console.log('[Main Process] fragment:copy', sourcePath, '->', fullDestPath);
 
     // 确保目标目录存在
-    const destDir = path.dirname(fullDestPath)
+    const destDir = path.dirname(fullDestPath);
     if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true })
+      fs.mkdirSync(destDir, { recursive: true });
     }
 
     // sourcePath 可能是绝对路径或相对于项目路径
-    let fullSourcePath = sourcePath
+    let fullSourcePath = sourcePath;
     if (!path.isAbsolute(sourcePath)) {
-      fullSourcePath = path.join(getDataPath(), sourcePath)
+      fullSourcePath = path.join(getDataPath(), sourcePath);
     }
 
-    fs.copyFileSync(fullSourcePath, fullDestPath)
-    return true
+    fs.copyFileSync(fullSourcePath, fullDestPath);
+    return true;
   } catch (error) {
-    console.error('Error copying fragment file:', error)
-    throw error
+    console.error('Error copying fragment file:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('fragment:delete-dir', async (event, dirPath) => {
   try {
-    const fullPath = path.join(getDataPath(), dirPath)
-    console.log('[Main Process] fragment:delete-dir path:', fullPath)
+    const fullPath = path.join(getDataPath(), dirPath);
+    console.log('[Main Process] fragment:delete-dir path:', fullPath);
     if (fs.existsSync(fullPath)) {
-      fs.rmSync(fullPath, { recursive: true, force: true })
+      fs.rmSync(fullPath, { recursive: true, force: true });
     }
-    return true
+    return true;
   } catch (error) {
-    console.error('Error deleting fragment directory:', error)
-    throw error
+    console.error('Error deleting fragment directory:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('fragment:get-full-path', async (event, relativePath) => {
   try {
-    const fullPath = path.join(getDataPath(), relativePath)
-    const normalizedPath = fullPath.replace(/\\/g, '/')
-    console.log('[Main Process] fragment:get-full-path:', relativePath, '->', normalizedPath)
-    return `app://${normalizedPath}`
+    const fullPath = path.join(getDataPath(), relativePath);
+    const normalizedPath = fullPath.replace(/\\/g, '/');
+    console.log('[Main Process] fragment:get-full-path:', relativePath, '->', normalizedPath);
+    return `app://${normalizedPath}`;
   } catch (error) {
-    console.error('Error getting fragment full path:', error)
-    throw error
+    console.error('Error getting fragment full path:', error);
+    throw error;
   }
-})
+});
 
 // ==================== 对话框 IPC 处理 ====================
 ipcMain.handle('dialog:showSaveDialog', async (event, options) => {
   try {
-    const result = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow(), options)
-    return result
+    const result = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow(), options);
+    return result;
   } catch (error) {
-    console.error('Error showing save dialog:', error)
-    throw error
+    console.error('Error showing save dialog:', error);
+    throw error;
   }
-})
+});
 
 // ==================== 图片和文件操作 IPC 处理 ====================
 ipcMain.handle('file:copy', async (event, sourcePath, destPath) => {
   try {
     // 确保目标目录存在
-    const destDir = path.dirname(destPath)
+    const destDir = path.dirname(destPath);
     if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true })
+      fs.mkdirSync(destDir, { recursive: true });
     }
-    fs.copyFileSync(sourcePath, destPath)
-    return true
+    fs.copyFileSync(sourcePath, destPath);
+    return true;
   } catch (error) {
-    console.error('Error copying file:', error)
-    throw error
+    console.error('Error copying file:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:mkdir', async (event, dirPath) => {
   try {
-    console.log('[Main Process] file:mkdir called, dirPath:', dirPath)
+    console.log('[Main Process] file:mkdir called, dirPath:', dirPath);
     // 规范化路径（处理 Windows 路径分隔符）
-    const normalizedDirPath = path.normalize(dirPath)
-    console.log('[Main Process] Normalized dirPath:', normalizedDirPath)
+    const normalizedDirPath = path.normalize(dirPath);
+    console.log('[Main Process] Normalized dirPath:', normalizedDirPath);
     // 如果是相对路径（不包含 : 或 / 开头），需要拼接 dataPath
-    let fullPath = normalizedDirPath
-    const isAbsolute = path.isAbsolute(normalizedDirPath) || normalizedDirPath.includes(':')
-    console.log('[Main Process] Is absolute path:', isAbsolute)
+    let fullPath = normalizedDirPath;
+    const isAbsolute = path.isAbsolute(normalizedDirPath) || normalizedDirPath.includes(':');
+    console.log('[Main Process] Is absolute path:', isAbsolute);
     if (!isAbsolute) {
       // 相对路径：拼接到 dataPath
-      fullPath = path.join(getDataPath(), normalizedDirPath)
-      console.log('[Main Process] Converted to full path:', fullPath)
+      fullPath = path.join(getDataPath(), normalizedDirPath);
+      console.log('[Main Process] Converted to full path:', fullPath);
     }
 
     if (!fs.existsSync(fullPath)) {
-      console.log('[Main Process] Directory does not exist, creating:', fullPath)
-      fs.mkdirSync(fullPath, { recursive: true })
-      console.log('[Main Process] Directory created successfully')
+      console.log('[Main Process] Directory does not exist, creating:', fullPath);
+      fs.mkdirSync(fullPath, { recursive: true });
+      console.log('[Main Process] Directory created successfully');
     } else {
-      console.log('[Main Process] Directory already exists')
+      console.log('[Main Process] Directory already exists');
     }
-    return true
+    return true;
   } catch (error) {
-    console.error('[Main Process] Error creating directory:', error)
-    throw error
+    console.error('[Main Process] Error creating directory:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:write-binary', async (event, filePath, buffer) => {
   try {
-    console.log(
-      '[Main Process] file:write-binary called, filePath:',
-      filePath,
-      'buffer length:',
-      buffer.length,
-    )
+    console.log('[Main Process] file:write-binary called, filePath:', filePath, 'buffer length:', buffer.length);
     // 规范化路径（处理 Windows 路径分隔符）
-    const normalizedPath = path.normalize(filePath)
-    console.log('[Main Process] Normalized path:', normalizedPath)
+    const normalizedPath = path.normalize(filePath);
+    console.log('[Main Process] Normalized path:', normalizedPath);
     // 确保目录存在
-    const dir = path.dirname(normalizedPath)
-    console.log('[Main Process] Directory path:', dir)
+    const dir = path.dirname(normalizedPath);
+    console.log('[Main Process] Directory path:', dir);
     if (!fs.existsSync(dir)) {
-      console.log('[Main Process] Directory does not exist, creating...')
-      fs.mkdirSync(dir, { recursive: true })
-      console.log('[Main Process] Directory created')
+      console.log('[Main Process] Directory does not exist, creating...');
+      fs.mkdirSync(dir, { recursive: true });
+      console.log('[Main Process] Directory created');
     } else {
-      console.log('[Main Process] Directory already exists')
+      console.log('[Main Process] Directory already exists');
     }
-    console.log('[Main Process] Writing file...')
-    fs.writeFileSync(normalizedPath, Buffer.from(buffer))
-    console.log('[Main Process] File written successfully:', normalizedPath)
+    console.log('[Main Process] Writing file...');
+    fs.writeFileSync(normalizedPath, Buffer.from(buffer));
+    console.log('[Main Process] File written successfully:', normalizedPath);
     // 验证文件是否存在
     if (fs.existsSync(normalizedPath)) {
-      const stats = fs.statSync(normalizedPath)
-      console.log('[Main Process] File verified, size:', stats.size, 'bytes')
+      const stats = fs.statSync(normalizedPath);
+      console.log('[Main Process] File verified, size:', stats.size, 'bytes');
     } else {
-      console.error('[Main Process] File was not created!')
+      console.error('[Main Process] File was not created!');
     }
-    return true
+    return true;
   } catch (error) {
-    console.error('[Main Process] Error writing binary file:', error)
-    throw error
+    console.error('[Main Process] Error writing binary file:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:read-binary', async (event, filePath) => {
   try {
     if (fs.existsSync(filePath)) {
-      const buffer = fs.readFileSync(filePath)
-      return Array.from(buffer)
+      const buffer = fs.readFileSync(filePath);
+      return Array.from(buffer);
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('Error reading binary file:', error)
-    throw error
+    console.error('Error reading binary file:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:exists-path', async (event, filePath) => {
   try {
-    return fs.existsSync(filePath)
+    return fs.existsSync(filePath);
   } catch (error) {
-    console.error('Error checking file existence:', error)
-    throw error
+    console.error('Error checking file existence:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('file:get-stats', async (event, filePath) => {
   try {
     if (fs.existsSync(filePath)) {
-      const stats = fs.statSync(filePath)
+      const stats = fs.statSync(filePath);
       return {
         size: stats.size,
         mtime: stats.mtime.toISOString(),
         isFile: stats.isFile(),
-        isDirectory: stats.isDirectory(),
-      }
+        isDirectory: stats.isDirectory()
+      };
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('Error getting file stats:', error)
-    throw error
+    console.error('Error getting file stats:', error);
+    throw error;
   }
-})
+});
 
 // 获取文件的完整路径（用于构建app://协议URL）
 ipcMain.handle('file:get-full-path', async (event, relativePath) => {
   try {
-    let fullPath
+    let fullPath;
 
     // 检查是否是绝对路径（外部文件）
     if (path.isAbsolute(relativePath)) {
       // 外部文件：直接使用绝对路径
-      fullPath = relativePath
+      fullPath = relativePath;
     } else {
       // 数据库文档：相对于dataPath的路径，如 "documents/xxx/assets/image.png"
-      fullPath = path.join(getDataPath(), relativePath)
+      fullPath = path.join(getDataPath(), relativePath);
     }
 
     // 转换为app://协议URL（自定义协议，更安全）
     // Windows路径需要特殊处理：C:\path\to\file -> app://C:/path/to/file
-    const normalizedPath = fullPath.replace(/\\/g, '/')
+    const normalizedPath = fullPath.replace(/\\/g, '/');
 
     // 直接返回 app:// 协议的 URL，协议处理器会处理路径解析
-    return `app://${normalizedPath}`
+    return `app://${normalizedPath}`;
   } catch (error) {
-    console.error('Error getting full path:', error)
-    throw error
+    console.error('Error getting full path:', error);
+    throw error;
   }
-})
+});
 
 // 获取数据目录的完整路径
 ipcMain.handle('file:get-data-path', async () => {
-  const path = getDataPath()
-  console.log('[Main Process] file:get-data-path called, returning:', path)
-  return path
-})
+  const path = getDataPath();
+  console.log('[Main Process] file:get-data-path called, returning:', path);
+  return path;
+});
 
 // 获取自定义数据路径（如果已设置）
 ipcMain.handle('file:get-custom-data-path', async () => {
-  const config = loadConfig()
-  const customPath = config.customDataPath || null
-  console.log('[Main Process] file:get-custom-data-path called, returning:', customPath)
-  return customPath
-})
+  const config = loadConfig();
+  const customPath = config.customDataPath || null;
+  console.log('[Main Process] file:get-custom-data-path called, returning:', customPath);
+  return customPath;
+});
 
 // 设置自定义数据路径
 ipcMain.handle('file:set-custom-data-path', async (_event, customPath) => {
   try {
-    console.log('[Main Process] file:set-custom-data-path called with:', customPath)
+    console.log('[Main Process] file:set-custom-data-path called with:', customPath);
 
     if (!customPath || !fs.existsSync(customPath)) {
-      throw new Error('Invalid path or path does not exist')
+      throw new Error('Invalid path or path does not exist');
     }
 
-    const config = loadConfig()
-    config.customDataPath = customPath
+    const config = loadConfig();
+    config.customDataPath = customPath;
     // 同时将这个路径设置为上次打开的文件夹（这样下次启动时会自动打开）
-    config.lastOpenedFolder = customPath
-    saveConfig(config)
+    config.lastOpenedFolder = customPath;
+    saveConfig(config);
 
     // 更新 dataPath 变量
-    dataPath = customPath
-    console.log('[Main Process] dataPath updated to:', dataPath)
+    dataPath = customPath;
+    console.log('[Main Process] dataPath updated to:', dataPath);
 
     // 确保数据目录存在
     if (!fs.existsSync(dataPath)) {
-      fs.mkdirSync(dataPath, { recursive: true })
+      fs.mkdirSync(dataPath, { recursive: true });
     }
 
-    await disposeAiGraphRepository()
+    await disposeAiGraphRepository();
 
-    console.log('[Main Process] Custom data path set successfully:', customPath)
-    return { success: true, path: customPath }
+    console.log('[Main Process] Custom data path set successfully:', customPath);
+    return { success: true, path: customPath };
   } catch (error) {
-    console.error('[Main Process] Error setting custom data path:', error)
-    return { success: false, error: error.message }
+    console.error('[Main Process] Error setting custom data path:', error);
+    return { success: false, error: error.message };
   }
-})
+});
 
 // 重置为默认数据路径
 ipcMain.handle('file:reset-data-path', async () => {
   try {
-    const config = loadConfig()
-    delete config.customDataPath
-    saveConfig(config)
+    const config = loadConfig();
+    delete config.customDataPath;
+    saveConfig(config);
 
     // 更新 dataPath 变量为默认路径
-    dataPath = path.join(userDataPath, 'data')
+    dataPath = path.join(userDataPath, 'data');
 
     // 确保数据目录存在
     if (!fs.existsSync(dataPath)) {
-      fs.mkdirSync(dataPath, { recursive: true })
+      fs.mkdirSync(dataPath, { recursive: true });
     }
 
-    await disposeAiGraphRepository()
+    await disposeAiGraphRepository();
 
-    return { success: true, path: dataPath }
+    return { success: true, path: dataPath };
   } catch (error) {
-    console.error('Error resetting data path:', error)
-    return { success: false, error: error.message }
+    console.error('Error resetting data path:', error);
+    return { success: false, error: error.message };
   }
-})
+});
 
 // 打开文件夹对话框
 ipcMain.handle('dialog:open-folder', async (_event, options = {}) => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory'],
-  })
+    properties: ['openDirectory']
+  });
   if (!result.canceled && result.filePaths.length > 0) {
     // 只有在不是知识片段库设置时才保存上次打开的文件夹
     // options.skipSaveLastFolder 为 true 时，不保存 lastOpenedFolder
     if (!options.skipSaveLastFolder) {
-      const config = loadConfig()
-      config.lastOpenedFolder = result.filePaths[0]
-      saveConfig(config)
+      const config = loadConfig();
+      config.lastOpenedFolder = result.filePaths[0];
+      saveConfig(config);
     }
-    return result.filePaths[0]
+    return result.filePaths[0];
   }
-  return null
-})
+  return null;
+});
 
 // 保存上次打开的文件夹
 ipcMain.handle('file:save-last-opened-folder', async (_event, folderPath) => {
   try {
-    const config = loadConfig()
-    config.lastOpenedFolder = folderPath
-    saveConfig(config)
-    return { success: true }
+    const config = loadConfig();
+    config.lastOpenedFolder = folderPath;
+    saveConfig(config);
+    return { success: true };
   } catch (error) {
-    console.error('Error saving last opened folder:', error)
-    return { success: false, error: error.message }
+    console.error('Error saving last opened folder:', error);
+    return { success: false, error: error.message };
   }
-})
+});
 
 // 获取上次打开的文件夹
 ipcMain.handle('file:get-last-opened-folder', async () => {
   try {
-    const config = loadConfig()
+    const config = loadConfig();
     if (config.lastOpenedFolder && fs.existsSync(config.lastOpenedFolder)) {
-      return config.lastOpenedFolder
+      return config.lastOpenedFolder;
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('Error getting last opened folder:', error)
-    return null
+    console.error('Error getting last opened folder:', error);
+    return null;
   }
-})
+});
 
 // 打开文件对话框
 ipcMain.handle('dialog:open-file', async (_event) => {
@@ -1386,291 +1324,277 @@ ipcMain.handle('dialog:open-file', async (_event) => {
     properties: ['openFile'],
     filters: [
       { name: 'Markdown Files', extensions: ['md', 'markdown'] },
-      { name: 'All Files', extensions: ['*'] },
-    ],
-  })
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
   if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0]
+    return result.filePaths[0];
   }
-  return null
-})
+  return null;
+});
 
 // 保存文件对话框
 ipcMain.handle('dialog:save-file', async (_event, options) => {
-  const browserWindow = BrowserWindow.getFocusedWindow()
+  const browserWindow = BrowserWindow.getFocusedWindow();
   const result = await dialog.showSaveDialog(browserWindow, {
     title: options.title || '保存文件',
     defaultPath: options.defaultPath,
-    filters: options.filters || [{ name: 'All Files', extensions: ['*'] }],
-  })
+    filters: options.filters || [
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
   if (result.canceled) {
-    return null
+    return null;
   }
-  return result.filePath
-})
+  return result.filePath;
+});
 
 // 规范化路径（供渲染进程统一 knowledge-graphs 等路径）
 ipcMain.handle('file:normalize-path', async (_event, p) => {
-  if (typeof p !== 'string' || !p) return p
-  return path.normalize(p)
-})
+  if (typeof p !== 'string' || !p) return p;
+  return path.normalize(p);
+});
 
 // ==================== AI 图谱 IPC 处理器 ====================
 ipcMain.handle('ai-graph:replace-document-contribution', async (_event, contribution) => {
   try {
-    const repo = await getAiGraphRepository()
-    await repo.replaceDocumentContribution(sanitizeAiGraphContribution(contribution))
-    return true
+    const repo = await getAiGraphRepository();
+    await repo.replaceDocumentContribution(sanitizeAiGraphContribution(contribution));
+    return true;
   } catch (error) {
-    console.error('[Main Process] Error replacing AI graph document contribution:', error)
-    throw error
+    console.error('[Main Process] Error replacing AI graph document contribution:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('ai-graph:get-document-graph', async (_event, docId) => {
   try {
-    const repo = await getAiGraphRepository()
-    return await repo.getDocumentGraph(assertAiGraphNonEmptyString(docId, 'docId'))
+    const repo = await getAiGraphRepository();
+    return await repo.getDocumentGraph(assertAiGraphNonEmptyString(docId, 'docId'));
   } catch (error) {
-    console.error('[Main Process] Error loading AI graph document graph:', error)
-    throw error
+    console.error('[Main Process] Error loading AI graph document graph:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('ai-graph:get-global-graph', async (_event, query) => {
   try {
-    const repo = await getAiGraphRepository()
-    return await repo.getGlobalGraph(sanitizeAiGraphQuery(query))
+    const repo = await getAiGraphRepository();
+    return await repo.getGlobalGraph(sanitizeAiGraphQuery(query));
   } catch (error) {
-    console.error('[Main Process] Error loading AI graph global graph:', error)
-    throw error
+    console.error('[Main Process] Error loading AI graph global graph:', error);
+    throw error;
   }
-})
+});
 
 ipcMain.handle('ai-graph:get-node-evidence', async (_event, nodeId) => {
   try {
-    const repo = await getAiGraphRepository()
-    return await repo.getNodeEvidence(assertAiGraphNonEmptyString(nodeId, 'nodeId'))
+    const repo = await getAiGraphRepository();
+    return await repo.getNodeEvidence(assertAiGraphNonEmptyString(nodeId, 'nodeId'));
   } catch (error) {
-    console.error('[Main Process] Error loading AI graph node evidence:', error)
-    throw error
+    console.error('[Main Process] Error loading AI graph node evidence:', error);
+    throw error;
   }
-})
+});
 
 // 读取目录内容
 ipcMain.handle('file:read-directory', async (event, dirPath) => {
   try {
-    const rootDir = typeof dirPath === 'string' ? path.normalize(dirPath) : dirPath
+    const rootDir = typeof dirPath === 'string' ? path.normalize(dirPath) : dirPath;
     if (!fs.existsSync(rootDir)) {
-      return []
+      return [];
     }
-    const items = fs.readdirSync(rootDir, { withFileTypes: true })
-    const result = []
+    const items = fs.readdirSync(rootDir, { withFileTypes: true });
+    const result = [];
 
-    const systemDirs = [
-      '.vault',
-      '.mdnote-ai-graph',
-      'fragments',
-      'variables',
-      'templates',
-      'exports',
-      'archive',
-    ]
-    const systemFiles = [
-      'vault.json',
-      'config.json',
-      'documents.json',
-      'folders.json',
-      '.mdnote-vars.yml',
-      '.mdnote-vars.json',
-      'index.json',
-    ]
+    const systemDirs = ['.vault', '.mdnote-ai-graph', 'fragments', 'variables', 'templates', 'exports', 'archive'];
+    const systemFiles = ['vault.json', 'config.json', 'documents.json', 'folders.json', '.mdnote-vars.yml', '.mdnote-vars.json', 'index.json'];
 
     for (const item of items) {
-      const fullPath = path.join(rootDir, item.name)
+      const fullPath = path.join(rootDir, item.name);
 
       if (item.isDirectory() && systemDirs.includes(item.name)) {
-        continue
+        continue;
       }
       if (!item.isDirectory() && (systemFiles.includes(item.name) || item.name.startsWith('.'))) {
-        continue
+        continue;
       }
 
       result.push({
         name: item.name,
         type: item.isDirectory() ? 'folder' : 'file',
-        path: fullPath,
-      })
+        path: fullPath
+      });
     }
 
     // 排序：文件夹在前，然后按名称排序
     result.sort((a, b) => {
       if (a.type !== b.type) {
-        return a.type === 'folder' ? -1 : 1
+        return a.type === 'folder' ? -1 : 1;
       }
-      return a.name.localeCompare(b.name)
-    })
+      return a.name.localeCompare(b.name);
+    });
 
-    return result
+    return result;
   } catch (error) {
-    console.error('Error reading directory:', error)
-    throw error
+    console.error('Error reading directory:', error);
+    throw error;
   }
-})
+});
 
 // 读取文件内容
 ipcMain.handle('file:read-file-content', async (event, filePath) => {
   try {
-    const normalized = path.normalize(filePath)
+    const normalized = path.normalize(filePath);
     if (fs.existsSync(normalized)) {
-      return fs.readFileSync(normalized, 'utf8')
+      return fs.readFileSync(normalized, 'utf8');
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('Error reading file content:', error)
-    throw error
+    console.error('Error reading file content:', error);
+    throw error;
   }
-})
+});
 
 // 写入文件内容
 ipcMain.handle('file:write-file-content', async (event, filePath, content) => {
   try {
-    const normalized = typeof filePath === 'string' ? path.normalize(filePath) : filePath
-    const dir = path.dirname(normalized)
+    const normalized = typeof filePath === 'string' ? path.normalize(filePath) : filePath;
+    const dir = path.dirname(normalized);
     if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true })
+      fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(normalized, content, 'utf8')
-    return true
+    fs.writeFileSync(normalized, content, 'utf8');
+    return true;
   } catch (error) {
-    console.error('Error writing file content:', error)
-    throw error
+    console.error('Error writing file content:', error);
+    throw error;
   }
-})
+});
 
 // 删除文件或文件夹
 ipcMain.handle('file:delete-node', async (event, nodePath) => {
   try {
     // 规范化路径（处理 Windows 路径）
-    const normalizedPath = path.normalize(nodePath)
+    const normalizedPath = path.normalize(nodePath);
 
     // 检查路径是否存在
     if (!fs.existsSync(normalizedPath)) {
-      console.warn('要删除的路径不存在:', normalizedPath)
-      return true // 路径不存在，视为删除成功
+      console.warn('要删除的路径不存在:', normalizedPath);
+      return true; // 路径不存在，视为删除成功
     }
 
-    const stats = fs.statSync(normalizedPath)
+    const stats = fs.statSync(normalizedPath);
     if (stats.isDirectory()) {
-      fs.rmSync(normalizedPath, { recursive: true, force: true })
-      console.log('已删除目录:', normalizedPath)
+      fs.rmSync(normalizedPath, { recursive: true, force: true });
+      console.log('已删除目录:', normalizedPath);
     } else {
-      fs.unlinkSync(normalizedPath)
-      console.log('已删除文件:', normalizedPath)
+      fs.unlinkSync(normalizedPath);
+      console.log('已删除文件:', normalizedPath);
     }
-    return true
+    return true;
   } catch (error) {
-    console.error('Error deleting node:', error)
-    throw error
+    console.error('Error deleting node:', error);
+    throw error;
   }
-})
+});
 
 // 重命名文件或文件夹
 ipcMain.handle('file:rename-node', async (event, oldPath, newName) => {
   try {
     // 规范化路径（处理 Windows 路径）
-    const normalizedOldPath = path.normalize(oldPath)
+    const normalizedOldPath = path.normalize(oldPath);
 
     // 检查路径是否存在
     if (!fs.existsSync(normalizedOldPath)) {
-      throw new Error('要重命名的路径不存在: ' + normalizedOldPath)
+      throw new Error('要重命名的路径不存在: ' + normalizedOldPath);
     }
 
     // 获取父目录
-    const parentDir = path.dirname(normalizedOldPath)
+    const parentDir = path.dirname(normalizedOldPath);
 
     // 构建新路径
-    const newPath = path.join(parentDir, newName)
+    const newPath = path.join(parentDir, newName);
 
     // 检查新路径是否已存在
     if (fs.existsSync(newPath)) {
-      throw new Error('目标路径已存在: ' + newPath)
+      throw new Error('目标路径已存在: ' + newPath);
     }
 
     // 执行重命名
-    fs.renameSync(normalizedOldPath, newPath)
-    console.log('[Main Process] 已重命名:', normalizedOldPath, '->', newPath)
+    fs.renameSync(normalizedOldPath, newPath);
+    console.log('[Main Process] 已重命名:', normalizedOldPath, '->', newPath);
 
     // 返回新路径（保持原始格式，前端会处理）
-    return { success: true, newPath: newPath }
+    return { success: true, newPath: newPath };
   } catch (error) {
-    console.error('Error renaming node:', error)
-    throw error
+    console.error('Error renaming node:', error);
+    throw error;
   }
-})
+});
 
 // 文件缓存操作（用于存储引用标志信息）
 const getCachePath = (filePath) => {
   // 将文件路径转换为缓存文件名（使用hash避免路径问题）
-  const crypto = require('crypto')
-  const hash = crypto.createHash('md5').update(filePath).digest('hex')
-  const cacheDir = path.join(getDataPath(), 'file-cache')
+  const crypto = require('crypto');
+  const hash = crypto.createHash('md5').update(filePath).digest('hex');
+  const cacheDir = path.join(getDataPath(), 'file-cache');
   if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true })
+    fs.mkdirSync(cacheDir, { recursive: true });
   }
-  return path.join(cacheDir, `${hash}.json`)
-}
+  return path.join(cacheDir, `${hash}.json`);
+};
 
 ipcMain.handle('file:save-file-cache', async (event, filePath, cacheData) => {
   try {
-    const cachePath = getCachePath(filePath)
-    fs.writeFileSync(cachePath, JSON.stringify(cacheData, null, 2), 'utf8')
-    return { success: true }
+    const cachePath = getCachePath(filePath);
+    fs.writeFileSync(cachePath, JSON.stringify(cacheData, null, 2), 'utf8');
+    return { success: true };
   } catch (error) {
-    console.error('Error saving file cache:', error)
-    return { success: false, error: error.message }
+    console.error('Error saving file cache:', error);
+    return { success: false, error: error.message };
   }
-})
+});
 
 ipcMain.handle('file:get-file-cache', async (event, filePath) => {
   try {
-    const cachePath = getCachePath(filePath)
+    const cachePath = getCachePath(filePath);
     if (fs.existsSync(cachePath)) {
-      const data = fs.readFileSync(cachePath, 'utf8')
-      return JSON.parse(data)
+      const data = fs.readFileSync(cachePath, 'utf8');
+      return JSON.parse(data);
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('Error getting file cache:', error)
-    return null
+    console.error('Error getting file cache:', error);
+    return null;
   }
-})
+});
 
 ipcMain.handle('file:delete-file-cache', async (event, filePath) => {
   try {
-    const cachePath = getCachePath(filePath)
+    const cachePath = getCachePath(filePath);
     if (fs.existsSync(cachePath)) {
-      fs.unlinkSync(cachePath)
+      fs.unlinkSync(cachePath);
     }
-    return { success: true }
+    return { success: true };
   } catch (error) {
-    console.error('Error deleting file cache:', error)
-    return { success: false, error: error.message }
+    console.error('Error deleting file cache:', error);
+    return { success: false, error: error.message };
   }
-})
+});
 
 // ==================== PDF 导出 IPC 处理器 ====================
 ipcMain.handle('export:pdf', async (event, options) => {
   try {
     // 从 options 中提取文件名（如果有的话）
-    const fileName = options.filename || options.title || 'document'
-    console.log('[Main Process] PDF export requested:', fileName)
+    const fileName = options.filename || options.title || 'document';
+    console.log('[Main Process] PDF export requested:', fileName);
 
     // 直接使用 Puppeteer 生成 PDF，不依赖 TypeScript 编译后的文件
     // 渲染进程已经准备好了 HTML 内容，我们只需要使用 Puppeteer 生成 PDF
-    const puppeteer = require('puppeteer')
+    const puppeteer = require('puppeteer');
 
-    let browser
+    let browser;
     try {
       // 启动浏览器（添加更多参数以避免文件锁定问题）
       browser = await puppeteer.launch({
@@ -1682,36 +1606,36 @@ ipcMain.handle('export:pdf', async (event, options) => {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--disable-gpu',
-        ],
-      })
+          '--disable-gpu'
+        ]
+      });
 
-      const page = await browser.newPage()
+      const page = await browser.newPage();
 
       // 设置页面默认超时（30秒）
-      page.setDefaultTimeout(30000)
-      page.setDefaultNavigationTimeout(30000)
+      page.setDefaultTimeout(30000);
+      page.setDefaultNavigationTimeout(30000);
 
       // 设置内容，等待网络资源（包括 KaTeX CSS）加载完成
       await page.setContent(options.html || options.content || '', {
-        waitUntil: 'networkidle0', // 等待网络空闲，确保外部资源（CSS、字体）加载完成
-        timeout: 30000,
-      })
+        waitUntil: 'networkidle0',  // 等待网络空闲，确保外部资源（CSS、字体）加载完成
+        timeout: 30000
+      });
 
       // 额外等待，确保 KaTeX 字体加载完成
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // 检查页面加载状态
       const loadStatus = await page.evaluate(() => {
-        const katexElements = document.querySelectorAll('.katex')
-        const katexStyles = document.querySelector('link[href*="katex"]')
+        const katexElements = document.querySelectorAll('.katex');
+        const katexStyles = document.querySelector('link[href*="katex"]');
         return {
           katexCount: katexElements.length,
           hasKatexCSS: !!katexStyles,
-          katexCSSHref: katexStyles ? katexStyles.getAttribute('href') : null,
-        }
-      })
-      console.log('[PDF Export] 页面加载状态:', loadStatus)
+          katexCSSHref: katexStyles ? katexStyles.getAttribute('href') : null
+        };
+      });
+      console.log('[PDF Export] 页面加载状态:', loadStatus);
 
       // 等待 KaTeX 和 Mermaid 渲染（带超时保护）
       try {
@@ -1723,51 +1647,47 @@ ipcMain.handle('export:pdf', async (event, options) => {
               setTimeout(() => {
                 // 检查 Mermaid 占位符
                 const checkAndWaitMermaid = () => {
-                  const placeholders = document.querySelectorAll('.mermaid-asset-placeholder')
+                  const placeholders = document.querySelectorAll('.mermaid-asset-placeholder');
 
                   if (placeholders.length === 0) {
-                    console.log('[PDF Export] 所有资源已就绪')
-                    resolve()
-                    return
+                    console.log('[PDF Export] 所有资源已就绪');
+                    resolve();
+                    return;
                   }
 
-                  console.log(`[PDF Export] 等待 ${placeholders.length} 个 Mermaid 图表渲染`)
+                  console.log(`[PDF Export] 等待 ${placeholders.length} 个 Mermaid 图表渲染`);
 
                   // 使用 setInterval 定期检查，最多等待 8 秒
-                  let attempts = 0
-                  const maxAttempts = 16
+                  let attempts = 0;
+                  const maxAttempts = 16;
                   const interval = setInterval(() => {
-                    attempts++
-                    const remaining = document.querySelectorAll('.mermaid-asset-placeholder')
+                    attempts++;
+                    const remaining = document.querySelectorAll('.mermaid-asset-placeholder');
 
                     if (remaining.length === 0) {
-                      clearInterval(interval)
-                      console.log('[PDF Export] Mermaid 图表渲染完成')
-                      resolve()
+                      clearInterval(interval);
+                      console.log('[PDF Export] Mermaid 图表渲染完成');
+                      resolve();
                     } else if (attempts >= maxAttempts) {
-                      clearInterval(interval)
-                      console.warn(
-                        `[PDF Export] 部分图表可能未完全渲染（剩余 ${remaining.length} 个）`,
-                      )
-                      resolve() // 超时后也继续，不中断导出
+                      clearInterval(interval);
+                      console.warn(`[PDF Export] 部分图表可能未完全渲染（剩余 ${remaining.length} 个）`);
+                      resolve(); // 超时后也继续，不中断导出
                     }
-                  }, 500)
-                }
+                  }, 500);
+                };
 
-                checkAndWaitMermaid()
-              }, 500)
-            })
+                checkAndWaitMermaid();
+              }, 500);
+            });
           }),
           // 超时保护（12秒）
-          new Promise((resolve) =>
-            setTimeout(() => {
-              console.warn('[PDF Export] 渲染等待超时，继续生成PDF')
-              resolve()
-            }, 12000),
-          ),
-        ])
+          new Promise((resolve) => setTimeout(() => {
+            console.warn('[PDF Export] 渲染等待超时，继续生成PDF');
+            resolve();
+          }, 12000))
+        ]);
       } catch (evaluateError) {
-        console.warn('[PDF Export] 渲染等待出错，继续生成PDF:', evaluateError.message)
+        console.warn('[PDF Export] 渲染等待出错，继续生成PDF:', evaluateError.message);
         // 即使等待失败也继续生成 PDF
       }
 
@@ -1778,15 +1698,15 @@ ipcMain.handle('export:pdf', async (event, options) => {
           top: '2cm',
           right: '2cm',
           bottom: '2cm',
-          left: '2cm',
+          left: '2cm'
         },
-        printBackground: true,
-      })
+        printBackground: true
+      });
 
-      console.log('[Main Process] PDF export completed, buffer size:', pdfBuffer.length)
+      console.log('[Main Process] PDF export completed, buffer size:', pdfBuffer.length);
 
       // 将 Buffer 转换为 Array（用于 IPC 传输）
-      const bufferArray = Array.from(pdfBuffer)
+      const bufferArray = Array.from(pdfBuffer);
 
       // 先准备返回值，然后关闭浏览器
       const result = {
@@ -1794,39 +1714,37 @@ ipcMain.handle('export:pdf', async (event, options) => {
         buffer: bufferArray,
         extension: 'pdf',
         mimeType: 'application/pdf',
-        filename: (options.title || 'document').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '.pdf',
-      }
+        filename: (options.title || 'document').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '.pdf'
+      };
 
       // 改进的浏览器关闭逻辑
       if (browser) {
         try {
           // 先尝试关闭所有页面
-          const pages = await browser.pages()
-          await Promise.all(
-            pages.map(async (p) => {
-              try {
-                if (!p.isClosed()) {
-                  await p.close()
-                }
-              } catch (e) {
-                // 忽略单个页面关闭错误
+          const pages = await browser.pages();
+          await Promise.all(pages.map(async (p) => {
+            try {
+              if (!p.isClosed()) {
+                await p.close();
               }
-            }),
-          )
+            } catch (e) {
+              // 忽略单个页面关闭错误
+            }
+          }));
 
           // 然后关闭浏览器
-          await browser.close()
+          await browser.close();
 
           // 添加延迟确保资源释放
-          await new Promise((resolve) => setTimeout(resolve, 300))
+          await new Promise(resolve => setTimeout(resolve, 300));
         } catch (closeError) {
-          console.warn('[Main Process] Browser close warning:', closeError.message)
+          console.warn('[Main Process] Browser close warning:', closeError.message);
           // 尝试强制终止浏览器进程
           try {
-            const browserProcess = browser.process()
+            const browserProcess = browser.process();
             if (browserProcess && !browserProcess.killed) {
-              browserProcess.kill('SIGTERM')
-              await new Promise((resolve) => setTimeout(resolve, 200))
+              browserProcess.kill('SIGTERM');
+              await new Promise(resolve => setTimeout(resolve, 200));
             }
           } catch (killError) {
             // 忽略终止错误
@@ -1834,250 +1752,248 @@ ipcMain.handle('export:pdf', async (event, options) => {
         }
       }
 
-      return result
+      return result;
     } catch (error) {
-      console.error('[Main Process] PDF export error:', error)
+      console.error('[Main Process] PDF export error:', error);
 
       // 确保浏览器被关闭（增强的错误处理）
       if (browser) {
         try {
-          const pages = await browser.pages()
-          await Promise.all(
-            pages.map(async (p) => {
-              try {
-                if (!p.isClosed()) {
-                  await p.close()
-                }
-              } catch (e) {
-                // 忽略
+          const pages = await browser.pages();
+          await Promise.all(pages.map(async (p) => {
+            try {
+              if (!p.isClosed()) {
+                await p.close();
               }
-            }),
-          )
+            } catch (e) {
+              // 忽略
+            }
+          }));
 
-          await browser.close()
-          await new Promise((resolve) => setTimeout(resolve, 300))
+          await browser.close();
+          await new Promise(resolve => setTimeout(resolve, 300));
         } catch (closeError) {
-          console.warn('[Main Process] Error closing browser after failure:', closeError.message)
+          console.warn('[Main Process] Error closing browser after failure:', closeError.message);
           // 强制终止
           try {
-            const browserProcess = browser.process()
+            const browserProcess = browser.process();
             if (browserProcess && !browserProcess.killed) {
-              browserProcess.kill('SIGTERM')
+              browserProcess.kill('SIGTERM');
             }
           } catch (killError) {
             // 忽略
           }
         }
       }
-      throw error
+      throw error;
     }
   } catch (error) {
-    console.error('[Main Process] PDF export error:', error)
+    console.error('[Main Process] PDF export error:', error);
     return {
       success: false,
-      error: error.message || 'PDF导出失败',
-    }
+      error: error.message || 'PDF导出失败'
+    };
   }
-})
+});
 
 // ==================== 知识库 IPC 处理器 ====================
 // 创建目录
 ipcMain.handle('vault:create-directory', async (event, dirPath) => {
   try {
-    console.log('[Main Process] vault:create-directory called, dirPath:', dirPath)
-    const normalizedPath = path.normalize(dirPath)
+    console.log('[Main Process] vault:create-directory called, dirPath:', dirPath);
+    const normalizedPath = path.normalize(dirPath);
     if (!fs.existsSync(normalizedPath)) {
-      fs.mkdirSync(normalizedPath, { recursive: true })
-      console.log('[Main Process] Directory created:', normalizedPath)
+      fs.mkdirSync(normalizedPath, { recursive: true });
+      console.log('[Main Process] Directory created:', normalizedPath);
     }
-    return true
+    return true;
   } catch (error) {
-    console.error('[Main Process] Error creating vault directory:', error)
-    throw error
+    console.error('[Main Process] Error creating vault directory:', error);
+    throw error;
   }
-})
+});
 
 // 写入文件
 ipcMain.handle('vault:write', async (event, filePath, data) => {
   try {
-    console.log('[Main Process] vault:write called, filePath:', filePath)
-    const normalizedPath = path.normalize(filePath)
-    const dir = path.dirname(normalizedPath)
+    console.log('[Main Process] vault:write called, filePath:', filePath);
+    const normalizedPath = path.normalize(filePath);
+    const dir = path.dirname(normalizedPath);
 
     if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true })
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      fs.mkdirSync(dir, { recursive: true });
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    const maxRetries = 5
-    const baseDelay = 50
+    const maxRetries = 5;
+    const baseDelay = 50;
 
     for (let i = 0; i < maxRetries; i++) {
       try {
-        fs.writeFileSync(normalizedPath, JSON.stringify(data, null, 2), 'utf8')
-        console.log('[Main Process] File written:', normalizedPath)
-        return true
+        fs.writeFileSync(normalizedPath, JSON.stringify(data, null, 2), 'utf8');
+        console.log('[Main Process] File written:', normalizedPath);
+        return true;
       } catch (err) {
-        console.log(`[Main Process] Write attempt ${i + 1}/${maxRetries} failed:`, err.message)
+        console.log(`[Main Process] Write attempt ${i + 1}/${maxRetries} failed:`, err.message);
         if (err.code === 'EPERM' || err.code === 'EBUSY') {
           if (i < maxRetries - 1) {
-            const delay = baseDelay * Math.pow(2, i)
-            console.log(`[Main Process] Retrying after ${delay}ms...`)
-            await new Promise((resolve) => setTimeout(resolve, delay))
+            const delay = baseDelay * Math.pow(2, i);
+            console.log(`[Main Process] Retrying after ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
           } else {
-            throw err
+            throw err;
           }
         } else {
-          throw err
+          throw err;
         }
       }
     }
-    return false
+    return false;
   } catch (error) {
-    console.error('[Main Process] Error writing vault file:', error)
-    throw error
+    console.error('[Main Process] Error writing vault file:', error);
+    throw error;
   }
-})
+});
 
 // 读取文件
 ipcMain.handle('vault:read', async (event, filePath) => {
   try {
-    console.log('[Main Process] vault:read called, filePath:', filePath)
-    const normalizedPath = path.normalize(filePath)
+    console.log('[Main Process] vault:read called, filePath:', filePath);
+    const normalizedPath = path.normalize(filePath);
     if (fs.existsSync(normalizedPath)) {
-      const data = fs.readFileSync(normalizedPath, 'utf8')
-      return JSON.parse(data)
+      const data = fs.readFileSync(normalizedPath, 'utf8');
+      return JSON.parse(data);
     }
-    return null
+    return null;
   } catch (error) {
-    console.error('[Main Process] Error reading vault file:', error)
-    throw error
+    console.error('[Main Process] Error reading vault file:', error);
+    throw error;
   }
-})
+});
 
 // 删除目录
 ipcMain.handle('vault:delete-directory', async (event, dirPath) => {
   try {
-    console.log('[Main Process] vault:delete-directory called, dirPath:', dirPath)
-    const normalizedPath = path.normalize(dirPath)
+    console.log('[Main Process] vault:delete-directory called, dirPath:', dirPath);
+    const normalizedPath = path.normalize(dirPath);
     if (fs.existsSync(normalizedPath)) {
-      fs.rmSync(normalizedPath, { recursive: true, force: true })
-      console.log('[Main Process] Directory deleted:', normalizedPath)
+      fs.rmSync(normalizedPath, { recursive: true, force: true });
+      console.log('[Main Process] Directory deleted:', normalizedPath);
     }
-    return true
+    return true;
   } catch (error) {
-    console.error('[Main Process] Error deleting vault directory:', error)
-    throw error
+    console.error('[Main Process] Error deleting vault directory:', error);
+    throw error;
   }
-})
+});
 
 // 检查文件是否存在
 ipcMain.handle('vault:exists', async (event, filePath) => {
   try {
-    const normalizedPath = path.normalize(filePath)
-    return fs.existsSync(normalizedPath)
+    const normalizedPath = path.normalize(filePath);
+    return fs.existsSync(normalizedPath);
   } catch (error) {
-    console.error('[Main Process] Error checking vault file existence:', error)
-    throw error
+    console.error('[Main Process] Error checking vault file existence:', error);
+    throw error;
   }
-})
+});
 
 // 检查目录是否存在
 ipcMain.handle('vault:directory-exists', async (event, dirPath) => {
   try {
-    const normalizedPath = path.normalize(dirPath)
+    const normalizedPath = path.normalize(dirPath);
     if (fs.existsSync(normalizedPath)) {
-      const stats = fs.statSync(normalizedPath)
-      return stats.isDirectory()
+      const stats = fs.statSync(normalizedPath);
+      return stats.isDirectory();
     }
-    return false
+    return false;
   } catch (error) {
-    console.error('[Main Process] Error checking vault directory existence:', error)
-    throw error
+    console.error('[Main Process] Error checking vault directory existence:', error);
+    throw error;
   }
-})
+});
 
 // ==================== 知识库注册表 IPC 处理器 ====================
-const VAULT_REGISTRY_FILE = 'vault-registry.json'
+const VAULT_REGISTRY_FILE = 'vault-registry.json';
 
 function getVaultRegistryPath() {
-  return path.join(userDataPath, VAULT_REGISTRY_FILE)
+  return path.join(userDataPath, VAULT_REGISTRY_FILE);
 }
 
 function loadVaultRegistry() {
-  const registryPath = getVaultRegistryPath()
+  const registryPath = getVaultRegistryPath();
   try {
     if (fs.existsSync(registryPath)) {
-      const data = fs.readFileSync(registryPath, 'utf8')
-      return JSON.parse(data)
+      const data = fs.readFileSync(registryPath, 'utf8');
+      return JSON.parse(data);
     }
   } catch (error) {
-    console.error('[Main Process] Error loading vault registry:', error)
+    console.error('[Main Process] Error loading vault registry:', error);
   }
   return {
     version: '1.0.0',
     vaults: [],
-    lastOpenedVaultId: null,
-  }
+    lastOpenedVaultId: null
+  };
 }
 
 function saveVaultRegistry(registry) {
-  const registryPath = getVaultRegistryPath()
+  const registryPath = getVaultRegistryPath();
   try {
-    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf8')
-    return true
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf8');
+    return true;
   } catch (error) {
-    console.error('[Main Process] Error saving vault registry:', error)
-    return false
+    console.error('[Main Process] Error saving vault registry:', error);
+    return false;
   }
 }
 
 ipcMain.handle('vault-registry:get', async () => {
-  return loadVaultRegistry()
-})
+  return loadVaultRegistry();
+});
 
 ipcMain.handle('vault-registry:save', async (event, registry) => {
-  return saveVaultRegistry(registry)
-})
+  return saveVaultRegistry(registry);
+});
 
 ipcMain.handle('vault-registry:add-vault', async (event, item) => {
-  const registry = loadVaultRegistry()
-  const existingIndex = registry.vaults.findIndex((v) => v.id === item.id)
+  const registry = loadVaultRegistry();
+  const existingIndex = registry.vaults.findIndex(v => v.id === item.id);
   if (existingIndex >= 0) {
-    registry.vaults[existingIndex] = item
+    registry.vaults[existingIndex] = item;
   } else {
-    registry.vaults.push(item)
+    registry.vaults.push(item);
   }
-  return saveVaultRegistry(registry)
-})
+  return saveVaultRegistry(registry);
+});
 
 ipcMain.handle('vault-registry:remove-vault', async (event, id) => {
-  const registry = loadVaultRegistry()
-  registry.vaults = registry.vaults.filter((v) => v.id !== id)
+  const registry = loadVaultRegistry();
+  registry.vaults = registry.vaults.filter(v => v.id !== id);
   if (registry.lastOpenedVaultId === id) {
-    registry.lastOpenedVaultId = null
+    registry.lastOpenedVaultId = null;
   }
-  return saveVaultRegistry(registry)
-})
+  return saveVaultRegistry(registry);
+});
 
 ipcMain.handle('vault-registry:set-last-opened', async (event, id) => {
-  const registry = loadVaultRegistry()
-  registry.lastOpenedVaultId = id
-  return saveVaultRegistry(registry)
-})
+  const registry = loadVaultRegistry();
+  registry.lastOpenedVaultId = id;
+  return saveVaultRegistry(registry);
+});
 
 ipcMain.handle('vault-registry:check-path-exists', async (event, vaultPath) => {
   try {
-    return fs.existsSync(vaultPath)
+    return fs.existsSync(vaultPath);
   } catch (error) {
-    return false
+    return false;
   }
-})
+});
 
 ipcMain.handle('vault:get-vaults-path', async () => {
-  const vaultsPath = path.join(userDataPath, 'vaults')
+  const vaultsPath = path.join(userDataPath, 'vaults');
   if (!fs.existsSync(vaultsPath)) {
-    fs.mkdirSync(vaultsPath, { recursive: true })
+    fs.mkdirSync(vaultsPath, { recursive: true });
   }
-  return vaultsPath
-})
+  return vaultsPath;
+});
