@@ -46,11 +46,7 @@
                 <div class="action-content">
                   <h3>选择保存位置</h3>
                   <p class="action-description">点击下方按钮选择文件保存位置和文件名</p>
-                  <button 
-                    class="btn-select-path-large" 
-                    @click="handleSelectPath"
-                    type="button"
-                  >
+                  <button class="btn-select-path-large" @click="handleSelectPath" type="button">
                     <span class="btn-icon">📂</span>
                     <span>选择保存位置和文件名</span>
                   </button>
@@ -165,7 +161,13 @@
               </div>
               <div class="form-group">
                 <label>行高</label>
-                <input type="number" v-model.number="config.body.lineHeight" min="1.0" max="3.0" step="0.1" />
+                <input
+                  type="number"
+                  v-model.number="config.body.lineHeight"
+                  min="1.0"
+                  max="3.0"
+                  step="0.1"
+                />
               </div>
             </div>
             <div class="form-row">
@@ -175,7 +177,13 @@
               </div>
               <div class="form-group">
                 <label>段落间距 (em)</label>
-                <input type="number" v-model.number="config.body.paragraphSpacing" min="0" max="2" step="0.1" />
+                <input
+                  type="number"
+                  v-model.number="config.body.paragraphSpacing"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                />
               </div>
             </div>
             <div class="form-group">
@@ -213,19 +221,43 @@
             <div class="form-row">
               <div class="form-group">
                 <label>上</label>
-                <input type="number" v-model.number="config.page.marginTop" min="0" max="5" step="0.1" />
+                <input
+                  type="number"
+                  v-model.number="config.page.marginTop"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                />
               </div>
               <div class="form-group">
                 <label>右</label>
-                <input type="number" v-model.number="config.page.marginRight" min="0" max="5" step="0.1" />
+                <input
+                  type="number"
+                  v-model.number="config.page.marginRight"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                />
               </div>
               <div class="form-group">
                 <label>下</label>
-                <input type="number" v-model.number="config.page.marginBottom" min="0" max="5" step="0.1" />
+                <input
+                  type="number"
+                  v-model.number="config.page.marginBottom"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                />
               </div>
               <div class="form-group">
                 <label>左</label>
-                <input type="number" v-model.number="config.page.marginLeft" min="0" max="5" step="0.1" />
+                <input
+                  type="number"
+                  v-model.number="config.page.marginLeft"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                />
               </div>
             </div>
           </div>
@@ -320,45 +352,50 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import type { ExportConfig, ExportPreset } from '../../domain/types/export-config.types';
-import { ExportPresets } from '../../domain/types/export-config.types';
+import { ref, watch } from 'vue'
+import type { ExportConfig, ExportPreset } from '../../domain/types/export-config.types'
+import { ExportPresets } from '../../domain/types/export-config.types'
 
 interface Props {
-  show: boolean;
-  format: 'pdf' | 'html' | 'markdown';
-  defaultFileName?: string;
+  show: boolean
+  format: 'pdf' | 'html' | 'markdown'
+  defaultFileName?: string
 }
 
 interface Emits {
-  (e: 'confirm', config: ExportConfig, fileName: string, savePath: string): void;
-  (e: 'cancel'): void;
+  (e: 'confirm', config: ExportConfig, fileName: string, savePath: string): void
+  (e: 'cancel'): void
 }
 
-const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
 
 // 当前选中的预设
-const selectedPreset = ref<ExportPreset>('default');
+const selectedPreset = ref<ExportPreset>('default')
 
 // 当前配置
-const config = ref<ExportConfig>({ ...ExportPresets.default });
+const config = ref<ExportConfig>({ ...ExportPresets.default })
 
 // 当前激活的标签页
-const activeTab = ref<'font' | 'heading' | 'body' | 'page' | 'advanced' | 'export'>('export');
+const activeTab = ref<'font' | 'heading' | 'body' | 'page' | 'advanced' | 'export'>('export')
 
 // 导出文件配置
-const exportFileName = ref('');
-const exportSavePath = ref('');
+const exportFileName = ref('')
+const exportSavePath = ref('')
 
 // 预设列表
 const presets = [
   { key: 'default' as ExportPreset, name: '默认', icon: '📄', description: '通用文档样式' },
   { key: 'academic' as ExportPreset, name: '学术论文', icon: '🎓', description: '适合学术写作' },
-  { key: 'professional' as ExportPreset, name: '专业文档', icon: '💼', description: '商务专业风格' },
+  {
+    key: 'professional' as ExportPreset,
+    name: '专业文档',
+    icon: '💼',
+    description: '商务专业风格',
+  },
   { key: 'minimal' as ExportPreset, name: '简约', icon: '✨', description: '简洁优雅' },
-  { key: 'custom' as ExportPreset, name: '自定义', icon: '⚙️', description: '自由配置' }
-];
+  { key: 'custom' as ExportPreset, name: '自定义', icon: '⚙️', description: '自由配置' },
+]
 
 // 标签页列表
 const tabs = [
@@ -367,123 +404,129 @@ const tabs = [
   { key: 'heading' as const, name: '标题', icon: '📑' },
   { key: 'body' as const, name: '正文', icon: '📝' },
   { key: 'page' as const, name: '页面', icon: '📄' },
-  { key: 'advanced' as const, name: '高级', icon: '⚙️' }
-];
+  { key: 'advanced' as const, name: '高级', icon: '⚙️' },
+]
 
 // 字体选项
 const fontOptions = [
-  { label: '系统默认', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif' },
+  {
+    label: '系统默认',
+    value: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif',
+  },
   { label: '微软雅黑', value: '"Microsoft YaHei", sans-serif' },
   { label: '宋体', value: '"SimSun", serif' },
   { label: '黑体', value: '"SimHei", sans-serif' },
   { label: 'Times New Roman', value: '"Times New Roman", "SimSun", serif' },
   { label: 'Arial', value: '"Arial", "Microsoft YaHei", sans-serif' },
   { label: 'Calibri', value: '"Calibri", "Microsoft YaHei", sans-serif' },
-  { label: 'Georgia', value: '"Georgia", "SimSun", serif' }
-];
+  { label: 'Georgia', value: '"Georgia", "SimSun", serif' },
+]
 
 // 代码字体选项
 const codeFontOptions = [
   { label: 'Consolas', value: '"Consolas", "Monaco", "Courier New", monospace' },
   { label: 'Monaco', value: '"Monaco", "Courier New", monospace' },
   { label: 'Courier New', value: '"Courier New", monospace' },
-  { label: 'Fira Code', value: '"Fira Code", "Consolas", monospace' }
-];
+  { label: 'Fira Code', value: '"Fira Code", "Consolas", monospace' },
+]
 
 // 选择预设
 const selectPreset = (preset: ExportPreset) => {
-  selectedPreset.value = preset;
-  config.value = JSON.parse(JSON.stringify(ExportPresets[preset]));
-};
+  selectedPreset.value = preset
+  config.value = JSON.parse(JSON.stringify(ExportPresets[preset]))
+}
 
 // 重置为默认
 const resetToDefault = () => {
-  selectPreset('default');
-};
+  selectPreset('default')
+}
 
 // 选择保存路径
 const handleSelectPath = async () => {
-  const electronAPI = (window as any).electronAPI;
+  const electronAPI = (window as any).electronAPI
   if (!electronAPI || !electronAPI.dialog || !electronAPI.dialog.showSaveDialog) {
-    alert('文件选择功能需要在 Electron 环境中运行');
-    return;
+    alert('文件选择功能需要在 Electron 环境中运行')
+    return
   }
 
   try {
-    const formatExtension = props.format === 'pdf' ? 'pdf' : props.format === 'html' ? 'html' : 'md';
+    const formatExtension = props.format === 'pdf' ? 'pdf' : props.format === 'html' ? 'html' : 'md'
     const result = await electronAPI.dialog.showSaveDialog({
       title: '选择导出位置',
       defaultPath: exportFileName.value + '.' + formatExtension,
       filters: [
         { name: `${props.format.toUpperCase()} 文件`, extensions: [formatExtension] },
-        { name: '所有文件', extensions: ['*'] }
-      ]
-    });
+        { name: '所有文件', extensions: ['*'] },
+      ],
+    })
 
     if (!result.canceled && result.filePath) {
-      exportSavePath.value = result.filePath;
+      exportSavePath.value = result.filePath
       // 从路径中提取文件名（不含扩展名）
-      const pathParts = result.filePath.split(/[/\\]/);
-      const fileNameWithExt = pathParts[pathParts.length - 1];
-      const fileNameParts = fileNameWithExt.split('.');
+      const pathParts = result.filePath.split(/[/\\]/)
+      const fileNameWithExt = pathParts[pathParts.length - 1]
+      const fileNameParts = fileNameWithExt.split('.')
       if (fileNameParts.length > 1) {
-        fileNameParts.pop(); // 移除扩展名
+        fileNameParts.pop() // 移除扩展名
       }
-      exportFileName.value = fileNameParts.join('.');
+      exportFileName.value = fileNameParts.join('.')
     }
   } catch (error) {
-    console.error('Failed to select path:', error);
-    alert('选择路径失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('Failed to select path:', error)
+    alert('选择路径失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 // 确认导出
 const handleConfirm = () => {
   // 验证路径
   if (!exportSavePath.value.trim()) {
-    alert('请先选择保存位置和文件名');
-    return;
+    alert('请先选择保存位置和文件名')
+    return
   }
 
   // 保存配置到 localStorage
   try {
-    localStorage.setItem('export-config', JSON.stringify(config.value));
-    localStorage.setItem('export-preset', selectedPreset.value);
+    localStorage.setItem('export-config', JSON.stringify(config.value))
+    localStorage.setItem('export-preset', selectedPreset.value)
   } catch (error) {
-    console.warn('Failed to save export config:', error);
+    console.warn('Failed to save export config:', error)
   }
-  
-  emit('confirm', config.value, exportFileName.value, exportSavePath.value);
-};
+
+  emit('confirm', config.value, exportFileName.value, exportSavePath.value)
+}
 
 // 取消
 const handleCancel = () => {
-  emit('cancel');
-};
+  emit('cancel')
+}
 
 // 监听 show 属性，打开时加载保存的配置
-watch(() => props.show, (newShow) => {
-  if (newShow) {
-    // 设置默认文件名
-    exportFileName.value = props.defaultFileName || '未命名文档';
-    exportSavePath.value = '';
-    
-    try {
-      const savedConfig = localStorage.getItem('export-config');
-      const savedPreset = localStorage.getItem('export-preset');
-      
-      if (savedConfig) {
-        config.value = JSON.parse(savedConfig);
+watch(
+  () => props.show,
+  (newShow) => {
+    if (newShow) {
+      // 设置默认文件名
+      exportFileName.value = props.defaultFileName || '未命名文档'
+      exportSavePath.value = ''
+
+      try {
+        const savedConfig = localStorage.getItem('export-config')
+        const savedPreset = localStorage.getItem('export-preset')
+
+        if (savedConfig) {
+          config.value = JSON.parse(savedConfig)
+        }
+
+        if (savedPreset) {
+          selectedPreset.value = savedPreset as ExportPreset
+        }
+      } catch (error) {
+        console.warn('Failed to load export config:', error)
       }
-      
-      if (savedPreset) {
-        selectedPreset.value = savedPreset as ExportPreset;
-      }
-    } catch (error) {
-      console.warn('Failed to load export config:', error);
     }
-  }
-});
+  },
+)
 </script>
 
 <style scoped>
@@ -655,8 +698,8 @@ watch(() => props.show, (newShow) => {
   color: var(--text-secondary);
 }
 
-.form-group input[type="text"],
-.form-group input[type="number"],
+.form-group input[type='text'],
+.form-group input[type='number'],
 .form-group select {
   width: 100%;
   padding: 8px 12px;
@@ -666,7 +709,7 @@ watch(() => props.show, (newShow) => {
   transition: border-color 0.2s;
 }
 
-.form-group input[type="color"] {
+.form-group input[type='color'] {
   width: 60px;
   height: 38px;
   border: 1px solid var(--border-primary);
@@ -703,7 +746,7 @@ watch(() => props.show, (newShow) => {
   cursor: pointer;
 }
 
-.checkbox-label input[type="checkbox"] {
+.checkbox-label input[type='checkbox'] {
   width: 18px;
   height: 18px;
   cursor: pointer;
@@ -718,7 +761,7 @@ watch(() => props.show, (newShow) => {
 }
 
 .preview-hint {
-  background: var(--bg-primary)3cd;
+  background: var(--bg-primary);
   border: 1px solid var(--accent-warning);
   border-radius: 8px;
   padding: 12px 16px;
@@ -912,4 +955,3 @@ watch(() => props.show, (newShow) => {
   margin: 4px 0;
 }
 </style>
-

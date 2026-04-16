@@ -11,6 +11,7 @@
         @open-formula="openFormulaEditor"
         @open-knowledge-graph="openKnowledgeGraph"
         @insert-fragment="handleInsertFragment"
+        @export="handleExport"
       />
     </div>
 
@@ -26,16 +27,13 @@
             {{ showPreview ? '👁️' : '👁️‍🗨️' }}
           </button>
         </div>
-        <div
-          class="editor-wrapper"
-          :class="{ 'drag-over': isDragging }"
-        >
+        <div class="editor-wrapper" :class="{ 'drag-over': isDragging }">
           <div
             contenteditable="true"
             class="markdown-editor-content"
             :data-placeholder="'开始编写您的 Markdown 文档...'"
             @input="handleEditorInput"
-          @scroll="syncScroll"
+            @scroll="syncScroll"
             @paste="handlePaste"
             @focus="handleEditorFocus"
             @blur="handleEditorBlur"
@@ -58,20 +56,26 @@
       <div v-if="showPreview" class="preview-pane">
         <div class="editor-label">实时预览</div>
         <div class="markdown-preview-container">
-        <div
-          class="markdown-preview"
-            :class="{ 'preview-active': activePreviewIndex === 0, 'preview-hidden': activePreviewIndex !== 0 }"
+          <div
+            class="markdown-preview"
+            :class="{
+              'preview-active': activePreviewIndex === 0,
+              'preview-hidden': activePreviewIndex !== 0,
+            }"
             v-html="previewBuffers[0]"
             ref="previewElement0"
             @scroll="handlePreviewScroll(0)"
           ></div>
           <div
             class="markdown-preview"
-            :class="{ 'preview-active': activePreviewIndex === 1, 'preview-hidden': activePreviewIndex !== 1 }"
+            :class="{
+              'preview-active': activePreviewIndex === 1,
+              'preview-hidden': activePreviewIndex !== 1,
+            }"
             v-html="previewBuffers[1]"
             ref="previewElement1"
             @scroll="handlePreviewScroll(1)"
-        ></div>
+          ></div>
         </div>
       </div>
       <div v-if="showRecommendationPanel" class="recommendation-pane">
@@ -97,12 +101,7 @@
     </div>
 
     <!-- 隐藏的焦点接收器：用于在删除文档时接收焦点，避免光标状态问题 -->
-    <div
-      ref="focusSinkElement"
-      tabindex="-1"
-      class="focus-sink"
-      aria-hidden="true"
-    ></div>
+    <div ref="focusSinkElement" tabindex="-1" class="focus-sink" aria-hidden="true"></div>
 
     <!-- 引用脱钩菜单 -->
     <div
@@ -140,29 +139,37 @@
       </div>
     </div>
 
-
     <!-- Mermaid编辑器模态框 -->
-    <div v-if="showMermaidEditor" class="modal-overlay" @click="closeMermaidEditor" style="
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    ">
-      <div class="modal-content" @click.stop style="
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        max-width: 90vw;
-        max-height: 90vh;
-        overflow: auto;
-        position: relative;
-      ">
+    <div
+      v-if="showMermaidEditor"
+      class="modal-overlay"
+      @click="closeMermaidEditor"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      "
+    >
+      <div
+        class="modal-content"
+        @click.stop
+        style="
+          background: white;
+          border-radius: 8px;
+          padding: 20px;
+          max-width: 90vw;
+          max-height: 90vh;
+          overflow: auto;
+          position: relative;
+        "
+      >
         <MermaidEditor
           :mermaid-code="currentMermaidCode"
           @save="handleMermaidSave"
@@ -172,26 +179,35 @@
     </div>
 
     <!-- 公式编辑器模态框 -->
-    <div v-if="showFormulaEditor" class="modal-overlay" @click="closeFormulaEditor" style="
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    ">
-      <div class="modal-content" @click.stop style="
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        max-width: 90vw;
-        max-height: 90vh;
-        overflow: auto;
-      ">
+    <div
+      v-if="showFormulaEditor"
+      class="modal-overlay"
+      @click="closeFormulaEditor"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      "
+    >
+      <div
+        class="modal-content"
+        @click.stop
+        style="
+          background: white;
+          border-radius: 8px;
+          padding: 20px;
+          max-width: 90vw;
+          max-height: 90vh;
+          overflow: auto;
+        "
+      >
         <FormulaEditor
           :latex-code="currentFormulaCode"
           :formula-type="currentFormulaType"
@@ -229,7 +245,10 @@
         :style="knowledgeGraphWindowStyle"
         @click.stop
       >
-        <div class="knowledge-graph-header knowledge-graph-header-draggable" @mousedown="startKnowledgeGraphDrag">
+        <div
+          class="knowledge-graph-header knowledge-graph-header-draggable"
+          @mousedown="startKnowledgeGraphDrag"
+        >
           <h3>🕸️ 知识图谱</h3>
           <div class="knowledge-graph-header-toolbar">
             <div class="kg-mode-tabs" @mousedown.stop>
@@ -288,7 +307,14 @@
               >
                 保存到知识图谱库
               </button>
-              <button type="button" class="toolbar-btn sample-btn" @click="showSampleGraph" title="查看样例效果">查看样例</button>
+              <button
+                type="button"
+                class="toolbar-btn sample-btn"
+                @click="showSampleGraph"
+                title="查看样例效果"
+              >
+                查看样例
+              </button>
               <button
                 type="button"
                 class="toolbar-btn sample-btn"
@@ -298,14 +324,18 @@
               >
                 随机重新布局
               </button>
-              <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">✕</button>
+              <button type="button" class="close-btn" @click="closeKnowledgeGraph" title="关闭">
+                ✕
+              </button>
             </div>
           </div>
         </div>
         <div class="knowledge-graph-panel-body">
           <aside class="knowledge-graph-list">
             <div class="knowledge-graph-list-title">图谱列表</div>
-            <div v-if="knowledgeGraphListLoading" class="knowledge-graph-list-loading">加载中...</div>
+            <div v-if="knowledgeGraphListLoading" class="knowledge-graph-list-loading">
+              加载中...
+            </div>
             <div v-else>
               <div class="knowledge-graph-list-group">
                 <div class="knowledge-graph-list-group-title">未保存（各 1 槽）</div>
@@ -315,7 +345,7 @@
                   class="knowledge-graph-list-item kg-temp-slot"
                   :class="{
                     active: slot.entry && selectedKnowledgeGraphEntryKey === slot.entry.entryKey,
-                    'kg-temp-slot--empty': !slot.entry
+                    'kg-temp-slot--empty': !slot.entry,
                   }"
                   @click="onKnowledgeGraphTempSlotClick(slot.kind)"
                 >
@@ -330,7 +360,8 @@
                     <span
                       class="knowledge-graph-list-badge"
                       :class="slot.kind === 'ai' ? 'ai' : 'heading'"
-                      >{{ slot.kind === 'ai' ? 'AI' : '标题' }}</span>
+                      >{{ slot.kind === 'ai' ? 'AI' : '标题' }}</span
+                    >
                   </div>
                   <div class="knowledge-graph-list-item-meta">
                     {{
@@ -343,7 +374,9 @@
               </div>
 
               <div class="knowledge-graph-list-group">
-                <div class="knowledge-graph-list-group-title">已保存 ({{ savedGraphEntries.length }})</div>
+                <div class="knowledge-graph-list-group-title">
+                  已保存 ({{ savedGraphEntries.length }})
+                </div>
                 <div
                   v-for="item in savedGraphEntries"
                   :key="item.entryKey"
@@ -353,9 +386,13 @@
                 >
                   <div class="knowledge-graph-list-item-row">
                     <span class="knowledge-graph-list-item-title">{{ item.title }}</span>
-                    <span class="knowledge-graph-list-badge" :class="item.graphType">{{ item.graphType === 'ai' ? 'AI' : '标题' }}</span>
+                    <span class="knowledge-graph-list-badge" :class="item.graphType">{{
+                      item.graphType === 'ai' ? 'AI' : '标题'
+                    }}</span>
                   </div>
-                  <div class="knowledge-graph-list-item-meta">{{ formatKnowledgeGraphListTime(item.updatedAt) }}</div>
+                  <div class="knowledge-graph-list-item-meta">
+                    {{ formatKnowledgeGraphListTime(item.updatedAt) }}
+                  </div>
                 </div>
               </div>
 
@@ -369,19 +406,31 @@
           </aside>
 
           <div class="knowledge-graph-main-pane">
-            <div v-if="isSampleMode" class="knowledge-graph-sample-hint">（样例展示，实际数据将由 RAG 等方式提取）</div>
+            <div v-if="isSampleMode" class="knowledge-graph-sample-hint">
+              （样例展示，实际数据将由 RAG 等方式提取）
+            </div>
             <div
               v-else-if="isKnowledgeGraphRendering && knowledgeGraphMode === 'ai' && !isSampleMode"
               class="knowledge-graph-ai-building"
             >
               <p class="knowledge-graph-ai-building-title">正在生成 AI 知识图谱</p>
-              <div class="kg-progress-track" role="progressbar" :aria-valuenow="aiGraphBuildProgress" aria-valuemin="0" aria-valuemax="100">
+              <div
+                class="kg-progress-track"
+                role="progressbar"
+                :aria-valuenow="aiGraphBuildProgress"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
                 <div class="kg-progress-fill" :style="{ width: `${aiGraphBuildProgress}%` }" />
               </div>
               <p class="kg-progress-hint">{{ aiGraphBuildLabel || '请稍候…' }}</p>
             </div>
-            <div v-else-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">正在生成图谱…</div>
-            <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">{{ knowledgeGraphError }}</div>
+            <div v-else-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">
+              正在生成图谱…
+            </div>
+            <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">
+              {{ knowledgeGraphError }}
+            </div>
             <KnowledgeGraphView
               v-else-if="knowledgeGraphData"
               ref="knowledgeGraphViewRef"
@@ -433,81 +482,94 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, toRaw } from 'vue';
-import { useRoute } from 'vue-router';
-import MermaidEditor from './MermaidEditor.vue';
-import FormulaEditor from './FormulaEditor.vue';
-import EditorToolbar from './editor/toolbar/EditorToolbar.vue';
-import ExportConfigModal from './ExportConfigModal.vue';
-import ExportProgressModal from './ExportProgressModal.vue';
-import KnowledgeGraphView from './KnowledgeGraphView.vue';
-import FragmentRecommendationPanel from './fragment/FragmentRecommendationPanel.vue';
-import type { DocumentResponse } from '../../application';
-import type { ExportConfig } from '../../domain/types/export-config.types';
-import { useAssetRenderer } from '../composables/useAssetRenderer';
-import { useImageUpload } from '../composables/useImageUpload';
-import { useEditorShortcuts } from '../composables/useShortcutManager';
-import { Application } from '../../core/application';
-import { TYPES } from '../../core/container/container.types';
-import { extractKnowledgeGraph, sampleKnowledgeGraph, type KnowledgeGraph } from '../../domain/services/knowledge-graph-extractor';
-import { NodeType } from '../../domain/types/knowledge-fragment.types';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, toRaw } from 'vue'
+import { useRoute } from 'vue-router'
+import MermaidEditor from './MermaidEditor.vue'
+import FormulaEditor from './FormulaEditor.vue'
+import EditorToolbar from './editor/toolbar/EditorToolbar.vue'
+import ExportConfigModal from './ExportConfigModal.vue'
+import ExportProgressModal from './ExportProgressModal.vue'
+import KnowledgeGraphView from './KnowledgeGraphView.vue'
+import FragmentRecommendationPanel from './fragment/FragmentRecommendationPanel.vue'
+import type { DocumentResponse } from '../../application'
+import type { ExportConfig } from '../../domain/types/export-config.types'
+import { useAssetRenderer } from '../composables/useAssetRenderer'
+import { useImageUpload } from '../composables/useImageUpload'
+import { useEditorShortcuts } from '../composables/useShortcutManager'
+import { Application } from '../../core/application'
+import { TYPES } from '../../core/container/container.types'
+import {
+  extractKnowledgeGraph,
+  sampleKnowledgeGraph,
+  type KnowledgeGraph,
+} from '../../domain/services/knowledge-graph-extractor'
+import { NodeType } from '../../domain/types/knowledge-fragment.types'
 import {
   mergeKgPositionSources,
   loadKgLayoutPayloadFromLocalStorage,
   mergeKgStoragePayloadIntoGraph,
-  clearKgLayoutLocalStorage
-} from '../../domain/services/knowledge-graph-layout';
+  clearKgLayoutLocalStorage,
+} from '../../domain/services/knowledge-graph-layout'
 import {
   FileSystemKnowledgeGraphService,
-  type KnowledgeGraphInfo
-} from '../../infrastructure/services/knowledge-graph-file.service';
-import { resolveFragmentReferenceJump } from '../../domain/services/knowledge-graph-fragment-jump';
-import { readDocumentTextForKnowledgeJump } from '../utils/knowledge-graph-jump.util';
+  type KnowledgeGraphInfo,
+} from '../../infrastructure/services/knowledge-graph-file.service'
+import { resolveFragmentReferenceJump } from '../../domain/services/knowledge-graph-fragment-jump'
+import { readDocumentTextForKnowledgeJump } from '../utils/knowledge-graph-jump.util'
 
 interface Props {
-  document: DocumentResponse | null;
-  vaultId?: string;
-  renderMarkdown: (content: string, documentId?: string, variables?: Record<string, any>, fileCache?: any) => Promise<string>;
+  document: DocumentResponse | null
+  vaultId?: string
+  renderMarkdown: (
+    content: string,
+    documentId?: string,
+    variables?: Record<string, any>,
+    fileCache?: any,
+  ) => Promise<string>
 }
 
 interface Emits {
-  (e: 'update-document', id: string, title: string, content: string): void;
-  (e: 'navigate-knowledge-jump', payload: { documentId: string; start: number; end: number }): void;
+  (e: 'update-document', id: string, title: string, content: string): void
+  (e: 'navigate-knowledge-jump', payload: { documentId: string; start: number; end: number }): void
 }
 
-const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
-const route = useRoute();
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
+const route = useRoute()
 
-const title = ref('');
-const content = ref(''); // 原始 Markdown 内容（包含 frontmatter 和正文）
-const frontmatter = ref(''); // frontmatter 部分
-const mainContent = ref(''); // 正文内容（不包含 frontmatter）
-const renderedContent = ref(''); // 预览渲染内容
-const hasChanges = ref(false);
-const isEditorFocused = ref(false); // 编辑器是否获得焦点
-const previewElement = ref<HTMLDivElement>();
-const previewElement0 = ref<HTMLDivElement>();
-const previewElement1 = ref<HTMLDivElement>();
-const editorElement = ref<HTMLDivElement>(); // 编辑器元素（contenteditable div）
-const focusSinkElement = ref<HTMLDivElement>(); // 隐藏的焦点接收器
-const currentFilePath = ref<string>(''); // 当前打开的外部文件路径
-const showPreview = ref(true); // 控制预览区的显示
+const title = ref('')
+const content = ref('') // 原始 Markdown 内容（包含 frontmatter 和正文）
+const frontmatter = ref('') // frontmatter 部分
+const mainContent = ref('') // 正文内容（不包含 frontmatter）
+const renderedContent = ref('') // 预览渲染内容
+const hasChanges = ref(false)
+const isEditorFocused = ref(false) // 编辑器是否获得焦点
+const previewElement = ref<HTMLDivElement>()
+const previewElement0 = ref<HTMLDivElement>()
+const previewElement1 = ref<HTMLDivElement>()
+const editorElement = ref<HTMLDivElement>() // 编辑器元素（contenteditable div）
+const focusSinkElement = ref<HTMLDivElement>() // 隐藏的焦点接收器
+const currentFilePath = ref<string>('') // 当前打开的外部文件路径
+const showPreview = ref(true) // 控制预览区的显示
 
 // 双缓冲预览
-const previewBuffers = ref<string[]>(['', '']); // 两个预览缓冲区
-const activePreviewIndex = ref(0); // 当前活动的预览索引
-const savedScrollPercentage = ref<number>(0); // 保存的滚动百分比
-const isRestoringScroll = ref(false); // 标记是否正在恢复滚动位置
-const isSyncingScroll = ref(false); // 标记是否正在同步滚动（防止循环触发）
-const pendingScrollRestore = ref<{ percentage: number; isAtBottom: boolean; previewIndex: number } | null>(null); // 待恢复的滚动信息
+const previewBuffers = ref<string[]>(['', '']) // 两个预览缓冲区
+const activePreviewIndex = ref(0) // 当前活动的预览索引
+const savedScrollPercentage = ref<number>(0) // 保存的滚动百分比
+const isRestoringScroll = ref(false) // 标记是否正在恢复滚动位置
+const isSyncingScroll = ref(false) // 标记是否正在同步滚动（防止循环触发）
+const pendingScrollRestore = ref<{
+  percentage: number
+  isAtBottom: boolean
+  previewIndex: number
+} | null>(null) // 待恢复的滚动信息
 
 // 资源渲染器
-const { useAutoRender, triggerRender } = useAssetRenderer();
+const { useAutoRender, triggerRender } = useAssetRenderer()
 
 // 图片上传
-const { handleDroppedImages, insertImageReference } = useImageUpload();
-const isDragging = ref(false);
+const { handleDroppedImages, insertImageReference } = useImageUpload()
+const isDragging = ref(false)
 
 // 快捷键系统（需要在顶层调用，确保内部的 onMounted 能正确执行）
 useEditorShortcuts({
@@ -515,189 +577,191 @@ useEditorShortcuts({
   content: mainContent,
   onContentUpdate: async (newContent, cursorPosition) => {
     // 当快捷键命令更新内容时，同步到编辑器
-    mainContent.value = newContent;
+    mainContent.value = newContent
     // 更新完整内容（包含 frontmatter），这样 renderContent 才能使用最新内容
-    content.value = mergeContent(frontmatter.value, mainContent.value);
-    hasChanges.value = true;
+    content.value = mergeContent(frontmatter.value, mainContent.value)
+    hasChanges.value = true
 
     // 等待响应式更新完成后再渲染预览
-    await nextTick();
+    await nextTick()
     // 重新渲染预览（确保使用最新内容）
-    await renderContent();
+    await renderContent()
 
     // 如果提供了光标位置，设置光标
     if (cursorPosition !== undefined && editorElement.value) {
       nextTick(() => {
-        setCursorPosition(editorElement.value!, cursorPosition);
-      });
+        setCursorPosition(editorElement.value!, cursorPosition)
+      })
     }
-  }
-});
+  },
+})
 
 // Mermaid编辑器相关状态
-const showMermaidEditor = ref(false);
-const currentMermaidCode = ref('');
-const currentSelectionStart = ref(0);
-const currentSelectionEnd = ref(0);
+const showMermaidEditor = ref(false)
+const currentMermaidCode = ref('')
+const currentSelectionStart = ref(0)
+const currentSelectionEnd = ref(0)
 
 // 公式编辑器相关状态
-const showFormulaEditor = ref(false);
-const currentFormulaCode = ref('');
-const currentFormulaType = ref<'inline' | 'block'>('inline');
+const showFormulaEditor = ref(false)
+const currentFormulaCode = ref('')
+const currentFormulaType = ref<'inline' | 'block'>('inline')
 
 // 知识图谱相关状态
-const showKnowledgeGraphModal = ref(false);
-const knowledgeGraphData = ref<KnowledgeGraph | null>(null);
-const knowledgeGraphError = ref('');
-const isKnowledgeGraphRendering = ref(false);
+const showKnowledgeGraphModal = ref(false)
+const knowledgeGraphData = ref<KnowledgeGraph | null>(null)
+const knowledgeGraphError = ref('')
+const isKnowledgeGraphRendering = ref(false)
 /** AI 构建进度 0–100，仅在为 AI 生成时更新 */
-const aiGraphBuildProgress = ref(0);
-const aiGraphBuildLabel = ref('');
-const knowledgeGraphMode = ref<'markdown' | 'ai'>('markdown');
-const isSampleMode = ref(false);
-const kgLayoutRandomizeKey = ref(0);
-const knowledgeGraphService = new FileSystemKnowledgeGraphService();
-const aiDocumentGraphService = Application.getInstance().getApplicationService().getAiDocumentGraphService();
-const knowledgeGraphWindowRef = ref<HTMLDivElement | null>(null);
-const knowledgeGraphViewRef = ref<InstanceType<typeof KnowledgeGraphView> | null>(null);
-const knowledgeGraphWindowPosition = ref({ x: 80, y: 64 });
+const aiGraphBuildProgress = ref(0)
+const aiGraphBuildLabel = ref('')
+const knowledgeGraphMode = ref<'markdown' | 'ai'>('markdown')
+const isSampleMode = ref(false)
+const kgLayoutRandomizeKey = ref(0)
+const knowledgeGraphService = new FileSystemKnowledgeGraphService()
+const aiDocumentGraphService = Application.getInstance()
+  .getApplicationService()
+  .getAiDocumentGraphService()
+const knowledgeGraphWindowRef = ref<HTMLDivElement | null>(null)
+const knowledgeGraphViewRef = ref<InstanceType<typeof KnowledgeGraphView> | null>(null)
+const knowledgeGraphWindowPosition = ref({ x: 80, y: 64 })
 const knowledgeGraphWindowDrag = ref({
   active: false,
   offsetX: 0,
-  offsetY: 0
-});
-const hasInitializedKnowledgeGraphWindow = ref(false);
+  offsetY: 0,
+})
+const hasInitializedKnowledgeGraphWindow = ref(false)
 
-type KnowledgeGraphEntryType = 'heading' | 'ai';
-type KnowledgeGraphEntrySource = 'temp' | 'saved';
+type KnowledgeGraphEntryType = 'heading' | 'ai'
+type KnowledgeGraphEntrySource = 'temp' | 'saved'
 
 interface KnowledgeGraphEntry {
-  entryKey: string;
-  source: KnowledgeGraphEntrySource;
-  graphType: KnowledgeGraphEntryType;
-  title: string;
-  updatedAt: string;
-  graph?: KnowledgeGraph;
-  fullPath?: string;
+  entryKey: string
+  source: KnowledgeGraphEntrySource
+  graphType: KnowledgeGraphEntryType
+  title: string
+  updatedAt: string
+  graph?: KnowledgeGraph
+  fullPath?: string
 }
 
 interface TempKnowledgeGraphEntry {
-  entryKey: string;
-  graphType: KnowledgeGraphEntryType;
-  title: string;
-  updatedAt: string;
-  graph: KnowledgeGraph;
+  entryKey: string
+  graphType: KnowledgeGraphEntryType
+  title: string
+  updatedAt: string
+  graph: KnowledgeGraph
 }
 
-const knowledgeGraphListLoading = ref(false);
-const selectedKnowledgeGraphEntryKey = ref<string | null>(null);
-const lastOpenedGraphByDoc = ref<Record<string, string>>({});
-const activeKnowledgeGraphLoadKey = ref('kg-empty');
-const headingTempGraphByDoc = ref<Record<string, TempKnowledgeGraphEntry>>({});
-const aiTempGraphByDoc = ref<Record<string, TempKnowledgeGraphEntry>>({});
-const savedGraphEntries = ref<KnowledgeGraphEntry[]>([]);
+const knowledgeGraphListLoading = ref(false)
+const selectedKnowledgeGraphEntryKey = ref<string | null>(null)
+const lastOpenedGraphByDoc = ref<Record<string, string>>({})
+const activeKnowledgeGraphLoadKey = ref('kg-empty')
+const headingTempGraphByDoc = ref<Record<string, TempKnowledgeGraphEntry>>({})
+const aiTempGraphByDoc = ref<Record<string, TempKnowledgeGraphEntry>>({})
+const savedGraphEntries = ref<KnowledgeGraphEntry[]>([])
 
 const knowledgeGraphVaultId = computed(() => {
-  const fromRoute = (route.query.vaultId as string | undefined)?.trim();
-  if (fromRoute) return fromRoute;
-  const fromProp = props.vaultId?.trim();
-  if (fromProp) return fromProp;
+  const fromRoute = (route.query.vaultId as string | undefined)?.trim()
+  if (fromRoute) return fromRoute
+  const fromProp = props.vaultId?.trim()
+  if (fromProp) return fromProp
   try {
-    const fromApp = Application.getInstance().getApplicationService().getCurrentVaultId();
-    const normalized = fromApp?.trim();
-    return normalized || 'default';
+    const fromApp = Application.getInstance().getApplicationService().getCurrentVaultId()
+    const normalized = fromApp?.trim()
+    return normalized || 'default'
   } catch {
-    return 'default';
+    return 'default'
   }
-});
+})
 
 const activeDocumentId = computed(() => {
-  const externalFilePath = (props.document as any)?.filePath;
+  const externalFilePath = (props.document as any)?.filePath
   if (externalFilePath) {
-    return externalFilePath;
+    return externalFilePath
   }
-  return props.document?.id || currentFilePath.value || '';
-});
+  return props.document?.id || currentFilePath.value || ''
+})
 
 const knowledgeGraphWindowStyle = computed(() => ({
   left: `${knowledgeGraphWindowPosition.value.x}px`,
-  top: `${knowledgeGraphWindowPosition.value.y}px`
-}));
+  top: `${knowledgeGraphWindowPosition.value.y}px`,
+}))
 
 const unsavedGraphEntries = computed<KnowledgeGraphEntry[]>(() => {
-  const scopeId = getKnowledgeGraphScopeId();
-  const out: KnowledgeGraphEntry[] = [];
-  const headingTempGraph = headingTempGraphByDoc.value[scopeId];
-  const aiTempGraph = aiTempGraphByDoc.value[scopeId];
+  const scopeId = getKnowledgeGraphScopeId()
+  const out: KnowledgeGraphEntry[] = []
+  const headingTempGraph = headingTempGraphByDoc.value[scopeId]
+  const aiTempGraph = aiTempGraphByDoc.value[scopeId]
   if (headingTempGraph) {
     out.push({
       ...headingTempGraph,
-      source: 'temp'
-    });
+      source: 'temp',
+    })
   }
   if (aiTempGraph) {
     out.push({
       ...aiTempGraph,
-      source: 'temp'
-    });
+      source: 'temp',
+    })
   }
-  return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-});
+  return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+})
 
 /** 侧栏「未保存」固定两个槽位：标题临时 / AI 临时，每槽至多 1 份（与 headingTempGraphByDoc / aiTempGraphByDoc 一致） */
 const knowledgeGraphTempSlots = computed(() => {
-  const scopeId = getKnowledgeGraphScopeId();
+  const scopeId = getKnowledgeGraphScopeId()
   return [
     { kind: 'heading' as const, entry: headingTempGraphByDoc.value[scopeId] ?? null },
-    { kind: 'ai' as const, entry: aiTempGraphByDoc.value[scopeId] ?? null }
-  ];
-});
+    { kind: 'ai' as const, entry: aiTempGraphByDoc.value[scopeId] ?? null },
+  ]
+})
 
 /** 工作3：文档编辑区右侧「推荐片段」面板 */
-const showRecommendationPanel = ref(true);
+const showRecommendationPanel = ref(true)
 /** 本会话内最近插入的片段 ID（用于推荐加权，最多保留 12 条） */
-const recentInsertedFragmentIds = ref<string[]>([]);
+const recentInsertedFragmentIds = ref<string[]>([])
 
 function extractTagsFromFrontmatter(fm: string): string[] {
-  if (!fm) return [];
-  const lines = fm.split('\n');
+  if (!fm) return []
+  const lines = fm.split('\n')
   for (const line of lines) {
-    const m = line.match(/^\s*tags?:\s*(.+)$/);
+    const m = line.match(/^\s*tags?:\s*(.+)$/)
     if (m) {
-      const v = m[1].trim();
+      const v = m[1].trim()
       if (v.startsWith('[')) {
         try {
-          const arr = JSON.parse(v.replace(/'/g, '"'));
-          if (Array.isArray(arr)) return arr.map(String);
+          const arr = JSON.parse(v.replace(/'/g, '"'))
+          if (Array.isArray(arr)) return arr.map(String)
         } catch {
           /* ignore */
         }
       }
-      return v.split(/[,\s]+/).filter(Boolean);
+      return v.split(/[,\s]+/).filter(Boolean)
     }
   }
-  return [];
+  return []
 }
 
 function extractRefIdsFromMain(md: string): string[] {
-  const ids = new Set<string>();
-  const re = /\{\{ref:([^}:]+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(md)) !== null) ids.add(m[1].trim());
-  return [...ids];
+  const ids = new Set<string>()
+  const re = /\{\{ref:([^}:]+)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(md)) !== null) ids.add(m[1].trim())
+  return [...ids]
 }
 
 /** 正文关键词：去掉代码块与引用标记，避免把 JSON/代码 token 误当主题词 */
 function extractContextKeywordsFromMain(md: string): string[] {
-  if (!md) return [];
-  let s = md.replace(/```[\s\S]*?```/g, '\n');
-  s = s.replace(/\{\{ref:[^}]+\}\}/g, '\n');
-  s = s.replace(/\[知识片段：[^\]]+\]/g, '\n');
+  if (!md) return []
+  let s = md.replace(/```[\s\S]*?```/g, '\n')
+  s = s.replace(/\{\{ref:[^}]+\}\}/g, '\n')
+  s = s.replace(/\[知识片段：[^\]]+\]/g, '\n')
   const raw = s
     .toLowerCase()
     .split(/[\s\n\r\t，。！？、；：""''（）【】\[\]\\/|,.!?;:]+/)
-    .map(w => w.replace(/^[^a-z0-9\u4e00-\u9fff]+|[^a-z0-9\u4e00-\u9fff]+$/gi, ''))
-    .filter(w => w.length >= 2 && w.length <= 32);
+    .map((w) => w.replace(/^[^a-z0-9\u4e00-\u9fff]+|[^a-z0-9\u4e00-\u9fff]+$/gi, ''))
+    .filter((w) => w.length >= 2 && w.length <= 32)
   const stop = new Set([
     'the',
     'and',
@@ -718,84 +782,89 @@ function extractContextKeywordsFromMain(md: string): string[] {
     '没有',
     '我们',
     '你们',
-    '他们'
-  ]);
-  const out: string[] = [];
-  const seen = new Set<string>();
+    '他们',
+  ])
+  const out: string[] = []
+  const seen = new Set<string>()
   for (const w of raw) {
-    if (stop.has(w)) continue;
-    if (seen.has(w)) continue;
-    seen.add(w);
-    out.push(w);
-    if (out.length >= 40) break;
+    if (stop.has(w)) continue
+    if (seen.has(w)) continue
+    seen.add(w)
+    out.push(w)
+    if (out.length >= 40) break
   }
-  return out;
+  return out
 }
 
 const recommendationTitleKeywords = computed(() =>
-  title.value.split(/[\s/\\._-]+/).filter(w => w.length > 1).slice(0, 24)
-);
-const recommendationDocumentTags = computed(() => extractTagsFromFrontmatter(frontmatter.value));
-const recommendationReferencedIds = computed(() => extractRefIdsFromMain(mainContent.value));
-const recommendationContextKeywords = computed(() => extractContextKeywordsFromMain(mainContent.value));
+  title.value
+    .split(/[\s/\\._-]+/)
+    .filter((w) => w.length > 1)
+    .slice(0, 24),
+)
+const recommendationDocumentTags = computed(() => extractTagsFromFrontmatter(frontmatter.value))
+const recommendationReferencedIds = computed(() => extractRefIdsFromMain(mainContent.value))
+const recommendationContextKeywords = computed(() =>
+  extractContextKeywordsFromMain(mainContent.value),
+)
 
 // 导出相关状态
-const isExporting = ref(false);
-const showExportConfigModal = ref(false);
-const pendingExportFormat = ref<'pdf' | 'html' | 'markdown'>('pdf');
-const currentExportConfig = ref<ExportConfig | null>(null);
+const isExporting = ref(false)
+const showExportConfigModal = ref(false)
+const pendingExportFormat = ref<'pdf' | 'html' | 'markdown'>('pdf')
+const currentExportConfig = ref<ExportConfig | null>(null)
 
 // 进度条相关状态
-const showExportProgress = ref(false);
-const exportProgress = ref(0);
-const exportStatus = ref<'processing' | 'success' | 'error'>('processing');
-const exportStatusMessage = ref('');
-const exportingFileName = ref('');
-const exportingFormat = ref('');
-const exportingSavePath = ref('');
+const showExportProgress = ref(false)
+const exportProgress = ref(0)
+const exportStatus = ref<'processing' | 'success' | 'error'>('processing')
+const exportStatusMessage = ref('')
+const exportingFileName = ref('')
+const exportingFormat = ref('')
+const exportingSavePath = ref('')
 
 /**
  * 分离 frontmatter 和正文内容
  */
 const splitContent = (fullContent: string) => {
-  const trimmed = fullContent.trimStart();
-  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n?/;
-  const match = trimmed.match(frontmatterRegex);
+  const trimmed = fullContent.trimStart()
+  const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n?/
+  const match = trimmed.match(frontmatterRegex)
 
   if (match) {
     return {
       frontmatter: match[0],
-      mainContent: trimmed.substring(match[0].length)
-    };
+      mainContent: trimmed.substring(match[0].length),
+    }
   }
 
   return {
     frontmatter: '',
-    mainContent: trimmed
-  };
-};
+    mainContent: trimmed,
+  }
+}
 
 /**
  * 合并 frontmatter 和正文内容
  */
 const mergeContent = (fm: string, main: string) => {
   if (fm && fm.trim()) {
-    return fm + '\n' + main;
+    return fm + '\n' + main
   }
-  return main;
-};
+  return main
+}
 
 // 引用文档对话框相关状态
 
 // 引用右键菜单状态
 const referenceContextMenu = ref<{
-  visible: boolean;
-  x: number;
-  y: number;
-  fragmentId: string | null;
-  startIndex: number;
-  endIndex: number;
-  currentMode: string;
+  visible: boolean
+  x: number
+  y: number
+  fragmentId: string | null
+  startIndex: number
+  endIndex: number
+  currentMode: string
 }>({
   visible: false,
   x: 0,
@@ -803,271 +872,284 @@ const referenceContextMenu = ref<{
   fragmentId: null,
   startIndex: 0,
   endIndex: 0,
-  currentMode: 'linked'
-});
+  currentMode: 'linked',
+})
 
 // 文本格式化右键菜单状态
 const textContextMenu = ref<{
-  visible: boolean;
-  x: number;
-  y: number;
-  savedRange: Range | null;
+  visible: boolean
+  x: number
+  y: number
+  savedRange: Range | null
 }>({
   visible: false,
   x: 0,
   y: 0,
-  savedRange: null
-});
+  savedRange: null,
+})
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let lastSavedTitle = '';
-let lastSavedContent = '';
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let lastSavedTitle = ''
+let lastSavedContent = ''
 
-watch(() => props.document, (newDocument, oldDocument) => {
-  // 清理光标状态：当文档切换或删除时，清除旧的 Selection
-  // window.getSelection() 是全局单例，如果还持有对已删除 DOM 节点的引用，会导致光标不显示
-  const selection = window.getSelection();
-  if (selection) {
-    selection.removeAllRanges();
-  }
-
-  // 重置光标位置状态
-  currentSelectionStart.value = 0;
-  currentSelectionEnd.value = 0;
-
-  // 如果文档被删除（从有文档变为无文档），将焦点移到隐藏的焦点接收器
-  // 这样可以避免 Selection 持有对已删除 DOM 节点的引用
-  if (oldDocument && !newDocument) {
-    nextTick(() => {
-      if (focusSinkElement.value) {
-        focusSinkElement.value.focus();
-      }
-    });
-  }
-
-  if (newDocument) {
-    // 检查是否是外部文件（包含 filePath 属性）
-    const filePath = (newDocument as any).filePath;
-
-    // 如果是外部文件，保留 currentFilePath
-    if (filePath) {
-      currentFilePath.value = filePath;
-    } else {
-      // 数据库文档，清空外部文件路径
-      currentFilePath.value = '';
+watch(
+  () => props.document,
+  (newDocument, oldDocument) => {
+    // 清理光标状态：当文档切换或删除时，清除旧的 Selection
+    // window.getSelection() 是全局单例，如果还持有对已删除 DOM 节点的引用，会导致光标不显示
+    const selection = window.getSelection()
+    if (selection) {
+      selection.removeAllRanges()
     }
 
-    title.value = newDocument.title;
-    content.value = newDocument.content || '';
-    lastSavedTitle = newDocument.title;
-    lastSavedContent = newDocument.content || '';
-    hasChanges.value = false;
+    // 重置光标位置状态
+    currentSelectionStart.value = 0
+    currentSelectionEnd.value = 0
 
-    // 分离 frontmatter 和正文（关键：renderContent 使用 mainContent）
-    const { frontmatter: fm, mainContent: main } = splitContent(newDocument.content || '');
-    frontmatter.value = fm;
-    mainContent.value = main;
-
-    // 确保内容渲染
-    nextTick(async () => {
-    renderContent();
-      // 更新编辑器内容（始终应用标注）
-      const editor = editorElement.value;
-      if (editor) {
-        // 先确保焦点接收器没有焦点（如果之前删除文档时焦点在它上面）
-        if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
-          focusSinkElement.value.blur();
+    // 如果文档被删除（从有文档变为无文档），将焦点移到隐藏的焦点接收器
+    // 这样可以避免 Selection 持有对已删除 DOM 节点的引用
+    if (oldDocument && !newDocument) {
+      nextTick(() => {
+        if (focusSinkElement.value) {
+          focusSinkElement.value.focus()
         }
+      })
+    }
 
-        await applyEditorAnnotations();
+    if (newDocument) {
+      // 检查是否是外部文件（包含 filePath 属性）
+      const filePath = (newDocument as any).filePath
 
-        // 在新文档加载后，将光标设置到文档开头，确保光标可见
-        // 使用 setTimeout 确保 DOM 已完全更新，特别是 applyEditorAnnotations 可能重新渲染了 DOM
-        setTimeout(() => {
-          if (editor && editor.textContent) {
-            // 再次确保焦点接收器没有焦点（applyEditorAnnotations 可能改变了焦点状态）
-            if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
-              focusSinkElement.value.blur();
-            }
-
-            // 确保没有其他元素持有焦点
-            if (document.activeElement && document.activeElement !== editor && document.activeElement !== document.body) {
-              (document.activeElement as HTMLElement).blur();
-            }
-
-            // 先设置光标位置
-            setCursorPosition(editor, 0);
-            // 关键：让编辑器获得焦点，这样光标才会显示
-            // 最小化/恢复窗口时能恢复光标，就是因为窗口恢复时会触发焦点事件
-            editor.focus();
-            // 再次设置光标位置，确保在获得焦点后光标位置正确
-            setCursorPosition(editor, 0);
-            // 更新焦点状态
-            isEditorFocused.value = true;
-          }
-        }, 150); // 增加延迟时间，确保 applyEditorAnnotations 完全完成
+      // 如果是外部文件，保留 currentFilePath
+      if (filePath) {
+        currentFilePath.value = filePath
+      } else {
+        // 数据库文档，清空外部文件路径
+        currentFilePath.value = ''
       }
-    });
-  }
-  // 当document为null时，需要清空编辑器内容
-  // 如果之前有document，现在变为null，说明文档被删除了，必须清空
-  else if (oldDocument && !newDocument) {
-    // 文档被删除，强制清空所有内容
-    title.value = '';
-    content.value = '';
-    frontmatter.value = '';
-    mainContent.value = '';
-    renderedContent.value = '';
-    hasChanges.value = false;
-    currentFilePath.value = ''; // 清空外部文件路径
 
-    // 清理编辑器状态和DOM内容
-    nextTick(() => {
-      const editor = editorElement.value;
-      if (editor) {
-        // 先清理 Selection，避免持有对已删除 DOM 节点的引用
-        const selection = window.getSelection();
-        if (selection) {
-          selection.removeAllRanges();
-        }
+      title.value = newDocument.title
+      content.value = newDocument.content || ''
+      lastSavedTitle = newDocument.title
+      lastSavedContent = newDocument.content || ''
+      hasChanges.value = false
 
-        // 如果编辑器有焦点，先移除焦点
-        if (document.activeElement === editor) {
-          editor.blur();
-        }
+      // 分离 frontmatter 和正文（关键：renderContent 使用 mainContent）
+      const { frontmatter: fm, mainContent: main } = splitContent(newDocument.content || '')
+      frontmatter.value = fm
+      mainContent.value = main
 
-        // 清空编辑器DOM内容
-        editor.textContent = '';
-        editor.innerHTML = '';
-        isEditorFocused.value = false;
-
-        // 将焦点移到 body，而不是隐藏的焦点接收器
-        // 这样可以确保后续点击编辑器时能正常获得焦点
-        // 使用 setTimeout 确保在 nextTick 之后执行
-        setTimeout(() => {
-          // 确保焦点不在任何元素上，让焦点回到 body
-          if (document.activeElement && document.activeElement !== document.body) {
-            (document.activeElement as HTMLElement).blur();
-          }
-          // 如果焦点接收器有焦点，也移除
+      // 确保内容渲染
+      nextTick(async () => {
+        renderContent()
+        // 更新编辑器内容（始终应用标注）
+        const editor = editorElement.value
+        if (editor) {
+          // 先确保焦点接收器没有焦点（如果之前删除文档时焦点在它上面）
           if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
-            focusSinkElement.value.blur();
+            focusSinkElement.value.blur()
           }
-        }, 0);
-      }
-    });
-  }
-  // 如果既没有document也没有外部文件路径，且内容为空，也清空（兜底逻辑）
-  else if (!currentFilePath.value && !content.value) {
-    title.value = '';
-    content.value = '';
-    frontmatter.value = '';
-    mainContent.value = '';
-    renderedContent.value = '';
-    hasChanges.value = false;
-  }
-}, { immediate: true });
 
-let renderTimer: ReturnType<typeof setTimeout> | null = null;
-let lastContent = '';
+          await applyEditorAnnotations()
+
+          // 在新文档加载后，将光标设置到文档开头，确保光标可见
+          // 使用 setTimeout 确保 DOM 已完全更新，特别是 applyEditorAnnotations 可能重新渲染了 DOM
+          setTimeout(() => {
+            if (editor && editor.textContent) {
+              // 再次确保焦点接收器没有焦点（applyEditorAnnotations 可能改变了焦点状态）
+              if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
+                focusSinkElement.value.blur()
+              }
+
+              // 确保没有其他元素持有焦点
+              if (
+                document.activeElement &&
+                document.activeElement !== editor &&
+                document.activeElement !== document.body
+              ) {
+                ;(document.activeElement as HTMLElement).blur()
+              }
+
+              // 先设置光标位置
+              setCursorPosition(editor, 0)
+              // 关键：让编辑器获得焦点，这样光标才会显示
+              // 最小化/恢复窗口时能恢复光标，就是因为窗口恢复时会触发焦点事件
+              editor.focus()
+              // 再次设置光标位置，确保在获得焦点后光标位置正确
+              setCursorPosition(editor, 0)
+              // 更新焦点状态
+              isEditorFocused.value = true
+            }
+          }, 150) // 增加延迟时间，确保 applyEditorAnnotations 完全完成
+        }
+      })
+    }
+    // 当document为null时，需要清空编辑器内容
+    // 如果之前有document，现在变为null，说明文档被删除了，必须清空
+    else if (oldDocument && !newDocument) {
+      // 文档被删除，强制清空所有内容
+      title.value = ''
+      content.value = ''
+      frontmatter.value = ''
+      mainContent.value = ''
+      renderedContent.value = ''
+      hasChanges.value = false
+      currentFilePath.value = '' // 清空外部文件路径
+
+      // 清理编辑器状态和DOM内容
+      nextTick(() => {
+        const editor = editorElement.value
+        if (editor) {
+          // 先清理 Selection，避免持有对已删除 DOM 节点的引用
+          const selection = window.getSelection()
+          if (selection) {
+            selection.removeAllRanges()
+          }
+
+          // 如果编辑器有焦点，先移除焦点
+          if (document.activeElement === editor) {
+            editor.blur()
+          }
+
+          // 清空编辑器DOM内容
+          editor.textContent = ''
+          editor.innerHTML = ''
+          isEditorFocused.value = false
+
+          // 将焦点移到 body，而不是隐藏的焦点接收器
+          // 这样可以确保后续点击编辑器时能正常获得焦点
+          // 使用 setTimeout 确保在 nextTick 之后执行
+          setTimeout(() => {
+            // 确保焦点不在任何元素上，让焦点回到 body
+            if (document.activeElement && document.activeElement !== document.body) {
+              ;(document.activeElement as HTMLElement).blur()
+            }
+            // 如果焦点接收器有焦点，也移除
+            if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
+              focusSinkElement.value.blur()
+            }
+          }, 0)
+        }
+      })
+    }
+    // 如果既没有document也没有外部文件路径，且内容为空，也清空（兜底逻辑）
+    else if (!currentFilePath.value && !content.value) {
+      title.value = ''
+      content.value = ''
+      frontmatter.value = ''
+      mainContent.value = ''
+      renderedContent.value = ''
+      hasChanges.value = false
+    }
+  },
+  { immediate: true },
+)
+
+let renderTimer: ReturnType<typeof setTimeout> | null = null
+let lastContent = ''
 
 // 处理编辑器输入（从 contenteditable div）
 const handleEditorInput = async (event: Event) => {
-  const editor = editorElement.value;
-  if (!editor) return;
+  const editor = editorElement.value
+  if (!editor) return
 
   // 获取纯文本内容（移除所有HTML标签）
-  let newMainContent = getTextContent(editor);
+  let newMainContent = getTextContent(editor)
 
   // 检测并修复被破坏的引用格式
   // 如果文本中包含 [知识片段：标题] 格式，但mainContent中没有对应的引用标志，尝试恢复
-  const linkedPlaceholderPattern = /\[知识片段：([^\]]+)\]/g;
-  let match;
-  const placeholders: Array<{ match: string; title: string; index: number }> = [];
+  const linkedPlaceholderPattern = /\[知识片段：([^\]]+)\]/g
+  let match
+  const placeholders: Array<{ match: string; title: string; index: number }> = []
 
-  linkedPlaceholderPattern.lastIndex = 0;
+  linkedPlaceholderPattern.lastIndex = 0
   while ((match = linkedPlaceholderPattern.exec(newMainContent)) !== null) {
     placeholders.push({
       match: match[0],
       title: match[1] || '',
-      index: match.index || 0
-    });
+      index: match.index || 0,
+    })
   }
 
   // 如果找到了占位符，检查mainContent中是否有对应的引用标志
   if (placeholders.length > 0) {
-    const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
-    const parser = new FragmentReferenceParser();
-    const references = parser.parseReferences(mainContent.value);
+    const { FragmentReferenceParser } = await import(
+      '../../domain/services/fragment-reference-parser.service'
+    )
+    const parser = new FragmentReferenceParser()
+    const references = parser.parseReferences(mainContent.value)
 
     // 从后往前替换，避免索引偏移问题
     for (let i = placeholders.length - 1; i >= 0; i--) {
-      const placeholder = placeholders[i];
-      if (!placeholder) continue;
+      const placeholder = placeholders[i]
+      if (!placeholder) continue
 
       // 检查这个位置是否已经有引用标志
-      const textBeforePlaceholder = newMainContent.substring(0, placeholder.index);
-      const hasRefAtPosition = references.some(ref => {
-        const textBeforeRef = mainContent.value.substring(0, ref.startIndex);
-        return Math.abs(textBeforeRef.length - textBeforePlaceholder.length) < 50;
-      });
+      const textBeforePlaceholder = newMainContent.substring(0, placeholder.index)
+      const hasRefAtPosition = references.some((ref) => {
+        const textBeforeRef = mainContent.value.substring(0, ref.startIndex)
+        return Math.abs(textBeforeRef.length - textBeforePlaceholder.length) < 50
+      })
 
       // 如果没有找到对应的引用标志，尝试从mainContent中查找
       if (!hasRefAtPosition) {
         // 尝试通过位置匹配来恢复引用
-        let correspondingRef = null;
+        let correspondingRef = null
         for (const ref of references) {
-          const textBeforeRef = mainContent.value.substring(0, ref.startIndex);
+          const textBeforeRef = mainContent.value.substring(0, ref.startIndex)
           if (Math.abs(textBeforeRef.length - textBeforePlaceholder.length) < 100) {
-            correspondingRef = ref;
-            break;
+            correspondingRef = ref
+            break
           }
         }
 
         if (correspondingRef && !correspondingRef.fragmentId.startsWith('placeholder:')) {
           // 找到了对应的引用，替换占位符
-          const refTag = `{{ref:${correspondingRef.fragmentId}:${correspondingRef.mode}}}`;
-          newMainContent = newMainContent.substring(0, placeholder.index) + refTag + newMainContent.substring(placeholder.index + placeholder.match.length);
+          const refTag = `{{ref:${correspondingRef.fragmentId}:${correspondingRef.mode}}}`
+          newMainContent =
+            newMainContent.substring(0, placeholder.index) +
+            refTag +
+            newMainContent.substring(placeholder.index + placeholder.match.length)
         }
       }
     }
   }
 
-  mainContent.value = newMainContent;
+  mainContent.value = newMainContent
 
   // 更新完整内容（frontmatter + mainContent）
-  content.value = mergeContent(frontmatter.value, mainContent.value);
+  content.value = mergeContent(frontmatter.value, mainContent.value)
 
   // 检测引用标志是否被修改
   if (props.document && lastContent) {
-    detectAndHandleReferenceModification(lastContent, content.value, props.document.id);
+    detectAndHandleReferenceModification(lastContent, content.value, props.document.id)
   }
-  lastContent = content.value;
+  lastContent = content.value
 
-  checkChanges();
+  checkChanges()
   // 使用防抖来避免频繁渲染
   if (renderTimer) {
-    clearTimeout(renderTimer);
+    clearTimeout(renderTimer)
   }
   renderTimer = setTimeout(() => {
-  renderContent();
+    renderContent()
     // 不要在用户输入时重新应用标注，因为这会重新渲染innerHTML导致失去焦点
     // 标注只在编辑器失去焦点时应用
-  }, 150);
-  debouncedSave();
-};
+  }, 150)
+  debouncedSave()
+}
 
 // 获取纯文本内容（移除HTML标签，保留换行）
 // 同时将友好显示文本 [知识片段：标题] 还原为原始引用格式 {{ref:id:linked}}
 const getTextContent = (element: HTMLElement): string => {
   // 如果元素是文本节点，直接返回
   if (element.nodeType === Node.TEXT_NODE) {
-    return element.textContent || '';
+    return element.textContent || ''
   }
 
   // 递归获取所有文本节点的内容，保留换行
-  let text = '';
-  const processedElements = new Set<HTMLElement>(); // 用于跟踪已处理的标注元素，避免重复
+  let text = ''
+  const processedElements = new Set<HTMLElement>() // 用于跟踪已处理的标注元素，避免重复
 
   const walker = document.createTreeWalker(
     element,
@@ -1076,422 +1158,438 @@ const getTextContent = (element: HTMLElement): string => {
       acceptNode: (node: Node) => {
         // 对于标注元素，跳过其子节点，因为我们会在处理元素本身时获取文本
         if (node.nodeType === Node.ELEMENT_NODE) {
-          const el = node as HTMLElement;
-          if (el.classList.contains('editor-reference') ||
-              el.classList.contains('editor-mermaid') ||
-              el.classList.contains('editor-code') ||
-              el.classList.contains('editor-formula')) {
+          const el = node as HTMLElement
+          if (
+            el.classList.contains('editor-reference') ||
+            el.classList.contains('editor-mermaid') ||
+            el.classList.contains('editor-code') ||
+            el.classList.contains('editor-formula')
+          ) {
             // 如果这个元素已经被处理过，跳过其子节点
             if (processedElements.has(el)) {
-              return NodeFilter.FILTER_REJECT; // 拒绝遍历子节点
+              return NodeFilter.FILTER_REJECT // 拒绝遍历子节点
             }
-            return NodeFilter.FILTER_ACCEPT; // 接受元素本身，但会在处理时标记为已处理
+            return NodeFilter.FILTER_ACCEPT // 接受元素本身，但会在处理时标记为已处理
           }
         }
-        return NodeFilter.FILTER_ACCEPT;
-      }
-    }
-  );
+        return NodeFilter.FILTER_ACCEPT
+      },
+    },
+  )
 
-  let node: Node | null;
-  let lastNode: Node | null = null;
+  let node: Node | null
+  let lastNode: Node | null = null
   while ((node = walker.nextNode()) !== null) {
     if (node.nodeType === Node.TEXT_NODE) {
       // 检查这个文本节点是否在已处理的标注元素内
-      let parent = node.parentElement;
-      let isInsideProcessedElement = false;
+      let parent = node.parentElement
+      let isInsideProcessedElement = false
       while (parent && parent !== element) {
         if (processedElements.has(parent)) {
-          isInsideProcessedElement = true;
-          break;
+          isInsideProcessedElement = true
+          break
         }
-        parent = parent.parentElement;
+        parent = parent.parentElement
       }
 
       // 如果文本节点不在已处理的标注元素内，才添加
       if (!isInsideProcessedElement) {
-        text += node.textContent || '';
+        text += node.textContent || ''
       }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       // 如果是引用标注span，需要还原为原始引用格式
-      const el = node as HTMLElement;
+      const el = node as HTMLElement
       if (el.classList.contains('editor-reference')) {
-        const fragmentId = el.getAttribute('data-fragment-id');
-        const mode = el.getAttribute('data-mode') || 'linked';
+        const fragmentId = el.getAttribute('data-fragment-id')
+        const mode = el.getAttribute('data-mode') || 'linked'
         if (fragmentId && !fragmentId.startsWith('placeholder:')) {
           // 还原为原始引用格式
-          text += `{{ref:${fragmentId}:${mode}}}`;
+          text += `{{ref:${fragmentId}:${mode}}}`
           // 标记为已处理，避免遍历子节点
-          processedElements.add(el);
-          continue;
+          processedElements.add(el)
+          continue
         }
       }
       // 检查是否是其他标注元素，如果是，只获取其文本内容，不获取HTML
-      if (el.classList.contains('editor-mermaid') ||
-          el.classList.contains('editor-code') ||
-          el.classList.contains('editor-formula')) {
+      if (
+        el.classList.contains('editor-mermaid') ||
+        el.classList.contains('editor-code') ||
+        el.classList.contains('editor-formula')
+      ) {
         // 对于这些标注，只获取文本内容（不包含HTML标签）
-        const textContent = el.textContent || '';
-        text += textContent;
+        const textContent = el.textContent || ''
+        text += textContent
         // 标记为已处理，避免遍历子节点时重复获取
-        processedElements.add(el);
-        continue;
+        processedElements.add(el)
+        continue
       }
       // 如果是块级元素，添加换行
       if (lastNode && (el.tagName === 'DIV' || el.tagName === 'P' || el.tagName === 'BR')) {
-        text += '\n';
+        text += '\n'
       }
     }
-    lastNode = node;
+    lastNode = node
   }
 
   // 如果没有获取到内容，使用textContent作为后备
   if (!text && element.textContent) {
-    text = element.textContent;
+    text = element.textContent
   }
 
-  return text;
-};
+  return text
+}
 
 // 处理编辑器获得焦点
 const handleEditorFocus = () => {
   // 不立即切换为纯文本，保持标注显示
   // 只有在用户真正输入时才处理
-  isEditorFocused.value = true;
-};
+  isEditorFocused.value = true
+}
 
 // 处理编辑器鼠标按下事件（在失去焦点之前保存光标位置）
 const handleEditorMouseDown = (event: MouseEvent) => {
-  const editor = editorElement.value;
-  if (!editor) return;
+  const editor = editorElement.value
+  if (!editor) return
 
   // 如果编辑器没有焦点，确保它能获得焦点
   // 这很重要，特别是删除文档后，焦点可能在焦点接收器上
   if (!isEditorFocused.value || document.activeElement !== editor) {
     // 如果焦点在焦点接收器上，先移除
     if (focusSinkElement.value && document.activeElement === focusSinkElement.value) {
-      focusSinkElement.value.blur();
+      focusSinkElement.value.blur()
     }
     // 确保没有其他元素持有焦点
-    if (document.activeElement && document.activeElement !== editor && document.activeElement !== document.body) {
-      (document.activeElement as HTMLElement).blur();
+    if (
+      document.activeElement &&
+      document.activeElement !== editor &&
+      document.activeElement !== document.body
+    ) {
+      ;(document.activeElement as HTMLElement).blur()
     }
     // 让编辑器获得焦点
-    editor.focus();
+    editor.focus()
     // 更新焦点状态
-    isEditorFocused.value = true;
+    isEditorFocused.value = true
   }
 
   // 如果编辑器有焦点，保存当前光标位置
   if (isEditorFocused.value || document.activeElement === editor) {
     // 使用 nextTick 确保焦点已经设置完成
     nextTick(() => {
-      const { start, end } = getCursorPosition(editor);
-      currentSelectionStart.value = start;
-      currentSelectionEnd.value = end;
-    });
+      const { start, end } = getCursorPosition(editor)
+      currentSelectionStart.value = start
+      currentSelectionEnd.value = end
+    })
   }
-};
+}
 
 // 处理编辑器失去焦点（精简版：只做状态标记，不再重建 DOM）
 const handleEditorBlur = () => {
-  isEditorFocused.value = false;
-};
+  isEditorFocused.value = false
+}
 
 // 处理粘贴事件
 const handlePaste = async (event: ClipboardEvent) => {
-  event.preventDefault();
-  const text = event.clipboardData?.getData('text/plain') || '';
-  const editor = editorElement.value;
-  if (!editor) return;
+  event.preventDefault()
+  const text = event.clipboardData?.getData('text/plain') || ''
+  const editor = editorElement.value
+  if (!editor) return
 
   // 插入纯文本
-  const selection = window.getSelection();
+  const selection = window.getSelection()
   if (selection && selection.rangeCount > 0) {
-    const range = selection.getRangeAt(0);
-    range.deleteContents();
-    const textNode = document.createTextNode(text);
-    range.insertNode(textNode);
-    range.setStartAfter(textNode);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+    const textNode = document.createTextNode(text)
+    range.insertNode(textNode)
+    range.setStartAfter(textNode)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
   }
 
   // 触发输入事件
-  handleEditorInput(event);
-};
+  handleEditorInput(event)
+}
 
 // 应用编辑器标注（高亮引用标志、代码块等）
 const applyEditorAnnotations = async () => {
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor || !mainContent.value) {
     if (editor && !mainContent.value) {
-      editor.textContent = '';
+      editor.textContent = ''
     }
-    return;
+    return
   }
 
   try {
     // 保存当前光标位置
-    const selection = window.getSelection();
-    let cursorPosition = 0;
+    const selection = window.getSelection()
+    let cursorPosition = 0
     if (selection && selection.rangeCount > 0 && selection.anchorNode) {
-      const range = selection.getRangeAt(0);
+      const range = selection.getRangeAt(0)
       // 计算光标在整个编辑器中的位置
-      const preRange = document.createRange();
-      preRange.selectNodeContents(editor);
-      preRange.setEnd(range.startContainer, range.startOffset);
-      cursorPosition = preRange.toString().length;
+      const preRange = document.createRange()
+      preRange.selectNodeContents(editor)
+      preRange.setEnd(range.startContainer, range.startOffset)
+      cursorPosition = preRange.toString().length
     }
 
     // 解析引用标志（基于正文内容）
-    const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
-    const parser = new FragmentReferenceParser();
-    const references = parser.parseReferences(mainContent.value);
+    const { FragmentReferenceParser } = await import(
+      '../../domain/services/fragment-reference-parser.service'
+    )
+    const parser = new FragmentReferenceParser()
+    const references = parser.parseReferences(mainContent.value)
 
     // 解析代码块（包括mermaid）
-    const codeBlocks: Array<{ start: number; end: number; type: 'mermaid' | 'code' | 'formula' }> = [];
-    const mermaidRegex = /```mermaid[\s\S]*?```/g;
-    const codeRegex = /```[\s\S]*?```/g;
-    const formulaRegex = /\$\$[\s\S]*?\$\$/g;
+    const codeBlocks: Array<{ start: number; end: number; type: 'mermaid' | 'code' | 'formula' }> =
+      []
+    const mermaidRegex = /```mermaid[\s\S]*?```/g
+    const codeRegex = /```[\s\S]*?```/g
+    const formulaRegex = /\$\$[\s\S]*?\$\$/g
 
-    let match: RegExpExecArray | null;
+    let match: RegExpExecArray | null
     while ((match = mermaidRegex.exec(mainContent.value)) !== null) {
-      codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'mermaid' });
+      codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'mermaid' })
     }
     while ((match = codeRegex.exec(mainContent.value)) !== null) {
       // 跳过已经匹配的mermaid块
-      if (!codeBlocks.some(cb => cb.start === match!.index)) {
-        codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'code' });
+      if (!codeBlocks.some((cb) => cb.start === match!.index)) {
+        codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'code' })
       }
     }
     while ((match = formulaRegex.exec(mainContent.value)) !== null) {
-      codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'formula' });
+      codeBlocks.push({ start: match.index, end: match.index + match[0].length, type: 'formula' })
     }
 
     // 获取引用元数据
-    let docId: string | undefined;
+    let docId: string | undefined
     if (props.document) {
-      docId = props.document.id;
+      docId = props.document.id
     } else if (currentFilePath.value) {
-      docId = currentFilePath.value;
+      docId = currentFilePath.value
     }
-    const referenceMetadata = await getReferenceMetadata(docId);
+    const referenceMetadata = await getReferenceMetadata(docId)
 
     // 获取知识片段标题以提高可读性
-    const fragmentTitles = new Map<string, string>();
+    const fragmentTitles = new Map<string, string>()
     if (references.length > 0) {
       try {
-        const { Application } = await import('../../core/application');
-        const app = Application.getInstance();
-        await app.getApplicationService().initialize();
-        const fragmentUseCases = app.getKnowledgeFragmentUseCases();
+        const { Application } = await import('../../core/application')
+        const app = Application.getInstance()
+        await app.getApplicationService().initialize()
+        const fragmentUseCases = app.getKnowledgeFragmentUseCases()
 
         // 批量获取片段标题（使用 Promise.all 并行获取，提高性能）
         const titlePromises = references.map(async (ref) => {
           try {
-            const fragment = await fragmentUseCases.getFragment(ref.fragmentId);
+            const fragment = await fragmentUseCases.getFragment(ref.fragmentId)
             if (fragment && fragment.title) {
-              return { fragmentId: ref.fragmentId, title: fragment.title };
+              return { fragmentId: ref.fragmentId, title: fragment.title }
             }
           } catch (error) {
             // 忽略单个片段获取失败
-            console.warn(`无法获取片段 ${ref.fragmentId} 的标题:`, error);
+            console.warn(`无法获取片段 ${ref.fragmentId} 的标题:`, error)
           }
-          return null;
-        });
+          return null
+        })
 
-        const titleResults = await Promise.all(titlePromises);
-        titleResults.forEach(result => {
+        const titleResults = await Promise.all(titlePromises)
+        titleResults.forEach((result) => {
           if (result) {
-            fragmentTitles.set(result.fragmentId, result.title);
+            fragmentTitles.set(result.fragmentId, result.title)
           }
-        });
+        })
       } catch (error) {
-        console.error('[标注] 获取知识片段标题失败:', error);
+        console.error('[标注] 获取知识片段标题失败:', error)
       }
     }
 
     // 合并所有需要标注的区域
     const annotations: Array<{
-      start: number;
-      end: number;
-      type: 'reference' | 'mermaid' | 'code' | 'formula';
-      fragmentId?: string;
-      mode?: string;
-      isConnected?: boolean;
-      title?: string;
-    }> = [];
+      start: number
+      end: number
+      type: 'reference' | 'mermaid' | 'code' | 'formula'
+      fragmentId?: string
+      mode?: string
+      isConnected?: boolean
+      title?: string
+    }> = []
 
-    references.forEach(ref => {
+    references.forEach((ref) => {
       if (ref) {
-        const meta = referenceMetadata.find(m => m.fragmentId === ref.fragmentId);
-          // 获取mode，兼容旧代码
-          const mode = (ref as any).mode || (ref.isConnected ? 'linked' : 'detached');
-          const annotation = {
-            start: ref.startIndex,
-            end: ref.endIndex,
-            type: 'reference' as const,
-            fragmentId: ref.fragmentId,
-            mode: mode,
-            isConnected: meta?.isConnected !== false,
-            title: (ref as any).title
-          };
-          annotations.push(annotation);
+        const meta = referenceMetadata.find((m) => m.fragmentId === ref.fragmentId)
+        // 获取mode，兼容旧代码
+        const mode = (ref as any).mode || (ref.isConnected ? 'linked' : 'detached')
+        const annotation = {
+          start: ref.startIndex,
+          end: ref.endIndex,
+          type: 'reference' as const,
+          fragmentId: ref.fragmentId,
+          mode: mode,
+          isConnected: meta?.isConnected !== false,
+          title: (ref as any).title,
+        }
+        annotations.push(annotation)
       }
-    });
+    })
 
-    codeBlocks.forEach(cb => {
+    codeBlocks.forEach((cb) => {
       annotations.push({
         start: cb.start,
         end: cb.end,
-        type: cb.type
-      });
-    });
+        type: cb.type,
+      })
+    })
 
     // 按位置排序
-    annotations.sort((a, b) => a.start - b.start);
+    annotations.sort((a, b) => a.start - b.start)
 
     // 构建带标注的HTML
-    let annotatedHtml = '';
-    let lastIndex = 0;
+    let annotatedHtml = ''
+    let lastIndex = 0
 
-    annotations.forEach(ann => {
+    annotations.forEach((ann) => {
       // 添加标注前的文本
       if (ann.start > lastIndex) {
-        const text = mainContent.value.substring(lastIndex, ann.start);
-        annotatedHtml += escapeHtml(text);
+        const text = mainContent.value.substring(lastIndex, ann.start)
+        annotatedHtml += escapeHtml(text)
       }
 
       // 添加标注
-      const text = mainContent.value.substring(ann.start, ann.end);
-      let className = '';
-      let title = '';
+      const text = mainContent.value.substring(ann.start, ann.end)
+      let className = ''
+      let title = ''
 
       // 为引用添加额外的数据属性，用于形态切换
-      const dataAttrs = ann.type === 'reference'
-        ? `data-fragment-id="${ann.fragmentId || ''}" data-mode="${ann.mode || 'linked'}"`
-        : '';
+      const dataAttrs =
+        ann.type === 'reference'
+          ? `data-fragment-id="${ann.fragmentId || ''}" data-mode="${ann.mode || 'linked'}"`
+          : ''
       // 为引用添加内联样式以确保背景色显示（解决scoped样式问题）
-      let inlineStyle = '';
+      let inlineStyle = ''
       if (ann.type === 'reference') {
         if (ann.mode === 'linked') {
-          inlineStyle = `style="background-color: rgba(102, 126, 234, 0.4) !important; border: 1px solid #667eea !important; color: #4c51bf !important; padding: 2px 4px !important; border-radius: 3px !important; display: inline-block !important; font-weight: 500 !important; cursor: pointer !important;"`;
+          inlineStyle = `style="background-color: rgba(102, 126, 234, 0.4) !important; border: 1px solid #667eea !important; color: #4c51bf !important; padding: 2px 4px !important; border-radius: 3px !important; display: inline-block !important; font-weight: 500 !important; cursor: pointer !important;"`
         } else if (ann.mode === 'detached') {
-          inlineStyle = `style="background-color: rgba(255, 193, 7, 0.3) !important; border: 1px solid #ffc107 !important; color: #856404 !important; padding: 2px 4px !important; border-radius: 3px !important; display: inline-block !important; font-weight: 500 !important; cursor: pointer !important;"`;
+          inlineStyle = `style="background-color: rgba(255, 193, 7, 0.3) !important; border: 1px solid #ffc107 !important; color: #856404 !important; padding: 2px 4px !important; border-radius: 3px !important; display: inline-block !important; font-weight: 500 !important; cursor: pointer !important;"`
         }
       }
 
       if (ann.type === 'reference') {
         // 根据形态设置不同的样式
-        const mode = ann.mode || 'linked';
+        const mode = ann.mode || 'linked'
         // 获取片段标题
-        const fragmentTitle = fragmentTitles.get(ann.fragmentId || '') || ann.title;
-        const displayText = fragmentTitle ? `[知识片段：${fragmentTitle}]` : text;
+        const fragmentTitle = fragmentTitles.get(ann.fragmentId || '') || ann.title
+        const displayText = fragmentTitle ? `[知识片段：${fragmentTitle}]` : text
 
         if (mode === 'linked') {
-          className = 'editor-reference linked';
-          title = fragmentTitle ? `知识片段：${fragmentTitle}` : `知识片段引用: ${ann.fragmentId}`;
+          className = 'editor-reference linked'
+          title = fragmentTitle ? `知识片段：${fragmentTitle}` : `知识片段引用: ${ann.fragmentId}`
         } else if (mode === 'detached') {
-          className = 'editor-reference detached';
-          title = fragmentTitle ? `知识片段（已脱钩）：${fragmentTitle}` : `知识片段（已脱钩）: ${ann.fragmentId}`;
+          className = 'editor-reference detached'
+          title = fragmentTitle
+            ? `知识片段（已脱钩）：${fragmentTitle}`
+            : `知识片段（已脱钩）: ${ann.fragmentId}`
         } else {
-          className = ann.isConnected ? 'editor-reference connected' : 'editor-reference disconnected';
-          title = fragmentTitle ? `知识片段：${fragmentTitle}` : `知识片段引用: ${ann.fragmentId}`;
+          className = ann.isConnected
+            ? 'editor-reference connected'
+            : 'editor-reference disconnected'
+          title = fragmentTitle ? `知识片段：${fragmentTitle}` : `知识片段引用: ${ann.fragmentId}`
         }
 
         // 如果有标题，使用友好显示文本
         if (fragmentTitle && mode === 'linked') {
           // 对于linked模式，显示友好文本而不是原始引用标志
           // 设置contenteditable="false"防止用户直接编辑引用文本
-          const spanHtml = `<span class="${className}" title="${title}" data-start="${ann.start}" data-end="${ann.end}" ${dataAttrs} ${inlineStyle} contenteditable="false">${escapeHtml(displayText)}</span>`;
-          annotatedHtml += spanHtml;
-          lastIndex = ann.end;
-          return; // 跳过后续处理
+          const spanHtml = `<span class="${className}" title="${title}" data-start="${ann.start}" data-end="${ann.end}" ${dataAttrs} ${inlineStyle} contenteditable="false">${escapeHtml(displayText)}</span>`
+          annotatedHtml += spanHtml
+          lastIndex = ann.end
+          return // 跳过后续处理
         }
       } else if (ann.type === 'mermaid') {
-        className = 'editor-mermaid';
-        title = 'Mermaid图表';
+        className = 'editor-mermaid'
+        title = 'Mermaid图表'
       } else if (ann.type === 'formula') {
-        className = 'editor-formula';
-        title = '数学公式';
+        className = 'editor-formula'
+        title = '数学公式'
       } else {
-        className = 'editor-code';
-        title = '代码块';
+        className = 'editor-code'
+        title = '代码块'
       }
 
-      const spanHtml = `<span class="${className}" title="${title}" data-start="${ann.start}" data-end="${ann.end}" ${dataAttrs} ${inlineStyle}>${escapeHtml(text)}</span>`;
-      annotatedHtml += spanHtml;
+      const spanHtml = `<span class="${className}" title="${title}" data-start="${ann.start}" data-end="${ann.end}" ${dataAttrs} ${inlineStyle}>${escapeHtml(text)}</span>`
+      annotatedHtml += spanHtml
 
       if (ann.type === 'reference') {
         console.log('[标注] 生成引用HTML:', {
           className,
           text: text.substring(0, 30),
-          html: spanHtml.substring(0, 100)
-        });
+          html: spanHtml.substring(0, 100),
+        })
       }
 
-      lastIndex = ann.end;
-    });
+      lastIndex = ann.end
+    })
 
     // 添加剩余的文本
     if (lastIndex < mainContent.value.length) {
-      annotatedHtml += escapeHtml(mainContent.value.substring(lastIndex));
+      annotatedHtml += escapeHtml(mainContent.value.substring(lastIndex))
     }
 
     // 更新编辑器内容
     if (annotatedHtml) {
-      editor.innerHTML = annotatedHtml;
+      editor.innerHTML = annotatedHtml
     } else {
       // 即使没有标注，也使用innerHTML以确保格式正确
-      editor.innerHTML = escapeHtml(mainContent.value).replace(/\n/g, '<br>');
+      editor.innerHTML = escapeHtml(mainContent.value).replace(/\n/g, '<br>')
     }
 
     // 恢复光标位置（仅当编辑器仍然有焦点时）
-    await nextTick();
+    await nextTick()
     if (cursorPosition > 0 && editor.textContent && document.activeElement === editor) {
       try {
-        const range = document.createRange();
-        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-        let currentPos = 0;
-        let targetNode: Node | null = null;
-        let targetOffset = 0;
+        const range = document.createRange()
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null)
+        let currentPos = 0
+        let targetNode: Node | null = null
+        let targetOffset = 0
 
         while (walker.nextNode()) {
-          const node = walker.currentNode;
-          const nodeLength = node.textContent?.length || 0;
+          const node = walker.currentNode
+          const nodeLength = node.textContent?.length || 0
           if (currentPos + nodeLength >= cursorPosition) {
-            targetNode = node;
-            targetOffset = cursorPosition - currentPos;
-            break;
+            targetNode = node
+            targetOffset = cursorPosition - currentPos
+            break
           }
-          currentPos += nodeLength;
+          currentPos += nodeLength
         }
 
         if (targetNode) {
-          range.setStart(targetNode, Math.min(targetOffset, targetNode.textContent?.length || 0));
-          range.collapse(true);
-          selection?.removeAllRanges();
-          selection?.addRange(range);
+          range.setStart(targetNode, Math.min(targetOffset, targetNode.textContent?.length || 0))
+          range.collapse(true)
+          selection?.removeAllRanges()
+          selection?.addRange(range)
         }
       } catch (e) {
         // 忽略光标恢复错误
       }
     }
   } catch (error) {
-    console.error('Error applying editor annotations:', error);
+    console.error('Error applying editor annotations:', error)
     // 出错时显示纯文本（转义HTML）
-    editor.innerHTML = escapeHtml(mainContent.value).replace(/\n/g, '<br>');
+    editor.innerHTML = escapeHtml(mainContent.value).replace(/\n/g, '<br>')
   }
-};
+}
 
 // HTML转义
 const escapeHtml = (text: string): string => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
+}
 
 // handleContentChange已移除，逻辑合并到handleEditorInput中
 
@@ -1499,334 +1597,341 @@ const escapeHtml = (text: string): string => {
 const detectAndHandleReferenceModification = async (
   oldContent: string,
   newContent: string,
-  documentId: string
+  documentId: string,
 ) => {
   try {
-    const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
-    const parser = new FragmentReferenceParser();
+    const { FragmentReferenceParser } = await import(
+      '../../domain/services/fragment-reference-parser.service'
+    )
+    const parser = new FragmentReferenceParser()
 
-    const oldReferences = parser.parseReferences(oldContent);
-    const newReferences = parser.parseReferences(newContent);
+    const oldReferences = parser.parseReferences(oldContent)
+    const newReferences = parser.parseReferences(newContent)
 
     // 找出被修改或删除的引用
     for (const oldRef of oldReferences) {
       const newRef = newReferences.find(
-        r => r.fragmentId === oldRef.fragmentId &&
-             r.startIndex === oldRef.startIndex
-      );
+        (r) => r.fragmentId === oldRef.fragmentId && r.startIndex === oldRef.startIndex,
+      )
 
       if (!newRef) {
         // 引用被删除，取消注册
-        const { Application } = await import('../../core/application');
-        const app = Application.getInstance();
-        const appService = app.getApplicationService();
-        await appService.initialize();
+        const { Application } = await import('../../core/application')
+        const app = Application.getInstance()
+        const appService = app.getApplicationService()
+        await appService.initialize()
 
-        const container = (appService as any).container;
+        const container = (appService as any).container
         if (container) {
-          const registrationService = container.get(TYPES.FragmentReferenceRegistrationService);
+          const registrationService = container.get(TYPES.FragmentReferenceRegistrationService)
           if (registrationService) {
-            await registrationService.unregisterReference(documentId, oldRef.fragmentId);
+            await registrationService.unregisterReference(documentId, oldRef.fragmentId)
           }
         }
       } else if (newRef.match !== oldRef.match) {
         // 引用标志被修改（不再是原来的格式），断开连接
-        const { Application } = await import('../../core/application');
-        const app = Application.getInstance();
-        const appService = app.getApplicationService();
-        await appService.initialize();
+        const { Application } = await import('../../core/application')
+        const app = Application.getInstance()
+        const appService = app.getApplicationService()
+        await appService.initialize()
 
-        const container = (appService as any).container;
+        const container = (appService as any).container
         if (container) {
-          const registrationService = container.get(TYPES.FragmentReferenceRegistrationService);
+          const registrationService = container.get(TYPES.FragmentReferenceRegistrationService)
           if (registrationService && newRef.isConnected) {
             // 更新为断开状态
-            const disconnectedTag = `{{ref:${newRef.fragmentId}:disconnected}}`;
-            const before = newContent.substring(0, newRef.startIndex);
-            const after = newContent.substring(newRef.endIndex);
-            content.value = before + disconnectedTag + after;
+            const disconnectedTag = `{{ref:${newRef.fragmentId}:disconnected}}`
+            const before = newContent.substring(0, newRef.startIndex)
+            const after = newContent.substring(newRef.endIndex)
+            content.value = before + disconnectedTag + after
 
             await registrationService.disconnectReference(
               documentId,
               newRef.fragmentId,
-              newContent.substring(newRef.startIndex, newRef.endIndex)
-            );
+              newContent.substring(newRef.startIndex, newRef.endIndex),
+            )
           }
         }
       }
     }
   } catch (error) {
-    console.error('Error detecting reference modification:', error);
+    console.error('Error detecting reference modification:', error)
   }
-};
+}
 
 const checkChanges = () => {
   // 如果工具栏操作正在进行，不检查更改
   // 避免从编辑器读取旧内容覆盖新的格式化内容
   if (isToolbarOperation) {
-    console.log('[checkChanges] 工具栏操作中，跳过更改检查');
+    console.log('[checkChanges] 工具栏操作中，跳过更改检查')
     // 但仍然需要标记为已更改
-    hasChanges.value = true;
-    return;
+    hasChanges.value = true
+    return
   }
 
   // 确保使用最新的内容（从编辑器获取，而不是使用缓存的content.value）
-  const editor = editorElement.value;
-  let currentContent = content.value;
+  const editor = editorElement.value
+  let currentContent = content.value
 
   // 如果编辑器存在，从编辑器获取最新内容
   if (editor) {
-    const currentMainContent = getTextContent(editor);
-    currentContent = mergeContent(frontmatter.value, currentMainContent);
+    const currentMainContent = getTextContent(editor)
+    currentContent = mergeContent(frontmatter.value, currentMainContent)
     // 更新content.value以保持同步
     if (currentContent !== content.value) {
-      mainContent.value = currentMainContent;
-      content.value = currentContent;
+      mainContent.value = currentMainContent
+      content.value = currentContent
     }
   }
 
-  const titleChanged = title.value !== lastSavedTitle;
-  const contentChanged = currentContent !== lastSavedContent;
-  hasChanges.value = titleChanged || contentChanged;
-  
+  const titleChanged = title.value !== lastSavedTitle
+  const contentChanged = currentContent !== lastSavedContent
+  hasChanges.value = titleChanged || contentChanged
+
   console.log('[实时保存] checkChanges 结果:', {
     titleChanged,
     contentChanged,
     hasChanges: hasChanges.value,
     currentContentLength: currentContent.length,
-    lastSavedContentLength: lastSavedContent.length
-  });
-};
+    lastSavedContentLength: lastSavedContent.length,
+  })
+}
 
 // 标志位：工具栏操作是否正在进行
-let isToolbarOperation = false;
+let isToolbarOperation = false
 
 // 处理工具栏内容更新
 const handleToolbarUpdate = (newContent: string) => {
-  console.log('[handleToolbarUpdate] ========== 开始处理 ==========');
-  console.log('[handleToolbarUpdate] 接收到的新内容:', newContent);
-  console.log('[handleToolbarUpdate] 当前 mainContent.value:', mainContent.value);
-  console.log('[handleToolbarUpdate] 内容是否相同:', newContent === mainContent.value);
+  console.log('[handleToolbarUpdate] ========== 开始处理 ==========')
+  console.log('[handleToolbarUpdate] 接收到的新内容:', newContent)
+  console.log('[handleToolbarUpdate] 当前 mainContent.value:', mainContent.value)
+  console.log('[handleToolbarUpdate] 内容是否相同:', newContent === mainContent.value)
   console.log('[handleToolbarUpdate] 内容长度对比:', {
     newLength: newContent.length,
-    oldLength: mainContent.value.length
-  });
+    oldLength: mainContent.value.length,
+  })
 
   // 设置标志位，阻止 handleEditorBlur 覆盖内容
-  isToolbarOperation = true;
-  console.log('[handleToolbarUpdate] 设置 isToolbarOperation = true');
+  isToolbarOperation = true
+  console.log('[handleToolbarUpdate] 设置 isToolbarOperation = true')
 
   // 更新主内容
-  console.log('[handleToolbarUpdate] 准备更新 mainContent.value');
-  mainContent.value = newContent;
-  console.log('[handleToolbarUpdate] mainContent.value 已更新:', mainContent.value);
+  console.log('[handleToolbarUpdate] 准备更新 mainContent.value')
+  mainContent.value = newContent
+  console.log('[handleToolbarUpdate] mainContent.value 已更新:', mainContent.value)
 
   // 合并 frontmatter 和主内容
-  console.log('[handleToolbarUpdate] 准备更新 content.value (完整内容)');
-  content.value = mergeContent(frontmatter.value, mainContent.value);
-  console.log('[handleToolbarUpdate] content.value 已更新:', content.value);
+  console.log('[handleToolbarUpdate] 准备更新 content.value (完整内容)')
+  content.value = mergeContent(frontmatter.value, mainContent.value)
+  console.log('[handleToolbarUpdate] content.value 已更新:', content.value)
 
   // 更新编辑器显示
-  console.log('[handleToolbarUpdate] 准备在 nextTick 中更新编辑器 DOM');
+  console.log('[handleToolbarUpdate] 准备在 nextTick 中更新编辑器 DOM')
   nextTick(() => {
-    const editor = editorElement.value;
-    console.log('[handleToolbarUpdate] nextTick 回调执行');
-    console.log('[handleToolbarUpdate] editorElement.value:', editor);
-    console.log('[handleToolbarUpdate] 当前 mainContent.value:', mainContent.value);
-    console.log('[handleToolbarUpdate] mainContent.value 类型:', typeof mainContent.value);
-    console.log('[handleToolbarUpdate] mainContent.value 长度:', mainContent.value.length);
+    const editor = editorElement.value
+    console.log('[handleToolbarUpdate] nextTick 回调执行')
+    console.log('[handleToolbarUpdate] editorElement.value:', editor)
+    console.log('[handleToolbarUpdate] 当前 mainContent.value:', mainContent.value)
+    console.log('[handleToolbarUpdate] mainContent.value 类型:', typeof mainContent.value)
+    console.log('[handleToolbarUpdate] mainContent.value 长度:', mainContent.value.length)
 
     if (editor) {
       console.log('[handleToolbarUpdate] 更新编辑器前', {
         editorTextContent: editor.textContent,
         editorInnerHTML: editor.innerHTML,
         mainContentValue: mainContent.value,
-        mainContentLength: mainContent.value.length
-      });
+        mainContentLength: mainContent.value.length,
+      })
 
-      console.log('[handleToolbarUpdate] 执行 editor.textContent = mainContent.value');
-      editor.textContent = mainContent.value;
+      console.log('[handleToolbarUpdate] 执行 editor.textContent = mainContent.value')
+      editor.textContent = mainContent.value
 
       console.log('[handleToolbarUpdate] 更新编辑器后', {
         editorTextContent: editor.textContent,
         editorInnerHTML: editor.innerHTML,
-        textContentLength: editor.textContent?.length
-      });
+        textContentLength: editor.textContent?.length,
+      })
 
       // 短暂延迟后清除标志位，确保 DOM 更新完成
-      console.log('[handleToolbarUpdate] 设置 100ms 后清除 isToolbarOperation');
+      console.log('[handleToolbarUpdate] 设置 100ms 后清除 isToolbarOperation')
       setTimeout(() => {
-        console.log('[handleToolbarUpdate] 清除 isToolbarOperation = false');
-        isToolbarOperation = false;
-      }, 100);
+        console.log('[handleToolbarUpdate] 清除 isToolbarOperation = false')
+        isToolbarOperation = false
+      }, 100)
     } else {
-      console.error('[handleToolbarUpdate] editorElement.value 为 null，无法更新编辑器');
+      console.error('[handleToolbarUpdate] editorElement.value 为 null，无法更新编辑器')
     }
-  });
+  })
 
   // 渲染预览
-  console.log('[handleToolbarUpdate] 准备调用 renderContent()');
-  renderContent();
+  console.log('[handleToolbarUpdate] 准备调用 renderContent()')
+  renderContent()
 
   // 检查更改并保存
-  console.log('[handleToolbarUpdate] 准备调用 checkChanges() 和 debouncedSave()');
-  checkChanges();
-  debouncedSave();
-  console.log('[handleToolbarUpdate] ========== 处理结束 ==========');
-};
+  console.log('[handleToolbarUpdate] 准备调用 checkChanges() 和 debouncedSave()')
+  checkChanges()
+  debouncedSave()
+  console.log('[handleToolbarUpdate] ========== 处理结束 ==========')
+}
 
 const debouncedSave = () => {
-  console.log('[实时保存] debouncedSave 被调用');
+  console.log('[实时保存] debouncedSave 被调用')
   if (debounceTimer) {
-    clearTimeout(debounceTimer);
+    clearTimeout(debounceTimer)
   }
 
   debounceTimer = setTimeout(() => {
-    console.log('[实时保存] 延迟结束，准备保存');
-    saveDocument();
-  }, 1000);
-};
+    console.log('[实时保存] 延迟结束，准备保存')
+    saveDocument()
+  }, 1000)
+}
 
 const updateDocument = () => {
-  checkChanges();
+  checkChanges()
   if (hasChanges.value) {
-    saveDocument();
+    saveDocument()
   }
-};
+}
 
 const saveDocument = async () => {
   console.log('[实时保存] saveDocument 被调用', {
     hasChanges: hasChanges.value,
     currentFilePath: currentFilePath.value,
-    hasDocument: !!props.document
-  });
-  
+    hasDocument: !!props.document,
+  })
+
   if (!hasChanges.value) {
-    console.log('[实时保存] 没有变化，跳过保存');
-    return;
+    console.log('[实时保存] 没有变化，跳过保存')
+    return
   }
 
   // 如果有外部文件路径，保存到文件系统
   if (currentFilePath.value) {
     try {
-      const electronAPI = (window as any).electronAPI;
+      const electronAPI = (window as any).electronAPI
       if (electronAPI && electronAPI.file && electronAPI.file.writeFileContent) {
         // 确保使用最新的内容（从编辑器获取，而不是使用缓存的content.value）
-        const editor = editorElement.value;
-        const currentMainContent = editor ? getTextContent(editor) : mainContent.value;
-        let contentToSave = mergeContent(frontmatter.value, currentMainContent);
-        const cache = await electronAPI.file.getFileCache?.(currentFilePath.value);
+        const editor = editorElement.value
+        const currentMainContent = editor ? getTextContent(editor) : mainContent.value
+        let contentToSave = mergeContent(frontmatter.value, currentMainContent)
+        const cache = await electronAPI.file.getFileCache?.(currentFilePath.value)
 
         // 更新content.value和mainContent.value以保持同步
-        mainContent.value = currentMainContent;
-        content.value = contentToSave;
+        mainContent.value = currentMainContent
+        content.value = contentToSave
 
         if (cache && cache.references && cache.references.length > 0) {
           // 从后往前替换，避免索引偏移
           for (let i = cache.references.length - 1; i >= 0; i--) {
-            const ref = cache.references[i];
-            const refTag = `{{ref:${ref.fragmentId}}}`;
-            const startIndex = ref.position;
-            const endIndex = startIndex + ref.length;
+            const ref = cache.references[i]
+            const refTag = `{{ref:${ref.fragmentId}}}`
+            const startIndex = ref.position
+            const endIndex = startIndex + ref.length
 
             // 检查内容中是否还有这个引用标志
             if (contentToSave.substring(startIndex, endIndex) === refTag) {
               // 替换为片段内容
-              contentToSave = contentToSave.substring(0, startIndex) +
-                             ref.content +
-                             contentToSave.substring(endIndex);
+              contentToSave =
+                contentToSave.substring(0, startIndex) +
+                ref.content +
+                contentToSave.substring(endIndex)
             }
           }
         }
 
-        await electronAPI.file.writeFileContent(currentFilePath.value, contentToSave);
-        lastSavedTitle = title.value;
-        lastSavedContent = content.value; // 保存编辑器中的内容（带引用标志）
-        hasChanges.value = false;
-        console.log('[实时保存] 外部文件保存成功:', currentFilePath.value);
-        return;
+        await electronAPI.file.writeFileContent(currentFilePath.value, contentToSave)
+        lastSavedTitle = title.value
+        lastSavedContent = content.value // 保存编辑器中的内容（带引用标志）
+        hasChanges.value = false
+        console.log('[实时保存] 外部文件保存成功:', currentFilePath.value)
+        return
       } else {
-        console.error('[保存] electronAPI.file.writeFileContent 不可用');
+        console.error('[保存] electronAPI.file.writeFileContent 不可用')
       }
     } catch (error) {
-      console.error('[保存] 保存文件失败:', error);
+      console.error('[保存] 保存文件失败:', error)
       // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
-      return;
+      return
     }
   }
 
   // 如果有document，保存到数据库
   if (props.document) {
-  try {
-    emit('update-document', props.document.id, title.value, content.value);
-    lastSavedTitle = title.value;
-    lastSavedContent = content.value;
-    hasChanges.value = false;
-    console.log('[实时保存] 数据库文档保存成功:', props.document.id);
-  } catch (error) {
-      console.error('[保存] 保存数据库文档失败:', error);
+    try {
+      emit('update-document', props.document.id, title.value, content.value)
+      lastSavedTitle = title.value
+      lastSavedContent = content.value
+      hasChanges.value = false
+      console.log('[实时保存] 数据库文档保存成功:', props.document.id)
+    } catch (error) {
+      console.error('[保存] 保存数据库文档失败:', error)
       // 即使保存失败，也不要更新 lastSavedContent，这样下次还会尝试保存
     }
   } else {
-    console.warn('[实时保存] 既没有 currentFilePath 也没有 document，无法保存');
+    console.warn('[实时保存] 既没有 currentFilePath 也没有 document，无法保存')
   }
-};
-
+}
 
 // 获取引用元数据
-const getReferenceMetadata = async (docId?: string): Promise<Array<{ fragmentId: string; isConnected: boolean }>> => {
-  const metadata: Array<{ fragmentId: string; isConnected: boolean }> = [];
+const getReferenceMetadata = async (
+  docId?: string,
+): Promise<Array<{ fragmentId: string; isConnected: boolean }>> => {
+  const metadata: Array<{ fragmentId: string; isConnected: boolean }> = []
 
   if (currentFilePath.value) {
     // 外部文件：从缓存获取
     try {
-      const electronAPI = (window as any).electronAPI;
+      const electronAPI = (window as any).electronAPI
       if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
-        const cache = await electronAPI.file.getFileCache(currentFilePath.value);
+        const cache = await electronAPI.file.getFileCache(currentFilePath.value)
         if (cache && cache.references) {
           cache.references.forEach((ref: any) => {
             metadata.push({
               fragmentId: ref.fragmentId,
-              isConnected: ref.isConnected !== false
-            });
-          });
+              isConnected: ref.isConnected !== false,
+            })
+          })
         }
       }
     } catch (error) {
-      console.error('Error getting file cache:', error);
+      console.error('Error getting file cache:', error)
     }
   } else if (props.document) {
     // 数据库文档：从文档实体获取
     try {
-      const { Application } = await import('../../core/application');
-      const app = Application.getInstance();
-      await app.getApplicationService().initialize();
+      const { Application } = await import('../../core/application')
+      const app = Application.getInstance()
+      await app.getApplicationService().initialize()
 
       // 通过容器获取文档仓储，直接访问文档实体
-      const { InversifyContainer } = await import('../../core/container/inversify.container');
-      const container = InversifyContainer.getInstance();
+      const { InversifyContainer } = await import('../../core/container/inversify.container')
+      const container = InversifyContainer.getInstance()
 
-      if (container && typeof container.isBound === 'function' && container.isBound(TYPES.DocumentRepository)) {
-        const documentRepository = container.get<any>(TYPES.DocumentRepository);
-        const document = await documentRepository.findById({ value: props.document.id });
+      if (
+        container &&
+        typeof container.isBound === 'function' &&
+        container.isBound(TYPES.DocumentRepository)
+      ) {
+        const documentRepository = container.get<any>(TYPES.DocumentRepository)
+        const document = await documentRepository.findById({ value: props.document.id })
 
         if (document) {
-          const references = document.getFragmentReferences();
+          const references = document.getFragmentReferences()
           references.forEach((ref: { fragmentId: string; isConnected: boolean }) => {
             metadata.push({
               fragmentId: ref.fragmentId,
-              isConnected: ref.isConnected !== false
-            });
-          });
+              isConnected: ref.isConnected !== false,
+            })
+          })
         }
       }
     } catch (error) {
-      console.error('Error getting document references:', error);
+      console.error('Error getting document references:', error)
     }
   }
 
-  return metadata;
-};
+  return metadata
+}
 
 // 渲染预览内容
 const renderContent = async () => {
@@ -1835,28 +1940,28 @@ const renderContent = async () => {
     try {
       // 传递documentId以处理图片路径（如果有document）
       // 对于外部文件，传递文件路径（不带file:前缀，因为renderMarkdown会处理）
-      let docId: string | undefined;
-      let docPath: string | undefined;
+      let docId: string | undefined
+      let docPath: string | undefined
       if (props.document) {
         // 优先使用 filePath（外部文件），否则使用 id（数据库文档）
-        const actualPath = (props.document as any).filePath || props.document.id;
-        docId = actualPath;
-        docPath = actualPath;
+        const actualPath = (props.document as any).filePath || props.document.id
+        docId = actualPath
+        docPath = actualPath
       } else if (currentFilePath.value) {
         // 对于外部文件，直接使用文件路径
-        docId = currentFilePath.value;
-        docPath = currentFilePath.value;
+        docId = currentFilePath.value
+        docPath = currentFilePath.value
       }
 
       // 渲染内容（不进行变量替换）
       // renderMarkdown 会调用 resolveReferences 来解析引用标志
       // 尝试从文件缓存读取，传递给 renderMarkdown 以提高性能
-      let fileCache = null;
+      let fileCache = null
       if (docId && (docId.includes('/') || docId.includes('\\'))) {
         try {
-          const electronAPI = (window as any).electronAPI;
+          const electronAPI = (window as any).electronAPI
           if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
-            fileCache = await electronAPI.file.getFileCache(docId);
+            fileCache = await electronAPI.file.getFileCache(docId)
           }
         } catch (error) {
           // 缓存读取失败不影响渲染
@@ -1868,59 +1973,59 @@ const renderContent = async () => {
         docId,
         undefined,
         fileCache,
-      );
+      )
 
       // 获取编辑器的滚动百分比位置（这是我们要同步到预览的基准）
-      const editor = editorElement.value;
-      let editorScrollPercentage = 0;
-      let isEditorAtBottom = false;
+      const editor = editorElement.value
+      let editorScrollPercentage = 0
+      let isEditorAtBottom = false
 
       if (editor) {
-        const editorScrollHeight = editor.scrollHeight - editor.clientHeight;
+        const editorScrollHeight = editor.scrollHeight - editor.clientHeight
         if (editorScrollHeight > 0) {
-          const distanceFromBottom = editorScrollHeight - editor.scrollTop;
+          const distanceFromBottom = editorScrollHeight - editor.scrollTop
           // 如果编辑器接近底部（距离底部小于10px），认为在底部
           if (distanceFromBottom <= 10) {
-            isEditorAtBottom = true;
-            editorScrollPercentage = 1;
+            isEditorAtBottom = true
+            editorScrollPercentage = 1
           } else {
-            editorScrollPercentage = editor.scrollTop / editorScrollHeight;
+            editorScrollPercentage = editor.scrollTop / editorScrollHeight
             // 限制在 0-1 之间
-            editorScrollPercentage = Math.max(0, Math.min(1, editorScrollPercentage));
+            editorScrollPercentage = Math.max(0, Math.min(1, editorScrollPercentage))
           }
         } else {
           // 如果编辑器没有滚动空间，默认在顶部
-          editorScrollPercentage = 0;
+          editorScrollPercentage = 0
         }
       }
 
       // 保存编辑器滚动百分比，用于设置预览滚动位置
-      savedScrollPercentage.value = editorScrollPercentage;
-      const currentPreviewIndex = activePreviewIndex.value;
+      savedScrollPercentage.value = editorScrollPercentage
+      const currentPreviewIndex = activePreviewIndex.value
 
       // 使用双缓冲技术平滑更新预览
-      const nextBufferIndex = currentPreviewIndex === 0 ? 1 : 0;
-      const nextPreviewElement = nextBufferIndex === 0 ? previewElement0 : previewElement1;
+      const nextBufferIndex = currentPreviewIndex === 0 ? 1 : 0
+      const nextPreviewElement = nextBufferIndex === 0 ? previewElement0 : previewElement1
 
       // 保存滚动恢复信息，用于在 previewBuffers 更新后恢复滚动位置
       pendingScrollRestore.value = {
         percentage: editorScrollPercentage,
         isAtBottom: isEditorAtBottom,
-        previewIndex: nextBufferIndex
-      };
+        previewIndex: nextBufferIndex,
+      }
 
       // 更新非活动缓冲区（这会触发 v-html 更新，watch 会处理滚动恢复）
-      previewBuffers.value[nextBufferIndex] = newRenderedContent;
+      previewBuffers.value[nextBufferIndex] = newRenderedContent
 
-      await nextTick();
+      await nextTick()
 
       // 渲染所有资源占位符（Mermaid图表等）到非活动缓冲区
       if (nextPreviewElement.value) {
-        await triggerRender(nextPreviewElement);
+        await triggerRender(nextPreviewElement)
       }
 
       // 等待DOM完全更新（包括triggerRender中的异步操作）
-      await nextTick();
+      await nextTick()
 
       // 确保新内容已经渲染完成后再切换
       // 使用双重 requestAnimationFrame 确保浏览器已经完成渲染和布局
@@ -1928,128 +2033,133 @@ const renderContent = async () => {
         requestAnimationFrame(() => {
           // 在切换前，先在新预览元素上设置滚动位置（此时元素还不可见，但内容已加载）
           if (nextPreviewElement.value) {
-            const previewScrollHeight = nextPreviewElement.value.scrollHeight - nextPreviewElement.value.clientHeight;
+            const previewScrollHeight =
+              nextPreviewElement.value.scrollHeight - nextPreviewElement.value.clientHeight
             if (previewScrollHeight > 0) {
-              const targetScrollTop = isEditorAtBottom ? previewScrollHeight : (editorScrollPercentage * previewScrollHeight);
-              nextPreviewElement.value.scrollTop = targetScrollTop;
+              const targetScrollTop = isEditorAtBottom
+                ? previewScrollHeight
+                : editorScrollPercentage * previewScrollHeight
+              nextPreviewElement.value.scrollTop = targetScrollTop
             }
           }
 
           // 切换活动缓冲区索引（这会触发CSS类变化，实现平滑过渡）
-          activePreviewIndex.value = nextBufferIndex;
-          renderedContent.value = newRenderedContent;
+          activePreviewIndex.value = nextBufferIndex
+          renderedContent.value = newRenderedContent
 
           // 更新 previewElement 引用以保持兼容性
-          previewElement.value = nextPreviewElement.value || undefined;
+          previewElement.value = nextPreviewElement.value || undefined
 
           // 切换后立即再次设置滚动位置（确保在元素变为可见后滚动位置正确）
           nextTick(() => {
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 if (nextPreviewElement.value) {
-                  const previewScrollHeight = nextPreviewElement.value.scrollHeight - nextPreviewElement.value.clientHeight;
+                  const previewScrollHeight =
+                    nextPreviewElement.value.scrollHeight - nextPreviewElement.value.clientHeight
                   if (previewScrollHeight > 0) {
-                    const targetScrollTop = isEditorAtBottom ? previewScrollHeight : (editorScrollPercentage * previewScrollHeight);
-                    nextPreviewElement.value.scrollTop = targetScrollTop;
+                    const targetScrollTop = isEditorAtBottom
+                      ? previewScrollHeight
+                      : editorScrollPercentage * previewScrollHeight
+                    nextPreviewElement.value.scrollTop = targetScrollTop
                   }
                 }
-              });
-            });
-          });
-        });
-      });
+              })
+            })
+          })
+        })
+      })
     } catch (error) {
-      console.error('Failed to render markdown:', error);
-      const errorContent = '<p>渲染错误</p>';
-      renderedContent.value = errorContent;
+      console.error('Failed to render markdown:', error)
+      const errorContent = '<p>渲染错误</p>'
+      renderedContent.value = errorContent
       // 更新当前活动的缓冲区
-      previewBuffers.value[activePreviewIndex.value] = errorContent;
+      previewBuffers.value[activePreviewIndex.value] = errorContent
     }
   } else {
-    renderedContent.value = '';
+    renderedContent.value = ''
     // 清空当前活动的缓冲区
-    previewBuffers.value[activePreviewIndex.value] = '';
+    previewBuffers.value[activePreviewIndex.value] = ''
   }
-};
-
+}
 
 // 同步编辑器滚动到预览（基于滚动百分比）
 const syncScroll = (event: Event) => {
   // 如果正在恢复滚动位置，不进行同步（避免干扰）
   if (isRestoringScroll.value || isSyncingScroll.value) {
-    return;
+    return
   }
 
-  const editor = event.target as HTMLElement;
-  const activePreview = activePreviewIndex.value === 0 ? previewElement0.value : previewElement1.value;
+  const editor = event.target as HTMLElement
+  const activePreview =
+    activePreviewIndex.value === 0 ? previewElement0.value : previewElement1.value
 
   if (!activePreview || !editor) {
-    return;
+    return
   }
 
-  const editorScrollHeight = editor.scrollHeight - editor.clientHeight;
-  const previewScrollHeight = activePreview.scrollHeight - activePreview.clientHeight;
+  const editorScrollHeight = editor.scrollHeight - editor.clientHeight
+  const previewScrollHeight = activePreview.scrollHeight - activePreview.clientHeight
 
   // 处理边界情况：如果编辑器或预览没有滚动空间，则不进行同步
   if (editorScrollHeight <= 0 || previewScrollHeight <= 0) {
-    return;
+    return
   }
 
   // 计算编辑器的滚动百分比
-  const scrollPercentage = editor.scrollTop / editorScrollHeight;
+  const scrollPercentage = editor.scrollTop / editorScrollHeight
 
   // 保存滚动百分比
-  savedScrollPercentage.value = scrollPercentage;
+  savedScrollPercentage.value = scrollPercentage
 
   // 计算预览应该滚动到的位置
-  const previewScrollTop = scrollPercentage * previewScrollHeight;
+  const previewScrollTop = scrollPercentage * previewScrollHeight
 
   // 设置预览滚动位置（使用标志位防止循环触发）
-  isSyncingScroll.value = true;
-  activePreview.scrollTop = previewScrollTop;
+  isSyncingScroll.value = true
+  activePreview.scrollTop = previewScrollTop
   // 使用 requestAnimationFrame 确保标志位在下一帧重置
   requestAnimationFrame(() => {
-    isSyncingScroll.value = false;
-  });
-};
+    isSyncingScroll.value = false
+  })
+}
 
 // 处理预览滚动事件（用户手动滚动预览时，可选：同步到编辑器）
 const handlePreviewScroll = (previewIndex: number) => {
   // 如果正在恢复滚动位置或正在同步，不处理（避免干扰）
   if (isRestoringScroll.value || isSyncingScroll.value) {
-    return;
+    return
   }
 
   // 只处理当前活动预览元素的滚动
   if (previewIndex === activePreviewIndex.value) {
-    const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
-  if (preview) {
-      const scrollHeight = preview.scrollHeight - preview.clientHeight;
+    const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value
+    if (preview) {
+      const scrollHeight = preview.scrollHeight - preview.clientHeight
       if (scrollHeight > 0) {
         // 保存预览的滚动百分比（但不反向同步到编辑器，因为编辑器是主导）
-        savedScrollPercentage.value = preview.scrollTop / scrollHeight;
+        savedScrollPercentage.value = preview.scrollTop / scrollHeight
       }
     }
   }
-};
-
+}
 
 // 恢复预览滚动位置（参考 VSCode 的简单实现）
 const restorePreviewScrollPosition = (scrollPercentage: number, previewIndex: number) => {
-  const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
-  if (!preview || scrollPercentage < 0) return;
+  const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value
+  if (!preview || scrollPercentage < 0) return
 
-  isRestoringScroll.value = true;
+  isRestoringScroll.value = true
 
   const setScroll = () => {
-    const scrollHeight = preview.scrollHeight - preview.clientHeight;
+    const scrollHeight = preview.scrollHeight - preview.clientHeight
     if (scrollHeight > 0) {
-      const targetScrollTop = scrollPercentage * scrollHeight;
-      preview.scrollTop = targetScrollTop;
-      return true;
+      const targetScrollTop = scrollPercentage * scrollHeight
+      preview.scrollTop = targetScrollTop
+      return true
     }
-    return false;
-  };
+    return false
+  }
 
   // 使用 requestAnimationFrame 确保 DOM 已渲染
   requestAnimationFrame(() => {
@@ -2057,83 +2167,97 @@ const restorePreviewScrollPosition = (scrollPercentage: number, previewIndex: nu
       if (!setScroll()) {
         // 如果失败，再试一次（可能是内容还在加载）
         setTimeout(() => {
-          setScroll();
-          isRestoringScroll.value = false;
-        }, 50);
+          setScroll()
+          isRestoringScroll.value = false
+        }, 50)
       } else {
-        isRestoringScroll.value = false;
+        isRestoringScroll.value = false
       }
-    });
-  });
-};
-
+    })
+  })
+}
 
 // 恢复预览滚动位置的辅助函数（带底部检测）
-const restorePreviewScrollPositionHelper = (scrollPercentage: number, previewIndex: number, isAtBottom: boolean = false): boolean => {
-  const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
-  if (!preview || scrollPercentage < 0) return false;
+const restorePreviewScrollPositionHelper = (
+  scrollPercentage: number,
+  previewIndex: number,
+  isAtBottom: boolean = false,
+): boolean => {
+  const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value
+  if (!preview || scrollPercentage < 0) return false
 
-  const scrollHeight = preview.scrollHeight - preview.clientHeight;
+  const scrollHeight = preview.scrollHeight - preview.clientHeight
   if (scrollHeight > 0) {
-    const targetScrollTop = isAtBottom ? scrollHeight : (scrollPercentage * scrollHeight);
-    preview.scrollTop = targetScrollTop;
-    return true;
+    const targetScrollTop = isAtBottom ? scrollHeight : scrollPercentage * scrollHeight
+    preview.scrollTop = targetScrollTop
+    return true
   }
-  return false;
-};
+  return false
+}
 
 // 尝试恢复预览滚动位置（带重试机制）
-const tryRestorePreviewScroll = (scrollPercentage: number, previewIndex: number, isAtBottom: boolean = false, maxAttempts: number = 10) => {
-  if (isRestoringScroll.value) return;
+const tryRestorePreviewScroll = (
+  scrollPercentage: number,
+  previewIndex: number,
+  isAtBottom: boolean = false,
+  maxAttempts: number = 10,
+) => {
+  if (isRestoringScroll.value) return
 
-  isRestoringScroll.value = true;
-  let attempts = 0;
+  isRestoringScroll.value = true
+  let attempts = 0
 
   const attempt = () => {
-    attempts++;
+    attempts++
     if (restorePreviewScrollPositionHelper(scrollPercentage, previewIndex, isAtBottom)) {
-      isRestoringScroll.value = false;
-      return;
+      isRestoringScroll.value = false
+      return
     }
 
     if (attempts < maxAttempts) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          attempt();
-        });
-      });
+          attempt()
+        })
+      })
     } else {
-      isRestoringScroll.value = false;
-    }
-  };
-
-  attempt();
-};
-
-// 监听 previewBuffers 变化，在 v-html 更新后立即恢复滚动位置
-watch(() => previewBuffers.value[activePreviewIndex.value], async (newContent, oldContent) => {
-  // 只在内容真正变化时恢复滚动位置
-  if (newContent !== oldContent && newContent && pendingScrollRestore.value) {
-    const { percentage, isAtBottom, previewIndex } = pendingScrollRestore.value;
-    if (previewIndex === activePreviewIndex.value) {
-      pendingScrollRestore.value = null;
-
-      await nextTick();
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value;
-          if (preview) {
-            const previewScrollHeight = preview.scrollHeight - preview.clientHeight;
-            if (previewScrollHeight > 0) {
-              const targetScrollTop = isAtBottom ? previewScrollHeight : (percentage * previewScrollHeight);
-              preview.scrollTop = targetScrollTop;
-            }
-          }
-        });
-      });
+      isRestoringScroll.value = false
     }
   }
-}, { flush: 'post' });
+
+  attempt()
+}
+
+// 监听 previewBuffers 变化，在 v-html 更新后立即恢复滚动位置
+watch(
+  () => previewBuffers.value[activePreviewIndex.value],
+  async (newContent, oldContent) => {
+    // 只在内容真正变化时恢复滚动位置
+    if (newContent !== oldContent && newContent && pendingScrollRestore.value) {
+      const { percentage, isAtBottom, previewIndex } = pendingScrollRestore.value
+      if (previewIndex === activePreviewIndex.value) {
+        pendingScrollRestore.value = null
+
+        await nextTick()
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const preview = previewIndex === 0 ? previewElement0.value : previewElement1.value
+            if (preview) {
+              const previewScrollHeight = preview.scrollHeight - preview.clientHeight
+              if (previewScrollHeight > 0) {
+                const targetScrollTop = isAtBottom
+                  ? previewScrollHeight
+                  : percentage * previewScrollHeight
+                preview.scrollTop = targetScrollTop
+              }
+            }
+          })
+        })
+      }
+    }
+  },
+  { flush: 'post' },
+)
 
 // 监听 activePreviewIndex 变化，在切换预览元素时恢复滚动位置
 watch(activePreviewIndex, (newIndex, oldIndex) => {
@@ -2141,617 +2265,651 @@ watch(activePreviewIndex, (newIndex, oldIndex) => {
     nextTick(() => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const preview = newIndex === 0 ? previewElement0.value : previewElement1.value;
+          const preview = newIndex === 0 ? previewElement0.value : previewElement1.value
           if (preview) {
-            const previewScrollHeight = preview.scrollHeight - preview.clientHeight;
+            const previewScrollHeight = preview.scrollHeight - preview.clientHeight
             if (previewScrollHeight > 0) {
               // 检查是否在底部（百分比接近1）
-              const isAtBottom = savedScrollPercentage.value >= 0.99;
-              const targetScrollTop = isAtBottom ? previewScrollHeight : (savedScrollPercentage.value * previewScrollHeight);
-              preview.scrollTop = targetScrollTop;
+              const isAtBottom = savedScrollPercentage.value >= 0.99
+              const targetScrollTop = isAtBottom
+                ? previewScrollHeight
+                : savedScrollPercentage.value * previewScrollHeight
+              preview.scrollTop = targetScrollTop
             }
           }
-        });
-      });
-    });
+        })
+      })
+    })
   }
-});
+})
 
 onMounted(() => {
   // 初始化时，两个预览元素都启用自动渲染
   if (previewElement0.value) {
-    useAutoRender(previewElement0);
+    useAutoRender(previewElement0)
   }
   if (previewElement1.value) {
-    useAutoRender(previewElement1);
+    useAutoRender(previewElement1)
   }
 
   // 添加点击外部关闭右键菜单的事件监听
-  document.addEventListener('click', handleClickOutside);
-  window.addEventListener('mousemove', handleKnowledgeGraphWindowDrag);
-  window.addEventListener('mouseup', stopKnowledgeGraphWindowDrag);
-  window.addEventListener('resize', ensureKnowledgeGraphWindowInViewport);
+  document.addEventListener('click', handleClickOutside)
+  window.addEventListener('mousemove', handleKnowledgeGraphWindowDrag)
+  window.addEventListener('mouseup', stopKnowledgeGraphWindowDrag)
+  window.addEventListener('resize', ensureKnowledgeGraphWindowInViewport)
 
   if (content.value) {
-    renderContent();
+    renderContent()
     // 确保编辑器内容正确显示
     nextTick(async () => {
-      const editor = editorElement.value;
+      const editor = editorElement.value
       if (editor) {
         // 初始加载时，无论是否焦点，都先应用标注以便用户看到效果
         // 如果用户点击编辑器，handleEditorFocus 会切换为纯文本模式
-        await applyEditorAnnotations();
+        await applyEditorAnnotations()
+      }
+    })
   }
-});
-  }
-});
+})
 
 onUnmounted(() => {
   // 移除点击外部关闭右键菜单的事件监听
-  document.removeEventListener('click', handleClickOutside);
-  window.removeEventListener('mousemove', handleKnowledgeGraphWindowDrag);
-  window.removeEventListener('mouseup', stopKnowledgeGraphWindowDrag);
-  window.removeEventListener('resize', ensureKnowledgeGraphWindowInViewport);
-  stopKnowledgeGraphWindowDrag();
-  void flushKnowledgeGraphToDisk();
+  document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('mousemove', handleKnowledgeGraphWindowDrag)
+  window.removeEventListener('mouseup', stopKnowledgeGraphWindowDrag)
+  window.removeEventListener('resize', ensureKnowledgeGraphWindowInViewport)
+  stopKnowledgeGraphWindowDrag()
+  void flushKnowledgeGraphToDisk()
 
   // 组件卸载前，如果有未保存的更改，强制保存
   if (hasChanges.value) {
     // 清除防抖定时器，立即保存
     if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
+      clearTimeout(debounceTimer)
+      debounceTimer = null
     }
     // 同步保存（不使用 await，因为 onUnmounted 不支持异步）
-    saveDocument().catch(error => {
-      console.error('[组件卸载] 保存失败:', error);
-    });
+    saveDocument().catch((error) => {
+      console.error('[组件卸载] 保存失败:', error)
+    })
   }
-});
+})
 
 // 计算从元素开始到指定范围的文本长度（使用与getTextContent相同的逻辑）
 const calculateTextLength = (element: HTMLElement, endNode: Node, endOffset: number): number => {
-  const range = document.createRange();
-  range.selectNodeContents(element);
-  range.setEnd(endNode, endOffset);
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  range.setEnd(endNode, endOffset)
 
   // 使用 getTextContent 的逻辑来计算文本长度
   // 创建一个临时容器来提取范围内的内容
-  const fragment = range.cloneContents();
-  const tempContainer = document.createElement('div');
-  tempContainer.appendChild(fragment);
+  const fragment = range.cloneContents()
+  const tempContainer = document.createElement('div')
+  tempContainer.appendChild(fragment)
 
   // 使用 getTextContent 来获取文本内容，确保逻辑一致
-  return getTextContent(tempContainer).length;
-};
+  return getTextContent(tempContainer).length
+}
 
 // 获取contenteditable元素的光标位置（基于纯文本，考虑HTML标注）
 const getCursorPosition = (element: HTMLElement): { start: number; end: number } => {
-  const selection = window.getSelection();
+  const selection = window.getSelection()
   if (!selection || selection.rangeCount === 0) {
     // 如果没有选择，尝试获取编辑器的文本内容长度作为默认位置
-    const editorText = getTextContent(element);
-    return { start: editorText.length, end: editorText.length };
+    const editorText = getTextContent(element)
+    return { start: editorText.length, end: editorText.length }
   }
 
-  const range = selection.getRangeAt(0);
+  const range = selection.getRangeAt(0)
 
   // 使用 calculateTextLength 来计算位置，确保与 getTextContent 的逻辑一致
-  const start = calculateTextLength(element, range.startContainer, range.startOffset);
-  const end = calculateTextLength(element, range.endContainer, range.endOffset);
+  const start = calculateTextLength(element, range.startContainer, range.startOffset)
+  const end = calculateTextLength(element, range.endContainer, range.endOffset)
 
-  return { start, end };
-};
+  return { start, end }
+}
 
 // 设置contenteditable元素的光标位置（基于纯文本位置）
 const setCursorPosition = (element: HTMLElement, position: number): void => {
   try {
-    const selection = window.getSelection();
+    const selection = window.getSelection()
     if (!selection) {
-    return;
-  }
+      return
+    }
 
     // 确保位置在有效范围内
-    const textContent = element.textContent || '';
-    const maxPosition = textContent.length;
-    const validPosition = Math.max(0, Math.min(position, maxPosition));
+    const textContent = element.textContent || ''
+    const maxPosition = textContent.length
+    const validPosition = Math.max(0, Math.min(position, maxPosition))
 
-    const range = document.createRange();
-    const walker = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_TEXT,
-      null
-    );
+    const range = document.createRange()
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null)
 
-    let currentPos = 0;
-    let targetNode: Node | null = null;
-    let targetOffset = 0;
+    let currentPos = 0
+    let targetNode: Node | null = null
+    let targetOffset = 0
 
     while (walker.nextNode()) {
-      const node = walker.currentNode;
-      const nodeLength = node.textContent?.length || 0;
+      const node = walker.currentNode
+      const nodeLength = node.textContent?.length || 0
 
       if (currentPos + nodeLength >= validPosition) {
-        targetNode = node;
-        targetOffset = Math.max(0, Math.min(validPosition - currentPos, nodeLength));
-        break;
+        targetNode = node
+        targetOffset = Math.max(0, Math.min(validPosition - currentPos, nodeLength))
+        break
       }
-      currentPos += nodeLength;
+      currentPos += nodeLength
     }
 
     if (targetNode) {
-      range.setStart(targetNode, targetOffset);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
+      range.setStart(targetNode, targetOffset)
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
     } else {
       // 如果找不到目标节点，将光标设置到末尾
-      const textNodes: Node[] = [];
-      const nodeWalker = document.createTreeWalker(
-        element,
-        NodeFilter.SHOW_TEXT,
-        null
-      );
-      let node: Node | null;
+      const textNodes: Node[] = []
+      const nodeWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null)
+      let node: Node | null
       while ((node = nodeWalker.nextNode())) {
-        textNodes.push(node);
+        textNodes.push(node)
       }
 
       if (textNodes.length > 0) {
-        const lastNode = textNodes[textNodes.length - 1];
+        const lastNode = textNodes[textNodes.length - 1]
         if (lastNode) {
-          const lastLength = lastNode.textContent?.length || 0;
-          range.setStart(lastNode, lastLength);
-          range.collapse(true);
-          selection.removeAllRanges();
-          selection.addRange(range);
+          const lastLength = lastNode.textContent?.length || 0
+          range.setStart(lastNode, lastLength)
+          range.collapse(true)
+          selection.removeAllRanges()
+          selection.addRange(range)
         }
       } else {
-        range.selectNodeContents(element);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
+        range.selectNodeContents(element)
+        range.collapse(false)
+        selection.removeAllRanges()
+        selection.addRange(range)
       }
     }
   } catch (error) {
-    console.error('[光标位置设置失败]', error);
+    console.error('[光标位置设置失败]', error)
   }
-};
+}
 
 // Mermaid编辑器相关方法
 const openMermaidEditor = () => {
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor) {
-    return;
+    return
   }
 
   // 先同步编辑器内容到 mainContent（如果编辑器有焦点，内容可能不同步）
-  const currentEditorText = getTextContent(editor);
+  const currentEditorText = getTextContent(editor)
   if (currentEditorText !== mainContent.value) {
-    mainContent.value = currentEditorText;
-    content.value = mergeContent(frontmatter.value, mainContent.value);
+    mainContent.value = currentEditorText
+    content.value = mergeContent(frontmatter.value, mainContent.value)
   }
 
   // 强制获取当前光标位置（必须在编辑器失去焦点之前）
-  let start = 0;
-  let end = 0;
+  let start = 0
+  let end = 0
 
   try {
     // 总是尝试获取当前光标位置，无论编辑器是否有焦点
-    const position = getCursorPosition(editor);
+    const position = getCursorPosition(editor)
     if (position.start >= 0 && position.end >= 0) {
-      start = position.start;
-      end = position.end;
-      console.log('[Mermaid编辑器] 获取到光标位置:', { start, end });
+      start = position.start
+      end = position.end
+      console.log('[Mermaid编辑器] 获取到光标位置:', { start, end })
     } else {
       // 如果获取失败，使用保存的位置
-      start = currentSelectionStart.value;
-      end = currentSelectionEnd.value;
-      console.log('[Mermaid编辑器] 使用保存的光标位置:', { start, end });
+      start = currentSelectionStart.value
+      end = currentSelectionEnd.value
+      console.log('[Mermaid编辑器] 使用保存的光标位置:', { start, end })
     }
   } catch (e) {
-    console.warn('[Mermaid编辑器] 获取光标位置失败，使用保存的位置:', e);
-    start = currentSelectionStart.value;
-    end = currentSelectionEnd.value;
+    console.warn('[Mermaid编辑器] 获取光标位置失败，使用保存的位置:', e)
+    start = currentSelectionStart.value
+    end = currentSelectionEnd.value
   }
 
   // 确保位置在有效范围内
-  const validStart = Math.max(0, Math.min(start, mainContent.value.length));
-  const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+  const validStart = Math.max(0, Math.min(start, mainContent.value.length))
+  const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length))
 
-  console.log('[Mermaid编辑器] 有效光标位置:', { validStart, validEnd, contentLength: mainContent.value.length });
+  console.log('[Mermaid编辑器] 有效光标位置:', {
+    validStart,
+    validEnd,
+    contentLength: mainContent.value.length,
+  })
 
   // 尝试提取Mermaid代码块（使用 mainContent，确保索引匹配）
-  const mermaidCode = extractMermaidCode(mainContent.value, validStart, validEnd);
+  const mermaidCode = extractMermaidCode(mainContent.value, validStart, validEnd)
 
-  currentMermaidCode.value = mermaidCode;
-  currentSelectionStart.value = validStart;
-  currentSelectionEnd.value = validEnd;
-  showMermaidEditor.value = true;
-};
+  currentMermaidCode.value = mermaidCode
+  currentSelectionStart.value = validStart
+  currentSelectionEnd.value = validEnd
+  showMermaidEditor.value = true
+}
 
 const extractMermaidCode = (content: string, start: number, end: number): string => {
   // 如果用户选择了文本，优先使用选中的文本
   if (start !== end) {
-    const selectedText = content.substring(start, end);
+    const selectedText = content.substring(start, end)
     if (selectedText.trim().startsWith('```mermaid')) {
-      return selectedText.replace(/^```mermaid\s*\n?/, '').replace(/\n?```$/, '');
+      return selectedText.replace(/^```mermaid\s*\n?/, '').replace(/\n?```$/, '')
     }
-    return selectedText;
+    return selectedText
   }
 
   // 如果没有选择文本，查找光标位置附近的Mermaid代码块
-  const lines = content.split('\n');
-  let currentLine = 0;
-  let charCount = 0;
+  const lines = content.split('\n')
+  let currentLine = 0
+  let charCount = 0
 
   // 更精确地计算当前行号
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line) continue;
-    const lineLength = line.length + 1; // +1 for newline
+    const line = lines[i]
+    if (!line) continue
+    const lineLength = line.length + 1 // +1 for newline
 
     if (charCount <= start && start < charCount + lineLength) {
-      currentLine = i;
-      break;
+      currentLine = i
+      break
     }
-    charCount += lineLength;
+    charCount += lineLength
   }
 
   // 向前查找Mermaid代码块开始
-  let mermaidStart = -1;
+  let mermaidStart = -1
   for (let i = currentLine; i >= 0; i--) {
-    const line = lines[i];
+    const line = lines[i]
     if (line && line.trim() === '```mermaid') {
-      mermaidStart = i;
-      break;
+      mermaidStart = i
+      break
     }
   }
 
   // 向后查找Mermaid代码块结束
   if (mermaidStart !== -1) {
     for (let i = mermaidStart + 1; i < lines.length; i++) {
-      const line = lines[i];
+      const line = lines[i]
       if (line && line.trim() === '```') {
-        return lines.slice(mermaidStart + 1, i).join('\n');
+        return lines.slice(mermaidStart + 1, i).join('\n')
       }
     }
   }
 
   // 如果没有找到Mermaid代码块，返回默认的流程图模板
-  return `graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]`;
-};
+  return `graph TD\n    A[开始] --> B[处理]\n    B --> C[结束]`
+}
 
 const handleMermaidSave = async (mermaidCode: string) => {
-  const editor = editorElement.value;
-  if (!editor) return;
+  const editor = editorElement.value
+  if (!editor) return
 
-  const start = currentSelectionStart.value;
-  const end = currentSelectionEnd.value;
+  const start = currentSelectionStart.value
+  const end = currentSelectionEnd.value
 
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
-  let newMainContent = mainContent.value;
+  let newMainContent = mainContent.value
 
   // 构建 Mermaid 代码块
-  const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
-  let newCursorPosition = start;
+  const mermaidBlock = `\`\`\`mermaid\n${mermaidCode}\n\`\`\``
+  let newCursorPosition = start
 
   // 如果之前有选中的Mermaid代码块，替换它
   if (start !== end && start < newMainContent.length && end <= newMainContent.length) {
-    const selectedText = newMainContent.substring(start, end);
+    const selectedText = newMainContent.substring(start, end)
     if (selectedText.trim().startsWith('```mermaid')) {
       // 替换整个Mermaid代码块
-      newMainContent = newMainContent.substring(0, start) + mermaidBlock + newMainContent.substring(end);
+      newMainContent =
+        newMainContent.substring(0, start) + mermaidBlock + newMainContent.substring(end)
       // 光标位置设置为插入块之后
-      newCursorPosition = start + mermaidBlock.length;
+      newCursorPosition = start + mermaidBlock.length
     } else {
       // 替换选中的文本
-      newMainContent = newMainContent.substring(0, start) + mermaidBlock + newMainContent.substring(end);
+      newMainContent =
+        newMainContent.substring(0, start) + mermaidBlock + newMainContent.substring(end)
       // 光标位置设置为插入块之后
-      newCursorPosition = start + mermaidBlock.length;
+      newCursorPosition = start + mermaidBlock.length
     }
   } else {
     // 如果没有选中文本，在当前位置插入Mermaid代码块
-    const insertPos = Math.min(start, newMainContent.length);
-    newMainContent = newMainContent.substring(0, insertPos) + mermaidBlock + '\n' + newMainContent.substring(insertPos);
+    const insertPos = Math.min(start, newMainContent.length)
+    newMainContent =
+      newMainContent.substring(0, insertPos) +
+      mermaidBlock +
+      '\n' +
+      newMainContent.substring(insertPos)
     // 光标位置设置为插入块之后（包括换行）
-    newCursorPosition = insertPos + mermaidBlock.length + 1;
+    newCursorPosition = insertPos + mermaidBlock.length + 1
   }
 
   // 更新 mainContent 和完整 content
-  mainContent.value = newMainContent;
-  content.value = mergeContent(frontmatter.value, mainContent.value);
+  mainContent.value = newMainContent
+  content.value = mergeContent(frontmatter.value, mainContent.value)
 
   // 关闭编辑器对话框（先关闭，避免干扰）
-  closeMermaidEditor();
+  closeMermaidEditor()
 
   // 更新编辑器显示和光标位置
   // 注意：在应用标注之前，编辑器失去焦点，所以 isEditorFocused 可能是 false
   // 但我们仍然需要应用标注以显示格式
 
   // 先标记编辑器没有焦点，避免 applyEditorAnnotations 内部尝试恢复光标位置
-  const wasFocused = isEditorFocused.value;
-  isEditorFocused.value = false;
+  const wasFocused = isEditorFocused.value
+  isEditorFocused.value = false
 
   // 应用标注（会重新渲染编辑器内容）
-  await applyEditorAnnotations();
+  await applyEditorAnnotations()
 
   // 等待DOM更新完成
-  await nextTick();
+  await nextTick()
 
   // 设置光标位置（基于新的内容）
-  setCursorPosition(editor, newCursorPosition);
+  setCursorPosition(editor, newCursorPosition)
 
   // 更新保存的光标位置
-  currentSelectionStart.value = newCursorPosition;
-  currentSelectionEnd.value = newCursorPosition;
+  currentSelectionStart.value = newCursorPosition
+  currentSelectionEnd.value = newCursorPosition
 
   // 给编辑器焦点，以便用户继续编辑
-  editor.focus();
+  editor.focus()
   // 恢复焦点状态
   if (wasFocused) {
-    isEditorFocused.value = true;
+    isEditorFocused.value = true
   }
 
-  checkChanges();
-  renderContent();
-};
+  checkChanges()
+  renderContent()
+}
 
 const closeMermaidEditor = () => {
-  showMermaidEditor.value = false;
-  currentMermaidCode.value = '';
-  currentSelectionStart.value = 0;
-  currentSelectionEnd.value = 0;
-};
+  showMermaidEditor.value = false
+  currentMermaidCode.value = ''
+  currentSelectionStart.value = 0
+  currentSelectionEnd.value = 0
+}
 
 // 公式编辑器相关方法
 const openFormulaEditor = () => {
-  const editor = editorElement.value;
-  if (!editor) return;
+  const editor = editorElement.value
+  if (!editor) return
 
   // 先同步编辑器内容到 mainContent（如果编辑器有焦点，内容可能不同步）
-  const currentEditorText = getTextContent(editor);
+  const currentEditorText = getTextContent(editor)
   if (currentEditorText !== mainContent.value) {
-    mainContent.value = currentEditorText;
-    content.value = mergeContent(frontmatter.value, mainContent.value);
+    mainContent.value = currentEditorText
+    content.value = mergeContent(frontmatter.value, mainContent.value)
   }
 
   // 强制获取当前光标位置（必须在编辑器失去焦点之前）
-  let start = 0;
-  let end = 0;
+  let start = 0
+  let end = 0
 
   try {
     // 总是尝试获取当前光标位置，无论编辑器是否有焦点
-    const position = getCursorPosition(editor);
+    const position = getCursorPosition(editor)
     if (position.start >= 0 && position.end >= 0) {
-      start = position.start;
-      end = position.end;
-      console.log('[公式编辑器] 获取到光标位置:', { start, end });
+      start = position.start
+      end = position.end
+      console.log('[公式编辑器] 获取到光标位置:', { start, end })
     } else {
       // 如果获取失败，使用保存的位置
-      start = currentSelectionStart.value;
-      end = currentSelectionEnd.value;
-      console.log('[公式编辑器] 使用保存的光标位置:', { start, end });
+      start = currentSelectionStart.value
+      end = currentSelectionEnd.value
+      console.log('[公式编辑器] 使用保存的光标位置:', { start, end })
     }
   } catch (e) {
-    console.warn('[公式编辑器] 获取光标位置失败，使用保存的位置:', e);
-    start = currentSelectionStart.value;
-    end = currentSelectionEnd.value;
+    console.warn('[公式编辑器] 获取光标位置失败，使用保存的位置:', e)
+    start = currentSelectionStart.value
+    end = currentSelectionEnd.value
   }
 
   // 确保位置在有效范围内
-  const validStart = Math.max(0, Math.min(start, mainContent.value.length));
-  const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+  const validStart = Math.max(0, Math.min(start, mainContent.value.length))
+  const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length))
 
-  console.log('[公式编辑器] 有效光标位置:', { validStart, validEnd, contentLength: mainContent.value.length });
+  console.log('[公式编辑器] 有效光标位置:', {
+    validStart,
+    validEnd,
+    contentLength: mainContent.value.length,
+  })
 
   // 尝试提取公式代码（使用 mainContent，确保索引匹配）
-  const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd);
-  currentFormulaCode.value = formulaCode;
+  const formulaCode = extractFormulaCode(mainContent.value, validStart, validEnd)
+  currentFormulaCode.value = formulaCode
 
   // 确定公式类型 - 更精确的判断逻辑
-  currentFormulaType.value = determineFormulaType(mainContent.value, validStart, validEnd);
+  currentFormulaType.value = determineFormulaType(mainContent.value, validStart, validEnd)
 
-  currentSelectionStart.value = validStart;
-  currentSelectionEnd.value = validEnd;
-  showFormulaEditor.value = true;
-};
+  currentSelectionStart.value = validStart
+  currentSelectionEnd.value = validEnd
+  showFormulaEditor.value = true
+}
 
 const extractFormulaCode = (content: string, start: number, end: number): string => {
   // 实现公式提取逻辑
   if (start !== end) {
-    const selectedText = content.substring(start, end);
+    const selectedText = content.substring(start, end)
     // 检查是否为块级公式
     if (selectedText.trim().startsWith('$$') && selectedText.trim().endsWith('$$')) {
-      return selectedText.replace(/^\$\$/, '').replace(/\$\$$/, '').trim();
+      return selectedText.replace(/^\$\$/, '').replace(/\$\$$/, '').trim()
     }
     // 检查是否为行内公式
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
-        !selectedText.trim().startsWith('$$')) {
-      return selectedText.replace(/^\$/, '').replace(/\$$/, '').trim();
+    if (
+      selectedText.trim().startsWith('$') &&
+      selectedText.trim().endsWith('$') &&
+      !selectedText.trim().startsWith('$$')
+    ) {
+      return selectedText.replace(/^\$/, '').replace(/\$$/, '').trim()
     }
-    return selectedText;
+    return selectedText
   }
 
   // 如果没有选中文本，尝试查找光标位置附近的公式
-  const textBefore = content.substring(0, start);
-  const textAfter = content.substring(start);
+  const textBefore = content.substring(0, start)
+  const textAfter = content.substring(start)
 
   // 检查行内公式
-  const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
-  const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
-  if (inlineBeforeMatch && inlineAfterMatch && inlineBeforeMatch[1] !== undefined && inlineAfterMatch[1] !== undefined) {
-    return (inlineBeforeMatch[1] + inlineAfterMatch[1]).trim();
+  const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/)
+  const inlineAfterMatch = textAfter.match(/^([^$]*)\$/)
+  if (
+    inlineBeforeMatch &&
+    inlineAfterMatch &&
+    inlineBeforeMatch[1] !== undefined &&
+    inlineAfterMatch[1] !== undefined
+  ) {
+    return (inlineBeforeMatch[1] + inlineAfterMatch[1]).trim()
   }
 
   // 检查块级公式
-  const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
-  const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
-  if (blockBeforeMatch && blockAfterMatch && blockBeforeMatch[1] !== undefined && blockAfterMatch[1] !== undefined) {
-    return (blockBeforeMatch[1] + blockAfterMatch[1]).trim();
+  const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/)
+  const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/)
+  if (
+    blockBeforeMatch &&
+    blockAfterMatch &&
+    blockBeforeMatch[1] !== undefined &&
+    blockAfterMatch[1] !== undefined
+  ) {
+    return (blockBeforeMatch[1] + blockAfterMatch[1]).trim()
   }
 
-  return '';
-};
+  return ''
+}
 
 const determineFormulaType = (content: string, start: number, end: number): 'inline' | 'block' => {
   if (start !== end) {
-    const selectedText = content.substring(start, end);
+    const selectedText = content.substring(start, end)
     // 检查是否为块级公式（以$$开头和结尾）
     if (selectedText.trim().startsWith('$$') && selectedText.trim().endsWith('$$')) {
-      return 'block';
+      return 'block'
     }
     // 检查是否为行内公式（以$开头和结尾，但不是$$）
-    if (selectedText.trim().startsWith('$') && selectedText.trim().endsWith('$') &&
-        !selectedText.trim().startsWith('$$')) {
-      return 'inline';
+    if (
+      selectedText.trim().startsWith('$') &&
+      selectedText.trim().endsWith('$') &&
+      !selectedText.trim().startsWith('$$')
+    ) {
+      return 'inline'
     }
   }
 
   // 如果没有选中文本，检查光标位置附近的公式类型
-  const textBefore = content.substring(0, start);
-  const textAfter = content.substring(start);
+  const textBefore = content.substring(0, start)
+  const textAfter = content.substring(start)
 
   // 检查行内公式
-  const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/);
-  const inlineAfterMatch = textAfter.match(/^([^$]*)\$/);
+  const inlineBeforeMatch = textBefore.match(/\$([^$]*)$/)
+  const inlineAfterMatch = textAfter.match(/^([^$]*)\$/)
   if (inlineBeforeMatch && inlineAfterMatch) {
-    return 'inline';
+    return 'inline'
   }
 
   // 检查块级公式
-  const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/);
-  const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/);
+  const blockBeforeMatch = textBefore.match(/\$\$([\s\S]*)$/)
+  const blockAfterMatch = textAfter.match(/^([\s\S]*)\$\$/)
   if (blockBeforeMatch && blockAfterMatch) {
-    return 'block';
+    return 'block'
   }
 
   // 默认返回行内公式
-  return 'inline';
-};
+  return 'inline'
+}
 
-const handleFormulaSave = async (formulaData: { latexCode: string; formulaType: 'inline' | 'block' } | string) => {
-  const editor = editorElement.value;
-  if (!editor) return;
+const handleFormulaSave = async (
+  formulaData: { latexCode: string; formulaType: 'inline' | 'block' } | string,
+) => {
+  const editor = editorElement.value
+  if (!editor) return
 
   // 处理两种可能的参数格式
-  let latexCode: string;
-  let formulaType: 'inline' | 'block';
+  let latexCode: string
+  let formulaType: 'inline' | 'block'
 
   if (typeof formulaData === 'string') {
     // 兼容旧格式
-    latexCode = formulaData;
-    formulaType = 'inline';
+    latexCode = formulaData
+    formulaType = 'inline'
   } else {
-    latexCode = formulaData.latexCode;
-    formulaType = formulaData.formulaType;
+    latexCode = formulaData.latexCode
+    formulaType = formulaData.formulaType
   }
 
-  const start = currentSelectionStart.value;
-  const end = currentSelectionEnd.value;
+  const start = currentSelectionStart.value
+  const end = currentSelectionEnd.value
 
   // 使用 mainContent 进行操作，因为编辑器显示的是 mainContent
-  let newMainContent = mainContent.value;
+  let newMainContent = mainContent.value
 
   // 根据公式类型格式化代码
-  let formattedFormula = formulaType === 'block'
-    ? `$$${latexCode}$$`
-    : `$${latexCode}$`;
+  let formattedFormula = formulaType === 'block' ? `$$${latexCode}$$` : `$${latexCode}$`
 
   // 确保位置有效
-  const validStart = Math.max(0, Math.min(start, newMainContent.length));
-  const validEnd = Math.max(validStart, Math.min(end, newMainContent.length));
+  const validStart = Math.max(0, Math.min(start, newMainContent.length))
+  const validEnd = Math.max(validStart, Math.min(end, newMainContent.length))
 
   // 对于块级公式，需要确保前后有空行
   if (formulaType === 'block') {
-    const textBefore = newMainContent.substring(0, validStart);
-    const textAfter = newMainContent.substring(validEnd);
+    const textBefore = newMainContent.substring(0, validStart)
+    const textAfter = newMainContent.substring(validEnd)
 
     // 检查前面是否需要空行
     // 如果不在文档开头，且前面不是两个换行符（空行），则添加换行
-    let prefixNewlines = '';
+    let prefixNewlines = ''
     if (textBefore.length > 0) {
       // 检查前面是否已有足够的换行（至少一个空行）
       if (!textBefore.endsWith('\n\n')) {
         if (textBefore.endsWith('\n')) {
           // 如果只有一个换行，再添加一个
-          prefixNewlines = '\n';
+          prefixNewlines = '\n'
         } else {
           // 如果没有换行，添加两个（形成空行）
-          prefixNewlines = '\n\n';
+          prefixNewlines = '\n\n'
         }
       }
     }
 
     // 检查后面是否需要空行
-    let suffixNewlines = '';
+    let suffixNewlines = ''
     if (textAfter.length > 0) {
       // 检查后面是否已有足够的换行（至少一个空行）
       if (!textAfter.startsWith('\n\n')) {
         if (textAfter.startsWith('\n')) {
           // 如果只有一个换行，再添加一个
-          suffixNewlines = '\n';
+          suffixNewlines = '\n'
         } else {
           // 如果没有换行，添加两个（形成空行）
-          suffixNewlines = '\n\n';
+          suffixNewlines = '\n\n'
         }
       }
     }
 
     // 更新格式化后的公式，包含必要的空行
-    formattedFormula = prefixNewlines + formattedFormula + suffixNewlines;
+    formattedFormula = prefixNewlines + formattedFormula + suffixNewlines
   }
 
   // 计算新的光标位置（插入公式后的位置）
-  let newCursorPosition = validStart + formattedFormula.length;
+  let newCursorPosition = validStart + formattedFormula.length
 
   // 替换或插入公式
-  if (validStart !== validEnd && validStart < newMainContent.length && validEnd <= newMainContent.length) {
-    newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validEnd);
+  if (
+    validStart !== validEnd &&
+    validStart < newMainContent.length &&
+    validEnd <= newMainContent.length
+  ) {
+    newMainContent =
+      newMainContent.substring(0, validStart) +
+      formattedFormula +
+      newMainContent.substring(validEnd)
   } else {
-    newMainContent = newMainContent.substring(0, validStart) + formattedFormula + newMainContent.substring(validStart);
+    newMainContent =
+      newMainContent.substring(0, validStart) +
+      formattedFormula +
+      newMainContent.substring(validStart)
   }
 
   // 更新 mainContent 和完整 content
-  mainContent.value = newMainContent;
-  content.value = mergeContent(frontmatter.value, mainContent.value);
+  mainContent.value = newMainContent
+  content.value = mergeContent(frontmatter.value, mainContent.value)
 
   // 关闭编辑器对话框
-  closeFormulaEditor();
+  closeFormulaEditor()
 
   // 更新编辑器显示（使用与 Mermaid 相同的方式）
-  const wasFocused = isEditorFocused.value;
-  isEditorFocused.value = false;
+  const wasFocused = isEditorFocused.value
+  isEditorFocused.value = false
 
   // 应用标注（异步等待完成）
-  await applyEditorAnnotations();
+  await applyEditorAnnotations()
 
   // 等待DOM更新
-  await nextTick();
+  await nextTick()
 
   // 设置光标位置
-  setCursorPosition(editor, newCursorPosition);
+  setCursorPosition(editor, newCursorPosition)
 
   // 更新保存的光标位置
-  currentSelectionStart.value = newCursorPosition;
-  currentSelectionEnd.value = newCursorPosition;
+  currentSelectionStart.value = newCursorPosition
+  currentSelectionEnd.value = newCursorPosition
 
   // 给编辑器焦点
-  editor.focus();
-  
+  editor.focus()
+
   // 恢复焦点状态
   if (wasFocused) {
-    isEditorFocused.value = true;
+    isEditorFocused.value = true
   }
 
-  checkChanges();
-  renderContent();
-};
+  checkChanges()
+  renderContent()
+}
 
 const closeFormulaEditor = () => {
-  showFormulaEditor.value = false;
-  currentFormulaCode.value = '';
-};
+  showFormulaEditor.value = false
+  currentFormulaCode.value = ''
+}
 
 /**
  * 知识图谱布局在 localStorage 中的键：文档 scope + 列表项 entryKey。
@@ -2759,236 +2917,250 @@ const closeFormulaEditor = () => {
  */
 function getKnowledgeGraphLayoutStorageKey(
   layoutScopeOverride?: string,
-  entryKeyOverride?: string | null
+  entryKeyOverride?: string | null,
 ): string {
   if (layoutScopeOverride === undefined && isSampleMode.value) {
-    return 'sample';
+    return 'sample'
   }
-  const scopeId = layoutScopeOverride ?? getKnowledgeGraphScopeId();
+  const scopeId = layoutScopeOverride ?? getKnowledgeGraphScopeId()
   if (scopeId === 'sample') {
-    return 'sample';
+    return 'sample'
   }
-  const ek = entryKeyOverride !== undefined ? entryKeyOverride : selectedKnowledgeGraphEntryKey.value;
+  const ek =
+    entryKeyOverride !== undefined ? entryKeyOverride : selectedKnowledgeGraphEntryKey.value
   if (ek) {
-    return `${scopeId}::${ek}`;
+    return `${scopeId}::${ek}`
   }
-  return scopeId;
+  return scopeId
 }
 
 /** 读取当前图谱的布局缓存；优先复合键，回退旧版「仅文档」键以兼容已有数据 */
 function loadKgLayoutPayloadForGraph(
   layoutScopeOverride?: string,
-  entryKeyOverride?: string | null
+  entryKeyOverride?: string | null,
 ): KgLayoutStoragePayload | null {
   if (layoutScopeOverride === undefined && isSampleMode.value) {
-    return loadKgLayoutPayloadFromLocalStorage('sample');
+    return loadKgLayoutPayloadFromLocalStorage('sample')
   }
-  const scopeId = layoutScopeOverride ?? getKnowledgeGraphScopeId();
+  const scopeId = layoutScopeOverride ?? getKnowledgeGraphScopeId()
   if (scopeId === 'sample') {
-    return loadKgLayoutPayloadFromLocalStorage('sample');
+    return loadKgLayoutPayloadFromLocalStorage('sample')
   }
-  const ek = entryKeyOverride !== undefined ? entryKeyOverride : selectedKnowledgeGraphEntryKey.value;
+  const ek =
+    entryKeyOverride !== undefined ? entryKeyOverride : selectedKnowledgeGraphEntryKey.value
   if (ek) {
-    const composite = `${scopeId}::${ek}`;
-    const from = loadKgLayoutPayloadFromLocalStorage(composite);
-    if (from) return from;
-    return loadKgLayoutPayloadFromLocalStorage(scopeId);
+    const composite = `${scopeId}::${ek}`
+    const from = loadKgLayoutPayloadFromLocalStorage(composite)
+    if (from) return from
+    return loadKgLayoutPayloadFromLocalStorage(scopeId)
   }
-  return loadKgLayoutPayloadFromLocalStorage(scopeId);
+  return loadKgLayoutPayloadFromLocalStorage(scopeId)
 }
 
 const onKnowledgeGraphUpdate = (g: KnowledgeGraph) => {
-  knowledgeGraphData.value = g;
-  const selectedKey = selectedKnowledgeGraphEntryKey.value;
+  knowledgeGraphData.value = g
+  const selectedKey = selectedKnowledgeGraphEntryKey.value
   if (selectedKey) {
-    const selected = findGraphEntryByKey(selectedKey);
+    const selected = findGraphEntryByKey(selectedKey)
     if (selected) {
-      selected.graph = g;
-      selected.updatedAt = new Date().toISOString();
+      selected.graph = g
+      selected.updatedAt = new Date().toISOString()
       if (selected.source === 'temp') {
         if (selected.graphType === 'heading') {
-          const scopeId = getKnowledgeGraphScopeId();
-          const temp = headingTempGraphByDoc.value[scopeId];
+          const scopeId = getKnowledgeGraphScopeId()
+          const temp = headingTempGraphByDoc.value[scopeId]
           if (temp) {
-            temp.graph = g;
-            temp.updatedAt = selected.updatedAt;
+            temp.graph = g
+            temp.updatedAt = selected.updatedAt
           }
         }
         if (selected.graphType === 'ai') {
-          const scopeId = getKnowledgeGraphScopeId();
-          const temp = aiTempGraphByDoc.value[scopeId];
+          const scopeId = getKnowledgeGraphScopeId()
+          const temp = aiTempGraphByDoc.value[scopeId]
           if (temp) {
-            temp.graph = g;
-            temp.updatedAt = selected.updatedAt;
+            temp.graph = g
+            temp.updatedAt = selected.updatedAt
           }
         }
       }
     }
   }
   /** 不在拖动时落盘：仅更新内存，写入 JSON 在切换显示内容时由 flushKnowledgeGraphToDisk 完成 */
-};
+}
 
 const onKnowledgeGraphJumpToFragment = async (payload: { fragmentId: string }) => {
   try {
-    const application = Application.getInstance();
-    await application.getApplicationService().initialize();
-    const fragmentUseCases = application.getKnowledgeFragmentUseCases();
+    const application = Application.getInstance()
+    await application.getApplicationService().initialize()
+    const fragmentUseCases = application.getKnowledgeFragmentUseCases()
     const target = await resolveFragmentReferenceJump(payload.fragmentId, {
       getFragment: async (id) => {
-        const f = await fragmentUseCases.getFragment(id);
-        if (!f) return null;
+        const f = await fragmentUseCases.getFragment(id)
+        if (!f) return null
         return {
           sourceDocumentId: f.sourceDocumentId,
-          referencedDocuments: f.referencedDocuments
-        };
+          referencedDocuments: f.referencedDocuments,
+        }
       },
-      readDocumentText: readDocumentTextForKnowledgeJump
-    });
-    if (!target) return;
-    const docId = props.document?.id ?? '';
-    const filePath = (props.document as { filePath?: string } | null)?.filePath ?? currentFilePath.value;
-    const sameVault = docId && docId === target.documentId;
+      readDocumentText: readDocumentTextForKnowledgeJump,
+    })
+    if (!target) return
+    const docId = props.document?.id ?? ''
+    const filePath =
+      (props.document as { filePath?: string } | null)?.filePath ?? currentFilePath.value
+    const sameVault = docId && docId === target.documentId
     const sameFile =
       filePath &&
       (target.documentId === filePath ||
-        target.documentId.replace(/^file:/, '') === filePath.replace(/^file:/, ''));
+        target.documentId.replace(/^file:/, '') === filePath.replace(/^file:/, ''))
     if (sameVault || sameFile) {
-      await nextTick();
-      setSelectionRange(target.start, target.end);
-      return;
+      await nextTick()
+      setSelectionRange(target.start, target.end)
+      return
     }
     emit('navigate-knowledge-jump', {
       documentId: target.documentId,
       start: target.start,
-      end: target.end
-    });
+      end: target.end,
+    })
   } catch (e) {
-    console.error('[知识图谱] 按片段跳转失败', e);
+    console.error('[知识图谱] 按片段跳转失败', e)
   }
-};
+}
 
 function getKnowledgeGraphWindowSize(): { width: number; height: number } {
-  const rect = knowledgeGraphWindowRef.value?.getBoundingClientRect();
+  const rect = knowledgeGraphWindowRef.value?.getBoundingClientRect()
   if (rect && rect.width > 0 && rect.height > 0) {
-    return { width: rect.width, height: rect.height };
+    return { width: rect.width, height: rect.height }
   }
   return {
     width: Math.min(1220, Math.max(820, window.innerWidth * 0.82)),
-    height: Math.min(860, Math.max(520, window.innerHeight * 0.82))
-  };
+    height: Math.min(860, Math.max(520, window.innerHeight * 0.82)),
+  }
 }
 
 function clampKnowledgeGraphWindowPosition(nextX: number, nextY: number): { x: number; y: number } {
-  const margin = 8;
-  const { width, height } = getKnowledgeGraphWindowSize();
-  const maxX = Math.max(margin, window.innerWidth - width - margin);
-  const maxY = Math.max(margin, window.innerHeight - height - margin);
+  const margin = 8
+  const { width, height } = getKnowledgeGraphWindowSize()
+  const maxX = Math.max(margin, window.innerWidth - width - margin)
+  const maxY = Math.max(margin, window.innerHeight - height - margin)
 
   return {
     x: Math.min(Math.max(nextX, margin), maxX),
-    y: Math.min(Math.max(nextY, margin), maxY)
-  };
+    y: Math.min(Math.max(nextY, margin), maxY),
+  }
 }
 
 function ensureKnowledgeGraphWindowInViewport() {
-  if (!showKnowledgeGraphModal.value) return;
+  if (!showKnowledgeGraphModal.value) return
   knowledgeGraphWindowPosition.value = clampKnowledgeGraphWindowPosition(
     knowledgeGraphWindowPosition.value.x,
-    knowledgeGraphWindowPosition.value.y
-  );
+    knowledgeGraphWindowPosition.value.y,
+  )
 }
 
 function initializeKnowledgeGraphWindowIfNeeded() {
-  if (hasInitializedKnowledgeGraphWindow.value) return;
-  const size = getKnowledgeGraphWindowSize();
+  if (hasInitializedKnowledgeGraphWindow.value) return
+  const size = getKnowledgeGraphWindowSize()
   knowledgeGraphWindowPosition.value = clampKnowledgeGraphWindowPosition(
     (window.innerWidth - size.width) / 2,
-    (window.innerHeight - size.height) / 2
-  );
-  hasInitializedKnowledgeGraphWindow.value = true;
+    (window.innerHeight - size.height) / 2,
+  )
+  hasInitializedKnowledgeGraphWindow.value = true
 }
 
 function startKnowledgeGraphDrag(event: MouseEvent) {
-  if (event.button !== 0) return;
-  const target = event.target as HTMLElement | null;
-  if (!target) return;
-  if (target.closest('.knowledge-graph-actions')) return;
-  if (target.closest('button')) return;
-  event.preventDefault();
+  if (event.button !== 0) return
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  if (target.closest('.knowledge-graph-actions')) return
+  if (target.closest('button')) return
+  event.preventDefault()
 
   knowledgeGraphWindowDrag.value = {
     active: true,
     offsetX: event.clientX - knowledgeGraphWindowPosition.value.x,
-    offsetY: event.clientY - knowledgeGraphWindowPosition.value.y
-  };
-  document.body.style.userSelect = 'none';
-  document.body.style.cursor = 'move';
+    offsetY: event.clientY - knowledgeGraphWindowPosition.value.y,
+  }
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'move'
 }
 
 function handleKnowledgeGraphWindowDrag(event: MouseEvent) {
-  if (!knowledgeGraphWindowDrag.value.active) return;
+  if (!knowledgeGraphWindowDrag.value.active) return
   knowledgeGraphWindowPosition.value = clampKnowledgeGraphWindowPosition(
     event.clientX - knowledgeGraphWindowDrag.value.offsetX,
-    event.clientY - knowledgeGraphWindowDrag.value.offsetY
-  );
+    event.clientY - knowledgeGraphWindowDrag.value.offsetY,
+  )
 }
 
 function stopKnowledgeGraphWindowDrag() {
-  if (!knowledgeGraphWindowDrag.value.active) return;
-  knowledgeGraphWindowDrag.value.active = false;
-  document.body.style.userSelect = '';
-  document.body.style.cursor = '';
+  if (!knowledgeGraphWindowDrag.value.active) return
+  knowledgeGraphWindowDrag.value.active = false
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
 }
 
 const randomizeKnowledgeGraphLayout = () => {
-  if (!knowledgeGraphData.value) return;
-  const { nodePositions: _np, viewState: _vs, ...rest } = knowledgeGraphData.value;
-  knowledgeGraphData.value = { ...rest };
+  if (!knowledgeGraphData.value) return
+  const { nodePositions: _np, viewState: _vs, ...rest } = knowledgeGraphData.value
+  knowledgeGraphData.value = { ...rest }
   const selected = selectedKnowledgeGraphEntryKey.value
     ? findGraphEntryByKey(selectedKnowledgeGraphEntryKey.value)
-    : null;
+    : null
   if (selected?.source === 'saved' && selected.fullPath) {
-    return;
+    return
   }
-  clearKgLayoutLocalStorage(getKnowledgeGraphLayoutStorageKey());
-  kgLayoutRandomizeKey.value += 1;
-};
+  clearKgLayoutLocalStorage(getKnowledgeGraphLayoutStorageKey())
+  kgLayoutRandomizeKey.value += 1
+}
 
 function getKnowledgeGraphScopeId(): string {
-  return activeDocumentId.value || 'untitled';
+  return activeDocumentId.value || 'untitled'
 }
 
 function getKnowledgeGraphDocumentTitle(): string {
-  const filePath = currentFilePath.value || (props.document as { filePath?: string } | null)?.filePath || '';
-  const fileName = filePath.split(/[/\\]/).pop();
-  return title.value || props.document?.title || fileName || '未命名文档';
+  const filePath =
+    currentFilePath.value || (props.document as { filePath?: string } | null)?.filePath || ''
+  const fileName = filePath.split(/[/\\]/).pop()
+  return title.value || props.document?.title || fileName || '未命名文档'
 }
 
-function buildKnowledgeGraphEntryKey(source: KnowledgeGraphEntrySource, graphType: KnowledgeGraphEntryType, id: string): string {
-  return `${source}:${graphType}:${id}`;
+function buildKnowledgeGraphEntryKey(
+  source: KnowledgeGraphEntrySource,
+  graphType: KnowledgeGraphEntryType,
+  id: string,
+): string {
+  return `${source}:${graphType}:${id}`
 }
 
 function formatKnowledgeGraphListTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString()
   } catch {
-    return iso;
+    return iso
   }
 }
 
 function convertAiGraphToKnowledgeGraph(aiGraph: {
   nodes: Array<{
-    id: string;
-    label: string;
-    entityType?: string;
-    description?: string;
-    primaryAnchor?: unknown;
-    evidenceCount?: number;
-    evidencePreview?: unknown[];
-  }>;
-  edges: Array<{ source: string; target: string; relationType?: string; description?: string; id?: string }>;
+    id: string
+    label: string
+    entityType?: string
+    description?: string
+    primaryAnchor?: unknown
+    evidenceCount?: number
+    evidencePreview?: unknown[]
+  }>
+  edges: Array<{
+    source: string
+    target: string
+    relationType?: string
+    description?: string
+    id?: string
+  }>
 }): KnowledgeGraph {
-  const nodes = aiGraph.nodes.map(node => ({
+  const nodes = aiGraph.nodes.map((node) => ({
     id: node.id,
     label: node.label,
     type: 'link' as const,
@@ -2996,544 +3168,573 @@ function convertAiGraphToKnowledgeGraph(aiGraph: {
     ...(node.description ? { description: node.description } : {}),
     ...(node.primaryAnchor ? { primaryAnchor: node.primaryAnchor } : {}),
     ...(typeof node.evidenceCount === 'number' ? { evidenceCount: node.evidenceCount } : {}),
-    ...(Array.isArray(node.evidencePreview) ? { evidencePreview: node.evidencePreview } : {})
-  }));
+    ...(Array.isArray(node.evidencePreview) ? { evidencePreview: node.evidencePreview } : {}),
+  }))
   const edges = aiGraph.edges.map((edge, index) => ({
     source: edge.source,
     target: edge.target,
     relation: edge.relationType || edge.description || `关系-${index + 1}`,
     ...(edge.id ? { id: edge.id } : {}),
     ...(edge.relationType ? { relationType: edge.relationType } : {}),
-    ...(edge.description ? { description: edge.description } : {})
-  }));
-  return { nodes, edges };
+    ...(edge.description ? { description: edge.description } : {}),
+  }))
+  return { nodes, edges }
 }
 
 function findGraphEntryByKey(entryKey: string): KnowledgeGraphEntry | null {
-  const tempEntry = unsavedGraphEntries.value.find(item => item.entryKey === entryKey);
-  if (tempEntry) return tempEntry;
-  return savedGraphEntries.value.find(item => item.entryKey === entryKey) || null;
+  const tempEntry = unsavedGraphEntries.value.find((item) => item.entryKey === entryKey)
+  if (tempEntry) return tempEntry
+  return savedGraphEntries.value.find((item) => item.entryKey === entryKey) || null
 }
 
 const selectedKnowledgeGraphIsTemp = computed(() => {
-  const key = selectedKnowledgeGraphEntryKey.value;
-  if (!key) return false;
-  const e = findGraphEntryByKey(key);
-  return e?.source === 'temp';
-});
+  const key = selectedKnowledgeGraphEntryKey.value
+  if (!key) return false
+  const e = findGraphEntryByKey(key)
+  return e?.source === 'temp'
+})
 
 /** 将当前已保存图谱写入磁盘（含节点坐标与视角）；仅应在切换显示内容时调用；临时与样例不落盘 */
 async function flushKnowledgeGraphToDisk(
   layoutScopeOverride?: string,
-  entryKeyOverride?: string | null
+  entryKeyOverride?: string | null,
 ): Promise<void> {
   try {
-    knowledgeGraphViewRef.value?.syncPendingViewportToParent?.();
-    await nextTick();
-    const key = selectedKnowledgeGraphEntryKey.value;
-    const entry = key ? findGraphEntryByKey(key) : null;
-    if (!entry?.fullPath || !knowledgeGraphData.value?.nodes?.length) return;
-    if (isSampleMode.value) return;
-    if (entry.source !== 'saved') return;
+    knowledgeGraphViewRef.value?.syncPendingViewportToParent?.()
+    await nextTick()
+    const key = selectedKnowledgeGraphEntryKey.value
+    const entry = key ? findGraphEntryByKey(key) : null
+    if (!entry?.fullPath || !knowledgeGraphData.value?.nodes?.length) return
+    if (isSampleMode.value) return
+    if (entry.source !== 'saved') return
 
-    const layoutPayload = loadKgLayoutPayloadForGraph(layoutScopeOverride, entryKeyOverride);
+    const layoutPayload = loadKgLayoutPayloadForGraph(layoutScopeOverride, entryKeyOverride)
     const graphToSave = {
       ...mergeKgPositionSources(
         knowledgeGraphData.value,
         knowledgeGraphData.value.nodePositions,
-        layoutPayload?.nodePositions ?? null
+        layoutPayload?.nodePositions ?? null,
       ),
-      ...(knowledgeGraphData.value.viewState ? { viewState: knowledgeGraphData.value.viewState } : {})
-    };
+      ...(knowledgeGraphData.value.viewState
+        ? { viewState: knowledgeGraphData.value.viewState }
+        : {}),
+    }
 
-    const path = await knowledgeGraphService.resolveKnowledgeGraphPath(entry.fullPath);
-    await knowledgeGraphService.writeGraphData(path, toRaw(graphToSave) as KnowledgeGraph);
-    entry.graph = graphToSave;
-    entry.updatedAt = new Date().toISOString();
-    knowledgeGraphData.value = graphToSave;
-    const flushKey = key;
-    await loadSavedKnowledgeGraphEntries();
+    const path = await knowledgeGraphService.resolveKnowledgeGraphPath(entry.fullPath)
+    await knowledgeGraphService.writeGraphData(path, toRaw(graphToSave) as KnowledgeGraph)
+    entry.graph = graphToSave
+    entry.updatedAt = new Date().toISOString()
+    knowledgeGraphData.value = graphToSave
+    const flushKey = key
+    await loadSavedKnowledgeGraphEntries()
     if (flushKey) {
-      const synced = findGraphEntryByKey(flushKey);
+      const synced = findGraphEntryByKey(flushKey)
       if (synced?.source === 'saved') {
-        synced.graph = graphToSave;
-        synced.updatedAt = entry.updatedAt;
+        synced.graph = graphToSave
+        synced.updatedAt = entry.updatedAt
       }
     }
   } catch (e) {
-    console.warn('[知识图谱] 自动保存失败', e);
+    console.warn('[知识图谱] 自动保存失败', e)
   }
 }
 
 async function setActiveKnowledgeGraph(entry: KnowledgeGraphEntry | null): Promise<void> {
-  const prevKey = selectedKnowledgeGraphEntryKey.value;
-  const nextKey = entry?.entryKey ?? null;
+  const prevKey = selectedKnowledgeGraphEntryKey.value
+  const nextKey = entry?.entryKey ?? null
   if (prevKey && (nextKey !== prevKey || !entry)) {
-    await flushKnowledgeGraphToDisk();
+    await flushKnowledgeGraphToDisk()
   }
 
   if (!entry || !entry.graph) {
-    knowledgeGraphData.value = null;
-    selectedKnowledgeGraphEntryKey.value = null;
-    return;
+    knowledgeGraphData.value = null
+    selectedKnowledgeGraphEntryKey.value = null
+    return
   }
 
-  knowledgeGraphData.value = entry.graph;
-  selectedKnowledgeGraphEntryKey.value = entry.entryKey;
-  knowledgeGraphMode.value = entry.graphType === 'ai' ? 'ai' : 'markdown';
-  isSampleMode.value = false;
-  knowledgeGraphError.value = '';
-  activeKnowledgeGraphLoadKey.value = `${getKnowledgeGraphScopeId()}#${entry.entryKey}#${Date.now()}`;
-  lastOpenedGraphByDoc.value[getKnowledgeGraphScopeId()] = entry.entryKey;
+  knowledgeGraphData.value = entry.graph
+  selectedKnowledgeGraphEntryKey.value = entry.entryKey
+  knowledgeGraphMode.value = entry.graphType === 'ai' ? 'ai' : 'markdown'
+  isSampleMode.value = false
+  knowledgeGraphError.value = ''
+  activeKnowledgeGraphLoadKey.value = `${getKnowledgeGraphScopeId()}#${entry.entryKey}#${Date.now()}`
+  lastOpenedGraphByDoc.value[getKnowledgeGraphScopeId()] = entry.entryKey
 }
 
 async function selectKnowledgeGraphEntry(entryKey: string): Promise<void> {
   if (entryKey === selectedKnowledgeGraphEntryKey.value && showKnowledgeGraphModal.value) {
-    await flushKnowledgeGraphToDisk();
+    await flushKnowledgeGraphToDisk()
   }
-  const entry = findGraphEntryByKey(entryKey);
-  if (!entry) return;
+  const entry = findGraphEntryByKey(entryKey)
+  if (!entry) return
 
   if (entry.source === 'saved' && entry.fullPath && !entry.graph) {
     try {
-      const loaded = await knowledgeGraphService.readGraph(entry.fullPath);
-      entry.graph = loaded.graph;
+      const loaded = await knowledgeGraphService.readGraph(entry.fullPath)
+      entry.graph = loaded.graph
     } catch (e) {
-      knowledgeGraphError.value = e instanceof Error ? e.message : '读取知识图谱失败';
-      return;
+      knowledgeGraphError.value = e instanceof Error ? e.message : '读取知识图谱失败'
+      return
     }
   }
   if (entry.graph) {
-    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, entryKey);
+    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, entryKey)
     /** 与手动保存一致：内存坐标优先于 localStorage，避免 overlay 覆盖刚拖动的位置 */
     const merged = mergeKgPositionSources(
       entry.graph,
       entry.graph.nodePositions,
-      layoutPayload?.nodePositions ?? null
-    );
-    const vs = merged.viewState ?? layoutPayload?.viewState;
-    entry.graph = vs ? { ...merged, viewState: vs } : merged;
+      layoutPayload?.nodePositions ?? null,
+    )
+    const vs = merged.viewState ?? layoutPayload?.viewState
+    entry.graph = vs ? { ...merged, viewState: vs } : merged
   }
-  await setActiveKnowledgeGraph(entry);
+  await setActiveKnowledgeGraph(entry)
 }
 
 async function loadSavedKnowledgeGraphEntries(): Promise<void> {
-  knowledgeGraphListLoading.value = true;
+  knowledgeGraphListLoading.value = true
   try {
-    const scopeId = getKnowledgeGraphScopeId();
-    const allGraphs = await knowledgeGraphService.listGraphs();
+    const scopeId = getKnowledgeGraphScopeId()
+    const allGraphs = await knowledgeGraphService.listGraphs()
     const scoped = allGraphs
-      .filter(item => (item.documentId || '') === scopeId)
-      .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+      .filter((item) => (item.documentId || '') === scopeId)
+      .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt))
 
-    savedGraphEntries.value = scoped.map(item => ({
-      entryKey: buildKnowledgeGraphEntryKey('saved', item.graphType === 'ai' ? 'ai' : 'heading', item.id),
+    savedGraphEntries.value = scoped.map((item) => ({
+      entryKey: buildKnowledgeGraphEntryKey(
+        'saved',
+        item.graphType === 'ai' ? 'ai' : 'heading',
+        item.id,
+      ),
       source: 'saved',
       graphType: item.graphType === 'ai' ? 'ai' : 'heading',
       title: item.title,
       updatedAt: item.updatedAt || item.createdAt,
-      fullPath: item.fullPath
-    }));
+      fullPath: item.fullPath,
+    }))
   } catch (e) {
-    knowledgeGraphError.value = e instanceof Error ? e.message : '加载图谱列表失败';
+    knowledgeGraphError.value = e instanceof Error ? e.message : '加载图谱列表失败'
   } finally {
-    knowledgeGraphListLoading.value = false;
+    knowledgeGraphListLoading.value = false
   }
 }
 
 watch(
   () => activeDocumentId.value,
   async (newId, oldId) => {
-    if (oldId === undefined || newId === oldId) return;
-    const oldEntryKey = selectedKnowledgeGraphEntryKey.value;
-    await flushKnowledgeGraphToDisk(oldId, oldEntryKey);
-  }
-);
+    if (oldId === undefined || newId === oldId) return
+    const oldEntryKey = selectedKnowledgeGraphEntryKey.value
+    await flushKnowledgeGraphToDisk(oldId, oldEntryKey)
+  },
+)
 
 /** 每文档、每类型至多 1 份：写入即覆盖对应槽（标题 / AI 各一条） */
-function upsertTempGraph(graphType: KnowledgeGraphEntryType, graph: KnowledgeGraph, title: string): KnowledgeGraphEntry {
+function upsertTempGraph(
+  graphType: KnowledgeGraphEntryType,
+  graph: KnowledgeGraph,
+  title: string,
+): KnowledgeGraphEntry {
   const base: TempKnowledgeGraphEntry = {
     entryKey: buildKnowledgeGraphEntryKey('temp', graphType, getKnowledgeGraphScopeId()),
     graphType,
     title,
     updatedAt: new Date().toISOString(),
-    graph
-  };
-  if (graphType === 'heading') {
-    headingTempGraphByDoc.value[getKnowledgeGraphScopeId()] = base;
-  } else {
-    aiTempGraphByDoc.value[getKnowledgeGraphScopeId()] = base;
+    graph,
   }
-  return { ...base, source: 'temp' };
+  if (graphType === 'heading') {
+    headingTempGraphByDoc.value[getKnowledgeGraphScopeId()] = base
+  } else {
+    aiTempGraphByDoc.value[getKnowledgeGraphScopeId()] = base
+  }
+  return { ...base, source: 'temp' }
 }
 
 const generateHeadingKnowledgeGraph = async () => {
-  isKnowledgeGraphRendering.value = true;
-  knowledgeGraphError.value = '';
+  isKnowledgeGraphRendering.value = true
+  knowledgeGraphError.value = ''
   try {
-    const fullContent = getContent();
+    const fullContent = getContent()
     if (!fullContent || !fullContent.trim()) {
-      knowledgeGraphData.value = null;
-      knowledgeGraphError.value = '当前文档为空，无法根据标题生成图谱';
-      return;
+      knowledgeGraphData.value = null
+      knowledgeGraphError.value = '当前文档为空，无法根据标题生成图谱'
+      return
     }
 
     const extracted = extractKnowledgeGraph(fullContent, {
       documentId: getKnowledgeGraphScopeId(),
-      documentTitle: getKnowledgeGraphDocumentTitle()
-    });
-    const tempEntryKey = buildKnowledgeGraphEntryKey('temp', 'heading', getKnowledgeGraphScopeId());
-    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, tempEntryKey);
-    const graph = mergeKgStoragePayloadIntoGraph(extracted, layoutPayload);
-    const entry = upsertTempGraph('heading', graph, '标题图谱 (临时)');
-    await setActiveKnowledgeGraph(entry);
+      documentTitle: getKnowledgeGraphDocumentTitle(),
+    })
+    const tempEntryKey = buildKnowledgeGraphEntryKey('temp', 'heading', getKnowledgeGraphScopeId())
+    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, tempEntryKey)
+    const graph = mergeKgStoragePayloadIntoGraph(extracted, layoutPayload)
+    const entry = upsertTempGraph('heading', graph, '标题图谱 (临时)')
+    await setActiveKnowledgeGraph(entry)
   } catch (e) {
-    knowledgeGraphData.value = null;
-    knowledgeGraphError.value = e instanceof Error ? e.message : '生成标题图谱失败';
+    knowledgeGraphData.value = null
+    knowledgeGraphError.value = e instanceof Error ? e.message : '生成标题图谱失败'
   } finally {
-    isKnowledgeGraphRendering.value = false;
+    isKnowledgeGraphRendering.value = false
   }
-};
+}
 
 /** 顶部标签：离开样例视图后切换模式（标题页无缓存时自动生成标题图谱） */
 async function onClickKnowledgeGraphModeTab(mode: 'markdown' | 'ai') {
   if (isSampleMode.value) {
-    isSampleMode.value = false;
+    isSampleMode.value = false
   }
-  await switchKnowledgeGraphMode(mode);
+  await switchKnowledgeGraphMode(mode)
 }
 
 /** 点击侧栏固定槽位：有则打开对应临时图，无则切模式并触发生成/空状态 */
 async function onKnowledgeGraphTempSlotClick(kind: 'heading' | 'ai') {
   if (isSampleMode.value) {
-    isSampleMode.value = false;
+    isSampleMode.value = false
   }
-  const scopeId = getKnowledgeGraphScopeId();
+  const scopeId = getKnowledgeGraphScopeId()
   if (kind === 'heading') {
-    const e = headingTempGraphByDoc.value[scopeId];
+    const e = headingTempGraphByDoc.value[scopeId]
     if (e) {
-      await selectKnowledgeGraphEntry(e.entryKey);
-      return;
+      await selectKnowledgeGraphEntry(e.entryKey)
+      return
     }
-    await onClickKnowledgeGraphModeTab('markdown');
-    return;
+    await onClickKnowledgeGraphModeTab('markdown')
+    return
   }
-  const ai = aiTempGraphByDoc.value[scopeId];
+  const ai = aiTempGraphByDoc.value[scopeId]
   if (ai) {
-    await selectKnowledgeGraphEntry(ai.entryKey);
-    return;
+    await selectKnowledgeGraphEntry(ai.entryKey)
+    return
   }
-  await onClickKnowledgeGraphModeTab('ai');
+  await onClickKnowledgeGraphModeTab('ai')
 }
 
 async function switchKnowledgeGraphMode(mode: 'markdown' | 'ai') {
-  isSampleMode.value = false;
-  const scopeId = getKnowledgeGraphScopeId();
-  const target = mode === 'ai' ? aiTempGraphByDoc.value[scopeId] : headingTempGraphByDoc.value[scopeId];
+  isSampleMode.value = false
+  const scopeId = getKnowledgeGraphScopeId()
+  const target =
+    mode === 'ai' ? aiTempGraphByDoc.value[scopeId] : headingTempGraphByDoc.value[scopeId]
   if (target) {
-    await setActiveKnowledgeGraph({ ...target, source: 'temp' });
-    return;
+    await setActiveKnowledgeGraph({ ...target, source: 'temp' })
+    return
   }
 
   if (mode === 'markdown') {
-    const savedHeading = savedGraphEntries.value.find(item => item.graphType === 'heading');
+    const savedHeading = savedGraphEntries.value.find((item) => item.graphType === 'heading')
     if (savedHeading) {
-      await selectKnowledgeGraphEntry(savedHeading.entryKey);
-      return;
+      await selectKnowledgeGraphEntry(savedHeading.entryKey)
+      return
     }
-    knowledgeGraphMode.value = 'markdown';
-    await generateHeadingKnowledgeGraph();
-    return;
+    knowledgeGraphMode.value = 'markdown'
+    await generateHeadingKnowledgeGraph()
+    return
   }
 
   // AI：仅展示临时槽；已保存的 AI 图谱只从左侧「已保存」列表点开，避免顶栏误进历史文件
-  knowledgeGraphMode.value = 'ai';
-  knowledgeGraphData.value = null;
-  knowledgeGraphError.value = '';
-  selectedKnowledgeGraphEntryKey.value = null;
+  knowledgeGraphMode.value = 'ai'
+  knowledgeGraphData.value = null
+  knowledgeGraphError.value = ''
+  selectedKnowledgeGraphEntryKey.value = null
 }
 
 const buildAiKnowledgeGraph = async () => {
-  if (!activeDocumentId.value) return;
-  isKnowledgeGraphRendering.value = true;
-  knowledgeGraphError.value = '';
-  knowledgeGraphMode.value = 'ai';
-  aiGraphBuildProgress.value = 0;
-  aiGraphBuildLabel.value = '准备中…';
+  if (!activeDocumentId.value) return
+  isKnowledgeGraphRendering.value = true
+  knowledgeGraphError.value = ''
+  knowledgeGraphMode.value = 'ai'
+  aiGraphBuildProgress.value = 0
+  aiGraphBuildLabel.value = '准备中…'
   try {
-    const aiGraph = await aiDocumentGraphService.buildDocumentKnowledgeGraph(activeDocumentId.value, {
-      onProgress: (ev) => {
-        if (ev.phase === 'chunks') {
-          const { current, total } = ev;
-          aiGraphBuildProgress.value =
-            total > 0 ? Math.min(92, Math.round((current / total) * 88)) : 0;
-          aiGraphBuildLabel.value =
-            total > 0 ? `正在分析正文片段 ${current}/${total}` : '正在分析正文…';
-        } else if (ev.phase === 'merge') {
-          aiGraphBuildProgress.value = 94;
-          aiGraphBuildLabel.value = '合并实体与关系…';
-        } else if (ev.phase === 'persist') {
-          aiGraphBuildProgress.value = 98;
-          aiGraphBuildLabel.value = '写入并加载图谱…';
-        }
-      }
-    });
-    aiGraphBuildProgress.value = 100;
-    aiGraphBuildLabel.value = '完成';
-    const graph = convertAiGraphToKnowledgeGraph(aiGraph);
-    const entry = upsertTempGraph('ai', graph, 'AI 图谱 (临时)');
-    await setActiveKnowledgeGraph(entry);
+    const aiGraph = await aiDocumentGraphService.buildDocumentKnowledgeGraph(
+      activeDocumentId.value,
+      {
+        onProgress: (ev) => {
+          if (ev.phase === 'chunks') {
+            const { current, total } = ev
+            aiGraphBuildProgress.value =
+              total > 0 ? Math.min(92, Math.round((current / total) * 88)) : 0
+            aiGraphBuildLabel.value =
+              total > 0 ? `正在分析正文片段 ${current}/${total}` : '正在分析正文…'
+          } else if (ev.phase === 'merge') {
+            aiGraphBuildProgress.value = 94
+            aiGraphBuildLabel.value = '合并实体与关系…'
+          } else if (ev.phase === 'persist') {
+            aiGraphBuildProgress.value = 98
+            aiGraphBuildLabel.value = '写入并加载图谱…'
+          }
+        },
+      },
+    )
+    aiGraphBuildProgress.value = 100
+    aiGraphBuildLabel.value = '完成'
+    const graph = convertAiGraphToKnowledgeGraph(aiGraph)
+    const entry = upsertTempGraph('ai', graph, 'AI 图谱 (临时)')
+    await setActiveKnowledgeGraph(entry)
   } catch (e) {
-    knowledgeGraphError.value = e instanceof Error ? e.message : '生成 AI 知识图谱失败';
+    knowledgeGraphError.value = e instanceof Error ? e.message : '生成 AI 知识图谱失败'
   } finally {
-    isKnowledgeGraphRendering.value = false;
-    aiGraphBuildProgress.value = 0;
-    aiGraphBuildLabel.value = '';
+    isKnowledgeGraphRendering.value = false
+    aiGraphBuildProgress.value = 0
+    aiGraphBuildLabel.value = ''
   }
-};
+}
 
 // 知识图谱相关方法
 const openKnowledgeGraph = () => {
-  showKnowledgeGraphModal.value = true;
-  knowledgeGraphMode.value = 'markdown';
-  knowledgeGraphError.value = '';
-  isSampleMode.value = false;
-  knowledgeGraphData.value = null;
-  initializeKnowledgeGraphWindowIfNeeded();
+  showKnowledgeGraphModal.value = true
+  knowledgeGraphMode.value = 'markdown'
+  knowledgeGraphError.value = ''
+  isSampleMode.value = false
+  knowledgeGraphData.value = null
+  initializeKnowledgeGraphWindowIfNeeded()
   nextTick(() => {
-    ensureKnowledgeGraphWindowInViewport();
-  });
+    ensureKnowledgeGraphWindowInViewport()
+  })
   void (async () => {
-    await loadSavedKnowledgeGraphEntries();
-    const scopeId = getKnowledgeGraphScopeId();
-    const lastOpened = lastOpenedGraphByDoc.value[scopeId];
+    await loadSavedKnowledgeGraphEntries()
+    const scopeId = getKnowledgeGraphScopeId()
+    const lastOpened = lastOpenedGraphByDoc.value[scopeId]
     if (lastOpened) {
-      await selectKnowledgeGraphEntry(lastOpened);
-      if (knowledgeGraphData.value) return;
+      await selectKnowledgeGraphEntry(lastOpened)
+      if (knowledgeGraphData.value) return
     }
-    const headingTemp = headingTempGraphByDoc.value[scopeId];
+    const headingTemp = headingTempGraphByDoc.value[scopeId]
     if (headingTemp) {
-      await selectKnowledgeGraphEntry(headingTemp.entryKey);
-      if (knowledgeGraphData.value) return;
+      await selectKnowledgeGraphEntry(headingTemp.entryKey)
+      if (knowledgeGraphData.value) return
     }
-    const firstSaved = savedGraphEntries.value[0];
+    const firstSaved = savedGraphEntries.value[0]
     if (firstSaved) {
-      await selectKnowledgeGraphEntry(firstSaved.entryKey);
-      if (knowledgeGraphData.value) return;
+      await selectKnowledgeGraphEntry(firstSaved.entryKey)
+      if (knowledgeGraphData.value) return
     }
-    await generateHeadingKnowledgeGraph();
-  })();
-};
+    await generateHeadingKnowledgeGraph()
+  })()
+}
 
 const showSampleGraph = async () => {
-  await flushKnowledgeGraphToDisk();
-  knowledgeGraphMode.value = 'markdown';
+  await flushKnowledgeGraphToDisk()
+  knowledgeGraphMode.value = 'markdown'
   knowledgeGraphData.value = mergeKgStoragePayloadIntoGraph(
     sampleKnowledgeGraph,
-    loadKgLayoutPayloadFromLocalStorage('sample')
-  );
-  knowledgeGraphError.value = '';
-  isSampleMode.value = true;
-};
+    loadKgLayoutPayloadFromLocalStorage('sample'),
+  )
+  knowledgeGraphError.value = ''
+  isSampleMode.value = true
+}
 
 const closeKnowledgeGraph = async () => {
-  await flushKnowledgeGraphToDisk();
-  showKnowledgeGraphModal.value = false;
-  knowledgeGraphError.value = '';
-  isSampleMode.value = false;
-  stopKnowledgeGraphWindowDrag();
-};
+  await flushKnowledgeGraphToDisk()
+  showKnowledgeGraphModal.value = false
+  knowledgeGraphError.value = ''
+  isSampleMode.value = false
+  stopKnowledgeGraphWindowDrag()
+}
 
 const saveKnowledgeGraph = async () => {
   try {
     const selected = selectedKnowledgeGraphEntryKey.value
       ? findGraphEntryByKey(selectedKnowledgeGraphEntryKey.value)
-      : null;
+      : null
     if (!selected || !selected.graph) {
-      knowledgeGraphError.value = '当前没有可保存的图谱';
-      return;
+      knowledgeGraphError.value = '当前没有可保存的图谱'
+      return
     }
 
-    const layoutPayload = loadKgLayoutPayloadForGraph(undefined, selectedKnowledgeGraphEntryKey.value);
+    const layoutPayload = loadKgLayoutPayloadForGraph(
+      undefined,
+      selectedKnowledgeGraphEntryKey.value,
+    )
     const graphToSave = {
       ...mergeKgPositionSources(
         selected.graph,
         selected.graph.nodePositions,
-        layoutPayload?.nodePositions ?? null
+        layoutPayload?.nodePositions ?? null,
       ),
-      ...(selected.graph.viewState
-        ? { viewState: selected.graph.viewState }
-        : {})
-    };
+      ...(selected.graph.viewState ? { viewState: selected.graph.viewState } : {}),
+    }
 
     const savedInfo = await knowledgeGraphService.saveGraph({
-      title: selected.source === 'temp'
-        ? `${getKnowledgeGraphDocumentTitle()} - ${selected.graphType === 'ai' ? 'AI 图谱' : '标题图谱'}`
-        : selected.title,
+      title:
+        selected.source === 'temp'
+          ? `${getKnowledgeGraphDocumentTitle()} - ${selected.graphType === 'ai' ? 'AI 图谱' : '标题图谱'}`
+          : selected.title,
       documentId: getKnowledgeGraphScopeId(),
       documentTitle: getKnowledgeGraphDocumentTitle(),
       graphType: selected.graphType,
-      graph: graphToSave
-    });
+      graph: graphToSave,
+    })
 
     if (selected.source === 'temp') {
       if (selected.graphType === 'heading') {
-        delete headingTempGraphByDoc.value[getKnowledgeGraphScopeId()];
+        delete headingTempGraphByDoc.value[getKnowledgeGraphScopeId()]
       } else {
-        delete aiTempGraphByDoc.value[getKnowledgeGraphScopeId()];
+        delete aiTempGraphByDoc.value[getKnowledgeGraphScopeId()]
       }
     }
 
-    await loadSavedKnowledgeGraphEntries();
-    await selectKnowledgeGraphEntry(buildKnowledgeGraphEntryKey('saved', selected.graphType, savedInfo.id));
-    knowledgeGraphError.value = '';
+    await loadSavedKnowledgeGraphEntries()
+    await selectKnowledgeGraphEntry(
+      buildKnowledgeGraphEntryKey('saved', selected.graphType, savedInfo.id),
+    )
+    knowledgeGraphError.value = ''
   } catch (e) {
-    knowledgeGraphError.value = e instanceof Error ? e.message : '保存知识图谱失败';
+    knowledgeGraphError.value = e instanceof Error ? e.message : '保存知识图谱失败'
   }
-};
+}
 
 // 导出相关方法
 const handleExport = async (format: 'pdf' | 'html' | 'markdown') => {
   // 检查是否有文档或外部文件
   if ((!props.document && !currentFilePath.value) || isExporting.value) {
-    return;
+    return
   }
 
   // Markdown 导出不需要配置，直接导出
   if (format === 'markdown') {
-    await performExport(format, null);
-    return;
+    await performExport(format, null)
+    return
   }
 
   // PDF 和 HTML 导出需要配置
-  pendingExportFormat.value = format;
-  showExportConfigModal.value = true;
-};
+  pendingExportFormat.value = format
+  showExportConfigModal.value = true
+}
 
 // 获取默认文件名（使用文件名而非标题）
 const getDefaultFileName = (): string => {
   // 优先使用当前文件路径的文件名
   if (currentFilePath.value) {
-    const pathParts = currentFilePath.value.split(/[/\\]/);
-    const fileName = pathParts[pathParts.length - 1] || '未命名文档';
+    const pathParts = currentFilePath.value.split(/[/\\]/)
+    const fileName = pathParts[pathParts.length - 1] || '未命名文档'
     // 移除扩展名
-    return fileName.replace(/\.(md|markdown|txt)$/i, '');
+    return fileName.replace(/\.(md|markdown|txt)$/i, '')
   }
 
   // 其次使用文档标题
   if (title.value) {
-    return title.value;
+    return title.value
   }
 
   // 最后使用默认名称
-  return '未命名文档';
-};
+  return '未命名文档'
+}
 
 // 处理导出配置确认
-const handleExportConfigConfirm = async (config: ExportConfig, fileName: string, savePath: string) => {
-  showExportConfigModal.value = false;
-  currentExportConfig.value = config;
-  exportingFileName.value = fileName;
-  exportingSavePath.value = savePath;
-  exportingFormat.value = pendingExportFormat.value;
+const handleExportConfigConfirm = async (
+  config: ExportConfig,
+  fileName: string,
+  savePath: string,
+) => {
+  showExportConfigModal.value = false
+  currentExportConfig.value = config
+  exportingFileName.value = fileName
+  exportingSavePath.value = savePath
+  exportingFormat.value = pendingExportFormat.value
 
   // 显示进度条
-  showExportProgress.value = true;
-  exportProgress.value = 0;
-  exportStatus.value = 'processing';
-  exportStatusMessage.value = '正在准备导出...';
+  showExportProgress.value = true
+  exportProgress.value = 0
+  exportStatus.value = 'processing'
+  exportStatusMessage.value = '正在准备导出...'
 
   try {
-    await performExport(pendingExportFormat.value, config, fileName, savePath);
+    await performExport(pendingExportFormat.value, config, fileName, savePath)
   } catch (error) {
-    exportStatus.value = 'error';
-    exportStatusMessage.value = '导出失败: ' + (error instanceof Error ? error.message : '未知错误');
+    exportStatus.value = 'error'
+    exportStatusMessage.value = '导出失败: ' + (error instanceof Error ? error.message : '未知错误')
   }
-};
+}
 
 // 处理导出配置取消
 const handleExportConfigCancel = () => {
-  showExportConfigModal.value = false;
-};
+  showExportConfigModal.value = false
+}
 
 // 执行实际的导出操作
-const performExport = async (format: 'pdf' | 'html' | 'markdown', config: ExportConfig | null, fileName?: string, savePath?: string) => {
-  isExporting.value = true;
+const performExport = async (
+  format: 'pdf' | 'html' | 'markdown',
+  config: ExportConfig | null,
+  fileName?: string,
+  savePath?: string,
+) => {
+  isExporting.value = true
 
   // 更新进度：10%
-  exportProgress.value = 10;
-  exportStatusMessage.value = '正在处理文档内容...';
+  exportProgress.value = 10
+  exportStatusMessage.value = '正在处理文档内容...'
 
   try {
-    const app = Application.getInstance();
-    const { ExportFormat } = await import('../../domain/services/document-export.interface');
-    const { ExportFactory } = await import('../../infrastructure/services/export-factory.service');
+    const app = Application.getInstance()
+    const { ExportFormat } = await import('../../domain/services/document-export.interface')
+    const { ExportFactory } = await import('../../infrastructure/services/export-factory.service')
 
-    let exportFormat;
+    let exportFormat
     switch (format) {
       case 'pdf':
-        exportFormat = ExportFormat.PDF;
-        break;
+        exportFormat = ExportFormat.PDF
+        break
       case 'html':
-        exportFormat = ExportFormat.HTML;
-        break;
+        exportFormat = ExportFormat.HTML
+        break
       case 'markdown':
-        exportFormat = ExportFormat.MARKDOWN;
-        break;
+        exportFormat = ExportFormat.MARKDOWN
+        break
       default:
-        throw new Error(`Unsupported format: ${format}`);
+        throw new Error(`Unsupported format: ${format}`)
     }
 
     // 获取当前文档内容（使用合并后的内容）
-    const documentContent = mergeContent(frontmatter.value, mainContent.value);
-    const documentTitle = title.value || '未命名文档';
+    const documentContent = mergeContent(frontmatter.value, mainContent.value)
+    const documentTitle = title.value || '未命名文档'
 
-    let result;
+    let result
 
     // PDF 导出需要通过主进程（Node.js 环境）
     if (format === 'pdf') {
-      const electronAPI = (window as any).electronAPI;
+      const electronAPI = (window as any).electronAPI
       if (!electronAPI || !electronAPI.export || !electronAPI.export.pdf) {
-        throw new Error('PDF导出需要在Electron环境中运行');
+        throw new Error('PDF导出需要在Electron环境中运行')
       }
 
       // 确定文档 ID 和类型
       // 对于外部文档（ID 以 external- 开头），使用文件路径而不是 ID
-      const isExternalDoc = props.document?.id?.startsWith?.('external-');
-      let documentId = isExternalDoc ? currentFilePath.value : (props.document?.id || currentFilePath.value);
+      const isExternalDoc = props.document?.id?.startsWith?.('external-')
+      let documentId = isExternalDoc
+        ? currentFilePath.value
+        : props.document?.id || currentFilePath.value
 
       console.log('[Export] PDF 导出 - 文档信息:', {
         hasDocument: !!props.document,
         documentId: documentId,
         isExternalDoc: isExternalDoc,
-        currentFilePath: currentFilePath.value
-      });
+        currentFilePath: currentFilePath.value,
+      })
 
       // 准备数据
-      let processedContent = documentContent;
+      let processedContent = documentContent
 
       // 处理片段引用（对于所有文档类型）
-      const { InversifyContainer } = await import('../../core/container/inversify.container');
-      const container = InversifyContainer.getInstance();
+      const { InversifyContainer } = await import('../../core/container/inversify.container')
+      const container = InversifyContainer.getInstance()
 
       try {
         if (container.isBound(TYPES.FragmentReferenceResolver)) {
-          const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+          const resolver = container.get<any>(TYPES.FragmentReferenceResolver)
           if (resolver && typeof resolver.resolveReferences === 'function') {
-            processedContent = await resolver.resolveReferences(processedContent, documentId);
+            processedContent = await resolver.resolveReferences(processedContent, documentId)
           }
         }
       } catch (error) {
-        console.warn('解析片段引用失败，使用原始内容:', error);
+        console.warn('解析片段引用失败，使用原始内容:', error)
       }
 
       // 准备 HTML 内容（渲染进程中处理 Markdown 和资源）
-      const exportFactory = container.get<any>(TYPES.ExportFactory);
-      const htmlExporter = exportFactory.getExporter(ExportFormat.HTML);
+      const exportFactory = container.get<any>(TYPES.ExportFactory)
+      const htmlExporter = exportFactory.getExporter(ExportFormat.HTML)
 
       // 更新进度：30%
-      exportProgress.value = 30;
-      exportStatusMessage.value = '正在生成 HTML...';
+      exportProgress.value = 30
+      exportStatusMessage.value = '正在生成 HTML...'
 
       // 先导出为 HTML（包含所有样式和资源）
       const htmlResult = await htmlExporter.export({
@@ -3543,88 +3744,88 @@ const performExport = async (format: 'pdf' | 'html' | 'markdown', config: Export
         documentId: documentId,
         variables: {},
         includeStyles: true,
-        config: config
-      });
+        config: config,
+      })
 
       // 更新进度：60%
-      exportProgress.value = 60;
-      exportStatusMessage.value = '正在生成 PDF...';
+      exportProgress.value = 60
+      exportStatusMessage.value = '正在生成 PDF...'
 
       // 将 HTML buffer 转换为字符串
-      const htmlString = new TextDecoder('utf-8').decode(htmlResult.buffer);
+      const htmlString = new TextDecoder('utf-8').decode(htmlResult.buffer)
 
       // 通过 IPC 调用主进程的 PDF 导出（传递完整的 HTML）
       const pdfResult = await electronAPI.export.pdf({
         title: documentTitle,
         html: htmlString,
-        filename: fileName || documentTitle  // 传递实际文件名用于日志
-      });
+        filename: fileName || documentTitle, // 传递实际文件名用于日志
+      })
 
       if (!pdfResult.success) {
-        throw new Error(pdfResult.error || 'PDF导出失败');
+        throw new Error(pdfResult.error || 'PDF导出失败')
       }
 
       // 将 Array 转换回 Buffer/ArrayBuffer
-      const buffer = new Uint8Array(pdfResult.buffer).buffer;
+      const buffer = new Uint8Array(pdfResult.buffer).buffer
       result = {
         buffer: buffer,
         extension: pdfResult.extension,
         mimeType: pdfResult.mimeType,
-        filename: pdfResult.filename
-      };
+        filename: pdfResult.filename,
+      }
     } else {
       // 其他格式（HTML、Markdown）在渲染进程中处理
       // 判断是否是外部文档
-      const isExternalDoc = props.document?.id?.startsWith?.('external-');
+      const isExternalDoc = props.document?.id?.startsWith?.('external-')
 
       console.log('[Export] HTML/Markdown 导出 - 文档信息:', {
         hasDocument: !!props.document,
         documentId: props.document?.id,
         isExternalDoc: isExternalDoc,
-        currentFilePath: currentFilePath.value
-      });
+        currentFilePath: currentFilePath.value,
+      })
 
       // 如果是数据库文档（非外部文档），使用 ExportUseCases
       if (props.document && !isExternalDoc) {
-        const exportUseCases = app.getExportUseCases() as any;
+        const exportUseCases = app.getExportUseCases() as any
         result = await exportUseCases.exportDocument({
           documentId: props.document.id,
           format: exportFormat,
           variables: {}, // 可以添加变量支持
-          config: config
-        });
+          config: config,
+        })
       } else {
         // 外部文件或外部文档：直接使用 ExportFactory 和导出器
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
+        const { InversifyContainer } = await import('../../core/container/inversify.container')
+        const container = InversifyContainer.getInstance()
 
         if (!container || !container.isBound(TYPES.ExportFactory)) {
-          throw new Error('导出服务未初始化，请确保应用已正确启动');
+          throw new Error('导出服务未初始化，请确保应用已正确启动')
         }
 
-        const exportFactory = container.get<any>(TYPES.ExportFactory);
-        const exporter = exportFactory.getExporter(exportFormat);
+        const exportFactory = container.get<any>(TYPES.ExportFactory)
+        const exporter = exportFactory.getExporter(exportFormat)
 
         // 确定文档 ID（外部文档使用文件路径）
-        const isExternalDoc = props.document?.id?.startsWith?.('external-');
-        const documentId = isExternalDoc ? currentFilePath.value : currentFilePath.value;
+        const isExternalDoc = props.document?.id?.startsWith?.('external-')
+        const documentId = isExternalDoc ? currentFilePath.value : currentFilePath.value
 
         // 处理片段引用（如果有）
-        let processedContent = documentContent;
+        let processedContent = documentContent
         try {
           if (container.isBound(TYPES.FragmentReferenceResolver)) {
-            const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+            const resolver = container.get<any>(TYPES.FragmentReferenceResolver)
             if (resolver && typeof resolver.resolveReferences === 'function') {
-              processedContent = await resolver.resolveReferences(processedContent, documentId);
+              processedContent = await resolver.resolveReferences(processedContent, documentId)
             }
           }
         } catch (error) {
-          console.warn('解析片段引用失败，使用原始内容:', error);
+          console.warn('解析片段引用失败，使用原始内容:', error)
         }
 
         // 更新进度：50%
-        exportProgress.value = 50;
-        exportStatusMessage.value = '正在生成文档...';
+        exportProgress.value = 50
+        exportStatusMessage.value = '正在生成文档...'
 
         // 执行导出
         result = await exporter.export({
@@ -3634,976 +3835,1037 @@ const performExport = async (format: 'pdf' | 'html' | 'markdown', config: Export
           documentId: documentId,
           variables: {},
           includeStyles: true,
-          config: config
-        });
+          config: config,
+        })
       }
     }
 
     // 更新进度：80%
-    exportProgress.value = 80;
-    exportStatusMessage.value = '正在保存文件...';
+    exportProgress.value = 80
+    exportStatusMessage.value = '正在保存文件...'
 
     // 保存文件到指定路径
     if (savePath) {
-      await saveExportFileToPath(result, savePath);
+      await saveExportFileToPath(result, savePath)
     } else {
-      await saveExportFile(result, format);
+      await saveExportFile(result, format)
     }
 
     // 更新进度：100%
-    exportProgress.value = 100;
-    exportStatus.value = 'success';
-    exportStatusMessage.value = '导出成功！';
+    exportProgress.value = 100
+    exportStatus.value = 'success'
+    exportStatusMessage.value = '导出成功！'
   } catch (error) {
-    console.error('导出失败:', error);
-    exportProgress.value = 100;
-    exportStatus.value = 'error';
-    exportStatusMessage.value = '导出失败: ' + (error instanceof Error ? error.message : '未知错误');
-    throw error;
+    console.error('导出失败:', error)
+    exportProgress.value = 100
+    exportStatus.value = 'error'
+    exportStatusMessage.value = '导出失败: ' + (error instanceof Error ? error.message : '未知错误')
+    throw error
   } finally {
-    isExporting.value = false;
+    isExporting.value = false
   }
-};
+}
 
 // 保存文件到指定路径
 const saveExportFileToPath = async (result: any, filePath: string) => {
-  const electronAPI = (window as any).electronAPI;
+  const electronAPI = (window as any).electronAPI
 
   if (!electronAPI || !electronAPI.file || !electronAPI.file.writeBinary) {
-    throw new Error('文件写入功能需要在 Electron 环境中运行');
+    throw new Error('文件写入功能需要在 Electron 环境中运行')
   }
 
   try {
     // 处理 buffer（可能是 Buffer 或 ArrayBuffer）
-    let arrayBuffer: ArrayBuffer;
+    let arrayBuffer: ArrayBuffer
     if (result.buffer instanceof ArrayBuffer) {
-      arrayBuffer = result.buffer;
+      arrayBuffer = result.buffer
     } else if (result.buffer instanceof Uint8Array) {
       arrayBuffer = result.buffer.buffer.slice(
         result.buffer.byteOffset,
-        result.buffer.byteOffset + result.buffer.byteLength
-      );
+        result.buffer.byteOffset + result.buffer.byteLength,
+      )
     } else {
       // 尝试从 buffer 对象创建 ArrayBuffer
-      arrayBuffer = result.buffer;
+      arrayBuffer = result.buffer
     }
 
     // 写入文件
-    await electronAPI.file.writeBinary(filePath, arrayBuffer);
+    await electronAPI.file.writeBinary(filePath, arrayBuffer)
   } catch (error) {
-    console.error('保存文件失败:', error);
-    throw new Error('保存文件失败: ' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('保存文件失败:', error)
+    throw new Error('保存文件失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 const saveExportFile = async (result: any, format: string) => {
   // 检查是否在Electron环境中
-  const electronAPI = (window as any).electronAPI;
+  const electronAPI = (window as any).electronAPI
 
   if (electronAPI && electronAPI.dialog && electronAPI.dialog.saveFile) {
     // Electron环境：使用保存对话框
-    const filters = [];
+    const filters = []
     switch (format) {
       case 'pdf':
-        filters.push({ name: 'PDF文档', extensions: ['pdf'] });
-        break;
+        filters.push({ name: 'PDF文档', extensions: ['pdf'] })
+        break
       case 'html':
-        filters.push({ name: 'HTML文件', extensions: ['html'] });
-        break;
+        filters.push({ name: 'HTML文件', extensions: ['html'] })
+        break
       case 'markdown':
-        filters.push({ name: 'Markdown文件', extensions: ['md'] });
-        break;
+        filters.push({ name: 'Markdown文件', extensions: ['md'] })
+        break
     }
-    filters.push({ name: 'All Files', extensions: ['*'] });
+    filters.push({ name: 'All Files', extensions: ['*'] })
 
     const filePath = await electronAPI.dialog.saveFile({
       title: '保存导出文件',
       defaultPath: result.filename,
-      filters: filters
-    });
+      filters: filters,
+    })
 
     if (filePath) {
       // 处理 buffer（可能是 Buffer 或 ArrayBuffer）
-      let arrayBuffer: ArrayBuffer;
+      let arrayBuffer: ArrayBuffer
       if (result.buffer instanceof ArrayBuffer) {
-        arrayBuffer = result.buffer;
+        arrayBuffer = result.buffer
       } else if (result.buffer instanceof Uint8Array) {
         arrayBuffer = result.buffer.buffer.slice(
           result.buffer.byteOffset,
-          result.buffer.byteOffset + result.buffer.byteLength
-        );
+          result.buffer.byteOffset + result.buffer.byteLength,
+        )
       } else if (result.buffer.buffer) {
         // Node.js Buffer
         arrayBuffer = result.buffer.buffer.slice(
           result.buffer.byteOffset,
-          result.buffer.byteOffset + result.buffer.byteLength
-        );
+          result.buffer.byteOffset + result.buffer.byteLength,
+        )
       } else {
-        throw new Error('不支持的 buffer 格式');
+        throw new Error('不支持的 buffer 格式')
       }
 
       // 使用writeBinary保存文件
-      await electronAPI.file.writeBinary(filePath, arrayBuffer);
+      await electronAPI.file.writeBinary(filePath, arrayBuffer)
     }
   } else {
     // 浏览器环境：使用下载API
-    const blob = new Blob([result.buffer], { type: result.mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = result.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const blob = new Blob([result.buffer], { type: result.mimeType })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = result.filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
-};
+}
 
 // 根据鼠标位置获取文本位置
 const getTextPositionFromPoint = (element: HTMLElement, x: number, y: number): number => {
-  const range = document.caretRangeFromPoint?.(x, y);
+  const range = document.caretRangeFromPoint?.(x, y)
   if (!range) {
     // 降级方案：使用selection
-    const selection = window.getSelection();
+    const selection = window.getSelection()
     if (selection && selection.rangeCount > 0) {
-      const selRange = selection.getRangeAt(0);
+      const selRange = selection.getRangeAt(0)
       // 使用 getTextContent 的逻辑来计算位置，确保与编辑器内容一致
-      return calculateTextLength(element, selRange.startContainer, selRange.startOffset);
+      return calculateTextLength(element, selRange.startContainer, selRange.startOffset)
     }
     // 如果没有选择，返回编辑器文本的末尾位置
-    const editorText = getTextContent(element);
-    return editorText.length;
+    const editorText = getTextContent(element)
+    return editorText.length
   }
 
   // 使用 calculateTextLength 来计算位置，确保与 getTextContent 的逻辑一致
-  return calculateTextLength(element, range.startContainer, range.startOffset);
-};
+  return calculateTextLength(element, range.startContainer, range.startOffset)
+}
 
 // 图片拖放处理
 const handleDragEnter = (event: DragEvent) => {
-  event.preventDefault();
-  if (event.dataTransfer?.types.includes('Files') || event.dataTransfer?.types.includes('application/x-knowledge-fragment')) {
-    isDragging.value = true;
+  event.preventDefault()
+  if (
+    event.dataTransfer?.types.includes('Files') ||
+    event.dataTransfer?.types.includes('application/x-knowledge-fragment')
+  ) {
+    isDragging.value = true
   }
-};
+}
 
 const handleDragLeave = (event: DragEvent) => {
-  event.preventDefault();
+  event.preventDefault()
   // 只有当离开整个编辑器区域时才取消拖拽状态
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (editor && !editor.contains(event.relatedTarget as Node)) {
-    isDragging.value = false;
+    isDragging.value = false
   }
-};
+}
 
 // 编辑器拖拽开始（保存选中内容的源代码）
 const handleEditorDragStart = (event: DragEvent) => {
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor || !event.dataTransfer) {
-    return;
+    return
   }
 
   // 获取选中内容的源代码
-  const sourceCode = getSelectedSourceCode();
-  
+  const sourceCode = getSelectedSourceCode()
+
   if (sourceCode && sourceCode.trim()) {
     // 将源代码保存到 dataTransfer 的自定义数据中
-    event.dataTransfer.setData('text/x-markdown-source', sourceCode);
-    console.log('[MarkdownEditor] 拖拽开始，保存源代码:', sourceCode.substring(0, 100));
+    event.dataTransfer.setData('text/x-markdown-source', sourceCode)
+    console.log('[MarkdownEditor] 拖拽开始，保存源代码:', sourceCode.substring(0, 100))
   }
-};
+}
 
 // 编辑器拖拽进入
 const handleEditorDragEnter = (event: DragEvent) => {
-  event.preventDefault();
-  event.stopPropagation();
-  if (event.dataTransfer?.types.includes('Files') || event.dataTransfer?.types.includes('application/x-knowledge-fragment')) {
-    isDragging.value = true;
+  event.preventDefault()
+  event.stopPropagation()
+  if (
+    event.dataTransfer?.types.includes('Files') ||
+    event.dataTransfer?.types.includes('application/x-knowledge-fragment')
+  ) {
+    isDragging.value = true
   }
-};
+}
 
 // 编辑器拖拽离开
 const handleEditorDragLeave = (event: DragEvent) => {
-  event.preventDefault();
-  event.stopPropagation();
-  const editor = editorElement.value;
+  event.preventDefault()
+  event.stopPropagation()
+  const editor = editorElement.value
   if (editor && !editor.contains(event.relatedTarget as Node)) {
-    isDragging.value = false;
+    isDragging.value = false
   }
-};
+}
 
 // 编辑器拖拽悬停
 const handleDragOver = (event: DragEvent) => {
-  event.preventDefault();
-  event.stopPropagation();
+  event.preventDefault()
+  event.stopPropagation()
 
   // 根据鼠标位置设置光标
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (editor) {
-    const range = document.caretRangeFromPoint?.(event.clientX, event.clientY);
+    const range = document.caretRangeFromPoint?.(event.clientX, event.clientY)
     if (range) {
-      const selection = window.getSelection();
+      const selection = window.getSelection()
       if (selection) {
-        selection.removeAllRanges();
-        selection.addRange(range);
+        selection.removeAllRanges()
+        selection.addRange(range)
       }
     }
   }
-};
+}
 
 // 编辑器拖拽放下
 const handleEditorDrop = async (event: DragEvent) => {
-  console.log('[MarkdownEditor] handleEditorDrop called');
-  event.preventDefault();
-  event.stopPropagation();
-  isDragging.value = false;
+  console.log('[MarkdownEditor] handleEditorDrop called')
+  event.preventDefault()
+  event.stopPropagation()
+  isDragging.value = false
 
   // 支持外部文件和数据库文档
   if (!props.document && !currentFilePath.value) {
-    console.log('[MarkdownEditor] No document or file path, showing alert');
-    alert('请先打开一个文档或文件');
-    return;
+    console.log('[MarkdownEditor] No document or file path, showing alert')
+    alert('请先打开一个文档或文件')
+    return
   }
 
-  console.log('[MarkdownEditor] Document:', props.document, 'CurrentFilePath:', currentFilePath.value);
+  console.log(
+    '[MarkdownEditor] Document:',
+    props.document,
+    'CurrentFilePath:',
+    currentFilePath.value,
+  )
 
   // 获取鼠标位置的文本位置
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor) {
-    console.log('[MarkdownEditor] Editor element not found');
-    return;
+    console.log('[MarkdownEditor] Editor element not found')
+    return
   }
 
   // 根据鼠标位置计算文本位置
-  const textPosition = getTextPositionFromPoint(editor, event.clientX, event.clientY);
+  const textPosition = getTextPositionFromPoint(editor, event.clientX, event.clientY)
 
   // 设置光标位置
-  const range = document.caretRangeFromPoint?.(event.clientX, event.clientY);
+  const range = document.caretRangeFromPoint?.(event.clientX, event.clientY)
   if (range) {
-    const selection = window.getSelection();
+    const selection = window.getSelection()
     if (selection) {
-      selection.removeAllRanges();
-      selection.addRange(range);
+      selection.removeAllRanges()
+      selection.addRange(range)
     }
   }
 
   // 检查是否是知识片段拖拽
-  const fragmentId = event.dataTransfer?.getData('application/x-knowledge-fragment');
+  const fragmentId = event.dataTransfer?.getData('application/x-knowledge-fragment')
   if (fragmentId) {
-    console.log('[MarkdownEditor] Fragment drag detected:', fragmentId);
+    console.log('[MarkdownEditor] Fragment drag detected:', fragmentId)
     // 处理知识片段拖拽，使用计算出的位置
-    await handleInsertFragmentAtPosition(fragmentId, textPosition);
-    return;
+    await handleInsertFragmentAtPosition(fragmentId, textPosition)
+    return
   }
 
   // 处理文件拖拽
-  console.log('[MarkdownEditor] Processing file drop');
-  await handleDrop(event);
-};
+  console.log('[MarkdownEditor] Processing file drop')
+  await handleDrop(event)
+}
 
 // 包装的handleDrop用于文件拖拽
 const handleDrop = async (event: DragEvent) => {
-  console.log('[MarkdownEditor] handleDrop called');
+  console.log('[MarkdownEditor] handleDrop called')
 
-  const files = event.dataTransfer?.files;
-  console.log('[MarkdownEditor] Dropped files:', files ? Array.from(files).map(f => ({ name: f.name, type: f.type, size: f.size })) : 'null');
+  const files = event.dataTransfer?.files
+  console.log(
+    '[MarkdownEditor] Dropped files:',
+    files ? Array.from(files).map((f) => ({ name: f.name, type: f.type, size: f.size })) : 'null',
+  )
 
   if (!files || files.length === 0) {
-    console.log('[MarkdownEditor] No files in drop event');
-    return;
+    console.log('[MarkdownEditor] No files in drop event')
+    return
   }
 
   // 获取光标位置
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor) {
-    console.log('[MarkdownEditor] Editor element not found in handleDrop');
-    return;
+    console.log('[MarkdownEditor] Editor element not found in handleDrop')
+    return
   }
 
-  const { start: cursorPosition } = getCursorPosition(editor);
-  console.log('[MarkdownEditor] Cursor position:', cursorPosition);
+  const { start: cursorPosition } = getCursorPosition(editor)
+  console.log('[MarkdownEditor] Cursor position:', cursorPosition)
 
   try {
-    let imagePaths: string[] = [];
+    let imagePaths: string[] = []
 
     // 获取实际的文件路径（外部文件用 filePath，数据库文档用 id）
-    const actualFilePath = (props.document as any)?.filePath || currentFilePath.value;
-    const isExternalFile = actualFilePath && (actualFilePath.includes('/') || actualFilePath.includes('\\'));
-    console.log('[MarkdownEditor] Actual file path:', actualFilePath, 'Is external:', isExternalFile);
+    const actualFilePath = (props.document as any)?.filePath || currentFilePath.value
+    const isExternalFile =
+      actualFilePath && (actualFilePath.includes('/') || actualFilePath.includes('\\'))
+    console.log(
+      '[MarkdownEditor] Actual file path:',
+      actualFilePath,
+      'Is external:',
+      isExternalFile,
+    )
 
     if (isExternalFile) {
       // 外部文件：使用文件路径的目录部分
-      const fileDir = actualFilePath.split(/[/\\]/).slice(0, -1).join('/');
-      const assetsDir = `${fileDir}/assets`;
-      console.log('[MarkdownEditor] External file - fileDir:', fileDir, 'assetsDir:', assetsDir);
+      const fileDir = actualFilePath.split(/[/\\]/).slice(0, -1).join('/')
+      const assetsDir = `${fileDir}/assets`
+      console.log('[MarkdownEditor] External file - fileDir:', fileDir, 'assetsDir:', assetsDir)
 
       // 确保assets目录存在
-      const electronAPI = (window as any).electronAPI;
+      const electronAPI = (window as any).electronAPI
       if (electronAPI && electronAPI.file && electronAPI.file.mkdir) {
         try {
-          await electronAPI.file.mkdir(assetsDir);
-          console.log('[MarkdownEditor] Assets directory created/verified');
+          await electronAPI.file.mkdir(assetsDir)
+          console.log('[MarkdownEditor] Assets directory created/verified')
         } catch (error) {
-          console.log('[MarkdownEditor] Assets directory creation error (may already exist):', error);
+          console.log(
+            '[MarkdownEditor] Assets directory creation error (may already exist):',
+            error,
+          )
           // 目录可能已存在，忽略错误
         }
       }
 
       // 使用FileSystemImageStorageService直接保存到文件系统
-      const { FileSystemImageStorageService } = await import('../../infrastructure/services/image-storage.service');
-      const imageStorage = new FileSystemImageStorageService();
+      const { FileSystemImageStorageService } = await import(
+        '../../infrastructure/services/image-storage.service'
+      )
+      const imageStorage = new FileSystemImageStorageService()
 
       // 使用文件目录作为documentId（需要特殊处理）
-      const tempDocId = `file:${fileDir}`;
-      console.log('[MarkdownEditor] Using tempDocId:', tempDocId);
+      const tempDocId = `file:${fileDir}`
+      console.log('[MarkdownEditor] Using tempDocId:', tempDocId)
 
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (!file) continue;
-        console.log('[MarkdownEditor] Processing file:', file.name, 'type:', file.type);
+        const file = files[i]
+        if (!file) continue
+        console.log('[MarkdownEditor] Processing file:', file.name, 'type:', file.type)
         if (file.type.startsWith('image/')) {
-          console.log('[MarkdownEditor] Saving image:', file.name);
+          console.log('[MarkdownEditor] Saving image:', file.name)
           // 保存图片到文件系统的assets目录
-          const imagePath = await imageStorage.saveImageToDocument(tempDocId, file);
-          console.log('[MarkdownEditor] Image saved, path:', imagePath);
-          imagePaths.push(imagePath);
+          const imagePath = await imageStorage.saveImageToDocument(tempDocId, file)
+          console.log('[MarkdownEditor] Image saved, path:', imagePath)
+          imagePaths.push(imagePath)
         } else {
-          console.log('[MarkdownEditor] Skipping non-image file:', file.name, 'type:', file.type);
+          console.log('[MarkdownEditor] Skipping non-image file:', file.name, 'type:', file.type)
         }
       }
     } else if (props.document) {
-      console.log('[MarkdownEditor] Database document, using document ID:', props.document.id);
+      console.log('[MarkdownEditor] Database document, using document ID:', props.document.id)
       // 数据库文档：使用document ID
-      imagePaths = await handleDroppedImages(props.document.id, files);
-      console.log('[MarkdownEditor] Images saved for database document, paths:', imagePaths);
+      imagePaths = await handleDroppedImages(props.document.id, files)
+      console.log('[MarkdownEditor] Images saved for database document, paths:', imagePaths)
     } else {
-      console.log('[MarkdownEditor] Neither external file nor database document, cannot save images');
+      console.log(
+        '[MarkdownEditor] Neither external file nor database document, cannot save images',
+      )
     }
 
-    console.log('[MarkdownEditor] Total image paths:', imagePaths.length);
+    console.log('[MarkdownEditor] Total image paths:', imagePaths.length)
 
     if (imagePaths.length > 0) {
-      console.log('[MarkdownEditor] Inserting image references into content');
+      console.log('[MarkdownEditor] Inserting image references into content')
       // 插入所有图片引用
-      let newContent = content.value;
-      let newPosition = cursorPosition;
+      let newContent = content.value
+      let newPosition = cursorPosition
 
       for (const imagePath of imagePaths) {
-        const result = insertImageReference(newContent, imagePath, newPosition);
-        newContent = result.content;
-        newPosition = result.newPosition;
-        console.log('[MarkdownEditor] Inserted image reference:', imagePath);
+        const result = insertImageReference(newContent, imagePath, newPosition)
+        newContent = result.content
+        newPosition = result.newPosition
+        console.log('[MarkdownEditor] Inserted image reference:', imagePath)
       }
 
-      content.value = newContent;
-      console.log('[MarkdownEditor] Content updated, new length:', newContent.length);
+      content.value = newContent
+      console.log('[MarkdownEditor] Content updated, new length:', newContent.length)
 
       // 更新 mainContent（从完整内容中分离）
-      const { mainContent: newMainContent } = splitContent(newContent);
-      mainContent.value = newMainContent;
-      console.log('[MarkdownEditor] MainContent updated, length:', newMainContent.length);
+      const { mainContent: newMainContent } = splitContent(newContent)
+      mainContent.value = newMainContent
+      console.log('[MarkdownEditor] MainContent updated, length:', newMainContent.length)
 
       // 更新编辑器显示
       if (editor) {
         if (!isEditorFocused.value) {
           // 编辑器没有焦点时，应用标注
-          await applyEditorAnnotations();
+          await applyEditorAnnotations()
         } else {
           // 编辑器有焦点时，直接更新文本内容
-          editor.textContent = newMainContent;
-          console.log('[MarkdownEditor] Editor textContent updated');
+          editor.textContent = newMainContent
+          console.log('[MarkdownEditor] Editor textContent updated')
         }
       }
 
       // 触发内容更新和重新渲染
-      checkChanges();
-      renderContent();
-      await nextTick();
-      debouncedSave();
-      console.log('[MarkdownEditor] Image drop handling completed successfully');
+      checkChanges()
+      renderContent()
+      await nextTick()
+      debouncedSave()
+      console.log('[MarkdownEditor] Image drop handling completed successfully')
     } else {
-      console.log('[MarkdownEditor] No image paths to insert');
+      console.log('[MarkdownEditor] No image paths to insert')
     }
   } catch (error) {
-    console.error('[MarkdownEditor] Error handling dropped images:', error);
-    alert('图片上传失败：' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('[MarkdownEditor] Error handling dropped images:', error)
+    alert('图片上传失败：' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 // 处理知识片段插入（在指定位置）
 const handleInsertFragmentAtPosition = async (fragmentId: string, position: number) => {
   if (!props.document && !currentFilePath.value) {
-    alert('请先打开一个文档或文件');
-    return;
+    alert('请先打开一个文档或文件')
+    return
   }
 
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor) {
-    return;
+    return
   }
 
   try {
-    const application = Application.getInstance();
+    const application = Application.getInstance()
     // 确保应用服务已初始化
-    await application.getApplicationService().initialize();
-    const fragmentUseCases = application.getKnowledgeFragmentUseCases();
+    await application.getApplicationService().initialize()
+    const fragmentUseCases = application.getKnowledgeFragmentUseCases()
 
     // 获取片段内容
-    const fragment = await fragmentUseCases.getFragment(fragmentId);
+    const fragment = await fragmentUseCases.getFragment(fragmentId)
     if (!fragment) {
-      throw new Error('知识片段不存在');
+      throw new Error('知识片段不存在')
     }
 
-    const cursorPosition = position;
+    const cursorPosition = position
 
     // 获取片段内容（Markdown格式）
     // 注意：这里不立即处理图片，图片处理将在后台异步执行
     // 缓存中保存的是原始内容，渲染时会使用缓存中已处理的内容
-    let fragmentContent = fragment.markdown;
+    let fragmentContent = fragment.markdown
 
     // 插入内容和引用标志
     // 使用形态A（强引用模式）的语法
-    const referenceTag = `{{ref:${fragmentId}:linked}}`;
+    const referenceTag = `{{ref:${fragmentId}:linked}}`
 
     // 注意：cursorPosition 是基于 mainContent 的位置，需要转换为 content 的位置
     // 先获取 frontmatter 的长度
-    const frontmatterLength = frontmatter.value.length;
+    const frontmatterLength = frontmatter.value.length
     // 在 content 中的实际位置 = frontmatter长度 + cursorPosition
-    const contentPosition = frontmatterLength + cursorPosition;
+    const contentPosition = frontmatterLength + cursorPosition
 
-    const before = content.value.substring(0, contentPosition);
-    const after = content.value.substring(contentPosition);
+    const before = content.value.substring(0, contentPosition)
+    const after = content.value.substring(contentPosition)
 
     // 在编辑器中显示引用标志
-    content.value = before + '\n\n' + referenceTag + '\n\n' + after;
+    content.value = before + '\n\n' + referenceTag + '\n\n' + after
 
     // 关键：更新 mainContent（从完整内容中分离）
-    const { mainContent: newMainContent } = splitContent(content.value);
-    mainContent.value = newMainContent;
+    const { mainContent: newMainContent } = splitContent(content.value)
+    mainContent.value = newMainContent
 
-    console.log('[MarkdownEditor] 插入片段后，mainContent长度:', newMainContent.length, '引用标志位置:', newMainContent.indexOf(referenceTag));
-    console.log('[MarkdownEditor] 插入片段后，更新 mainContent，长度:', newMainContent.length);
+    console.log(
+      '[MarkdownEditor] 插入片段后，mainContent长度:',
+      newMainContent.length,
+      '引用标志位置:',
+      newMainContent.indexOf(referenceTag),
+    )
+    console.log('[MarkdownEditor] 插入片段后，更新 mainContent，长度:', newMainContent.length)
 
     // 计算引用位置（用于后续操作）
-    const refPosition = newMainContent.indexOf(referenceTag);
-    const newPosition = refPosition !== -1 ? refPosition : (cursorPosition + 2); // +2 for \n\n
+    const refPosition = newMainContent.indexOf(referenceTag)
+    const newPosition = refPosition !== -1 ? refPosition : cursorPosition + 2 // +2 for \n\n
 
     // 并行执行所有异步操作以提高性能
-    const asyncOperations: Promise<void>[] = [];
+    const asyncOperations: Promise<void>[] = []
 
     // 后台处理图片并保存到缓存：存储引用标志位置和对应的片段内容（已处理图片路径）
     if (currentFilePath.value) {
       asyncOperations.push(
         (async () => {
           try {
-            const electronAPI = (window as any).electronAPI;
+            const electronAPI = (window as any).electronAPI
             if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
               // 先处理图片路径（如果有图片）
-              let processedContent = fragmentContent;
-              const hasImages = /!\[([^\]]*)\]\(([^)]+)\)/.test(fragmentContent);
+              let processedContent = fragmentContent
+              const hasImages = /!\[([^\]]*)\]\(([^)]+)\)/.test(fragmentContent)
               if (hasImages) {
                 try {
-                  const { FragmentReferenceResolver } = await import('../../domain/services/fragment-reference-resolver.service');
-                  const { InversifyContainer } = await import('../../core/container/inversify.container');
-                  const container = InversifyContainer.getInstance();
+                  const { FragmentReferenceResolver } = await import(
+                    '../../domain/services/fragment-reference-resolver.service'
+                  )
+                  const { InversifyContainer } = await import(
+                    '../../core/container/inversify.container'
+                  )
+                  const container = InversifyContainer.getInstance()
 
-                  if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
-                    const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+                  if (
+                    container &&
+                    typeof container.isBound === 'function' &&
+                    container.isBound(TYPES.FragmentReferenceResolver)
+                  ) {
+                    const resolver = container.get<any>(TYPES.FragmentReferenceResolver)
                     // 使用文件路径作为documentId，处理图片路径
-                    processedContent = await resolver.resolveReference(fragmentId, `file:${currentFilePath.value}`);
+                    processedContent = await resolver.resolveReference(
+                      fragmentId,
+                      `file:${currentFilePath.value}`,
+                    )
                   }
                 } catch (error) {
-                  console.warn('Error resolving fragment content for cache:', error);
+                  console.warn('Error resolving fragment content for cache:', error)
                   // 如果处理失败，使用原始内容
                 }
               }
 
               // 获取缓存并保存已处理的内容
-              const cache = await electronAPI.file.getFileCache(currentFilePath.value) || { references: [] };
-              cache.references = cache.references || [];
+              const cache = (await electronAPI.file.getFileCache(currentFilePath.value)) || {
+                references: [],
+              }
+              cache.references = cache.references || []
 
               // 获取片段更新时间，用于缓存验证
-              const fragmentUpdatedAt = new Date(fragment.updatedAt || fragment.createdAt || Date.now()).getTime();
+              const fragmentUpdatedAt = new Date(
+                fragment.updatedAt || fragment.createdAt || Date.now(),
+              ).getTime()
 
               // 检查是否已存在该引用，如果存在则更新，否则添加
-              const existingIndex = cache.references.findIndex((r: any) => r.fragmentId === fragmentId);
+              const existingIndex = cache.references.findIndex(
+                (r: any) => r.fragmentId === fragmentId,
+              )
               const cacheEntry = {
                 fragmentId,
                 position: newPosition,
                 length: referenceTag.length,
                 content: processedContent, // 已处理的完整内容（包括图片路径已转换）
                 isConnected: true,
-                fragmentUpdatedAt // 记录片段更新时间，用于判断缓存是否有效
-              };
+                fragmentUpdatedAt, // 记录片段更新时间，用于判断缓存是否有效
+              }
 
               if (existingIndex >= 0) {
-                cache.references[existingIndex] = cacheEntry;
+                cache.references[existingIndex] = cacheEntry
               } else {
-                cache.references.push(cacheEntry);
+                cache.references.push(cacheEntry)
               }
 
               // 按位置排序
-              cache.references.sort((a: any, b: any) => a.position - b.position);
+              cache.references.sort((a: any, b: any) => a.position - b.position)
 
               if (electronAPI.file.saveFileCache) {
-                await electronAPI.file.saveFileCache(currentFilePath.value, cache);
+                await electronAPI.file.saveFileCache(currentFilePath.value, cache)
               }
             }
           } catch (error) {
-            console.error('Error saving file cache:', error);
+            console.error('Error saving file cache:', error)
           }
-        })()
-      );
+        })(),
+      )
 
       // 为外部文件也注册引用关系到知识片段
       asyncOperations.push(
         (async () => {
           try {
-            const { InversifyContainer } = await import('../../core/container/inversify.container');
-            const container = InversifyContainer.getInstance();
+            const { InversifyContainer } = await import('../../core/container/inversify.container')
+            const container = InversifyContainer.getInstance()
 
-            if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
-              const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
+            if (
+              container &&
+              typeof container.isBound === 'function' &&
+              container.isBound(TYPES.FragmentReferenceRegistrationService)
+            ) {
+              const registrationService = container.get<any>(
+                TYPES.FragmentReferenceRegistrationService,
+              )
               // 使用 file: 前缀标识外部文件
-              const fileDocumentId = `file:${currentFilePath.value}`;
+              const fileDocumentId = `file:${currentFilePath.value}`
               // 从文件路径提取文件名作为标题
-              const fileName = currentFilePath.value.split(/[/\\]/).pop() || 'Untitled';
+              const fileName = currentFilePath.value.split(/[/\\]/).pop() || 'Untitled'
               await registrationService.registerExternalFileReference(
                 fileDocumentId,
                 fileName,
                 fragmentId,
                 newPosition,
-                referenceTag.length
-              );
+                referenceTag.length,
+              )
             }
           } catch (error) {
-            console.error('Error registering external file reference:', error);
+            console.error('Error registering external file reference:', error)
           }
-        })()
-      );
+        })(),
+      )
     }
 
     // 如果是数据库文档，注册引用关系
     // 注意：外部文件的临时ID（external-xxx）已经在上面处理过了，这里只处理真正的数据库文档
     if (props.document && props.document.id && !props.document.id.startsWith('external-')) {
-      const documentId = props.document.id; // 保存到局部变量，避免类型检查问题
+      const documentId = props.document.id // 保存到局部变量，避免类型检查问题
       asyncOperations.push(
         (async () => {
           try {
-            const { InversifyContainer } = await import('../../core/container/inversify.container');
-            const container = InversifyContainer.getInstance();
+            const { InversifyContainer } = await import('../../core/container/inversify.container')
+            const container = InversifyContainer.getInstance()
 
-            if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
-              const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
+            if (
+              container &&
+              typeof container.isBound === 'function' &&
+              container.isBound(TYPES.FragmentReferenceRegistrationService)
+            ) {
+              const registrationService = container.get<any>(
+                TYPES.FragmentReferenceRegistrationService,
+              )
               await registrationService.registerReference(
                 documentId,
                 fragmentId,
                 newPosition,
-                referenceTag.length
-              );
+                referenceTag.length,
+              )
             }
           } catch (error) {
-            console.error('Error registering fragment reference:', error);
+            console.error('Error registering fragment reference:', error)
           }
-        })()
-      );
+        })(),
+      )
     }
 
     // 更新编辑器内容（在聚焦之前应用标注，避免焦点丢失）
-    await nextTick();
+    await nextTick()
 
     // 并行执行所有异步操作，不等待完成（后台执行）
     // 这样可以立即显示内容，而不需要等待文件保存和引用注册
-    Promise.all(asyncOperations).catch(err => {
-      console.error('Error in async operations:', err);
-    });
+    Promise.all(asyncOperations).catch((err) => {
+      console.error('Error in async operations:', err)
+    })
 
     // 减少延迟时间：从200ms减少到50ms，足够让DOM更新完成
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
     // 无论编辑器是否有焦点，都应用标注以显示友好文本
     // 这样可以确保拖入知识片段后立即显示 [知识片段：标题] 而不是 {{ref:...}}
-    console.log('[MarkdownEditor] 应用标注以显示友好文本，isEditorFocused:', isEditorFocused.value);
-    await applyEditorAnnotations();
+    console.log('[MarkdownEditor] 应用标注以显示友好文本，isEditorFocused:', isEditorFocused.value)
+    await applyEditorAnnotations()
 
     // 如果编辑器有焦点，在应用标注后恢复焦点
     if (isEditorFocused.value) {
-      await nextTick();
-      editor.focus();
+      await nextTick()
+      editor.focus()
     }
 
     // 触发内容更新和重新渲染（确保引用被解析）
-    checkChanges();
-    console.log('[MarkdownEditor] 插入片段后，调用 renderContent 进行渲染');
-    await renderContent();
-    await nextTick();
-    debouncedSave();
+    checkChanges()
+    console.log('[MarkdownEditor] 插入片段后，调用 renderContent 进行渲染')
+    await renderContent()
+    await nextTick()
+    debouncedSave()
 
     recentInsertedFragmentIds.value = [
       fragmentId,
-      ...recentInsertedFragmentIds.value.filter(id => id !== fragmentId)
-    ].slice(0, 12);
+      ...recentInsertedFragmentIds.value.filter((id) => id !== fragmentId),
+    ].slice(0, 12)
   } catch (error) {
-    console.error('Error inserting fragment:', error);
-    alert('插入知识片段失败：' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('Error inserting fragment:', error)
+    alert('插入知识片段失败：' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 // 处理知识片段插入（使用当前光标位置）
 const handleInsertFragment = async (fragmentId: string) => {
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor) {
-    return;
+    return
   }
-  const { start: cursorPosition } = getCursorPosition(editor);
-  await handleInsertFragmentAtPosition(fragmentId, cursorPosition);
+  const { start: cursorPosition } = getCursorPosition(editor)
+  await handleInsertFragmentAtPosition(fragmentId, cursorPosition)
 
   // 确保编辑器获得焦点
-  await nextTick();
+  await nextTick()
   if (editor) {
-    editor.focus();
-    isEditorFocused.value = true;
+    editor.focus()
+    isEditorFocused.value = true
     // 恢复光标位置
-    const selection = window.getSelection();
+    const selection = window.getSelection()
     if (selection && editor.textContent) {
       try {
-        const range = document.createRange();
-        const textNode = editor.firstChild;
+        const range = document.createRange()
+        const textNode = editor.firstChild
         if (textNode) {
-          const textLength = textNode.textContent?.length || 0;
-          const newPosition = Math.min(cursorPosition, textLength);
-          range.setStart(textNode, newPosition);
-          range.setEnd(textNode, newPosition);
-          selection.removeAllRanges();
-          selection.addRange(range);
+          const textLength = textNode.textContent?.length || 0
+          const newPosition = Math.min(cursorPosition, textLength)
+          range.setStart(textNode, newPosition)
+          range.setEnd(textNode, newPosition)
+          selection.removeAllRanges()
+          selection.addRange(range)
         }
       } catch (error) {
-        console.warn('[MarkdownEditor] 恢复光标位置失败:', error);
+        console.warn('[MarkdownEditor] 恢复光标位置失败:', error)
       }
     }
   }
-};
+}
 
 // 暴露方法供外部调用
 const setContent = (newTitle: string, newContent: string, filePath?: string) => {
-  title.value = newTitle;
-  content.value = newContent || '';
-  lastSavedTitle = newTitle;
-  lastSavedContent = newContent || '';
-  hasChanges.value = false;
+  title.value = newTitle
+  content.value = newContent || ''
+  lastSavedTitle = newTitle
+  lastSavedContent = newContent || ''
+  hasChanges.value = false
   if (filePath) {
-    currentFilePath.value = filePath;
+    currentFilePath.value = filePath
   }
 
   // 分离 frontmatter 和正文
-  const { frontmatter: fm, mainContent: main } = splitContent(newContent || '');
-  frontmatter.value = fm;
-  mainContent.value = main;
+  const { frontmatter: fm, mainContent: main } = splitContent(newContent || '')
+  frontmatter.value = fm
+  mainContent.value = main
 
   // 使用nextTick确保DOM更新后再渲染
   nextTick(() => {
-    renderContent();
-    const editor = editorElement.value;
+    renderContent()
+    const editor = editorElement.value
     if (editor) {
       // 在编辑器中只显示正文内容（不包含 frontmatter）
       if (isEditorFocused.value) {
-        editor.textContent = mainContent.value;
+        editor.textContent = mainContent.value
       } else {
-        applyEditorAnnotations();
+        applyEditorAnnotations()
       }
     }
-  });
-};
+  })
+}
 
 // 刷新内容（用于知识片段更新后刷新预览）
 const refreshContent = () => {
-  renderContent();
-};
+  renderContent()
+}
 
 const getContent = () => {
   // 获取编辑器当前内容（使用getTextContent而不是textContent，避免重复）
-  const editor = editorElement.value;
-  const currentMainContent = editor ? getTextContent(editor) : mainContent.value;
+  const editor = editorElement.value
+  const currentMainContent = editor ? getTextContent(editor) : mainContent.value
 
   // 合并 frontmatter 和正文
-  return mergeContent(frontmatter.value, currentMainContent);
-};
+  return mergeContent(frontmatter.value, currentMainContent)
+}
 
 // 获取选中的文本（供外部调用）
 const getSelectedText = () => {
-  const selection = window.getSelection();
+  const selection = window.getSelection()
   if (selection && selection.rangeCount > 0) {
-    return selection.toString();
+    return selection.toString()
   }
-  return '';
-};
+  return ''
+}
 
 // 获取选中内容的源代码（从编辑器中提取，包含引用标记等原始内容）
 // 注意：这个方法会保存和恢复选中范围，避免干扰编辑器焦点
 const getSelectedSourceCode = (): string => {
-  const editor = editorElement.value;
+  const editor = editorElement.value
   if (!editor) {
-    return '';
+    return ''
   }
 
-  const selection = window.getSelection();
+  const selection = window.getSelection()
   if (!selection || selection.rangeCount === 0) {
-    return '';
+    return ''
   }
 
   // 保存当前选中范围
-  const range = selection.getRangeAt(0);
-  
+  const range = selection.getRangeAt(0)
+
   // 检查选中范围是否在编辑器内
   if (!editor.contains(range.commonAncestorContainer)) {
-    return '';
+    return ''
   }
 
   // 如果没有选中内容（范围折叠），返回空字符串
   if (range.collapsed) {
-    return '';
+    return ''
   }
 
   try {
     // 关键步骤1：先同步编辑器内容到mainContent（使用getTextContent还原引用格式）
     // getTextContent会将[知识片段: b]还原为{{ref:xxx}}，所以mainContent就是源代码
-    const currentEditorText = getTextContent(editor);
+    const currentEditorText = getTextContent(editor)
     if (currentEditorText !== mainContent.value) {
-      mainContent.value = currentEditorText;
+      mainContent.value = currentEditorText
     }
 
     // 关键步骤2：获取选中位置（getCursorPosition使用calculateTextLength，
     // 它基于getTextContent的逻辑，所以返回的位置已经是基于源代码的位置）
-    const position = getCursorPosition(editor);
-    const start = position.start;
-    const end = position.end;
+    const position = getCursorPosition(editor)
+    const start = position.start
+    const end = position.end
 
     // 确保位置在有效范围内
-    const validStart = Math.max(0, Math.min(start, mainContent.value.length));
-    const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length));
+    const validStart = Math.max(0, Math.min(start, mainContent.value.length))
+    const validEnd = Math.max(validStart, Math.min(end, mainContent.value.length))
 
     // 关键步骤3：直接从mainContent（源代码）中提取选中部分
-    const sourceCode = mainContent.value.substring(validStart, validEnd);
-    
+    const sourceCode = mainContent.value.substring(validStart, validEnd)
+
     // 恢复选中范围（确保编辑器焦点不丢失）
     try {
-      selection.removeAllRanges();
-      selection.addRange(range);
+      selection.removeAllRanges()
+      selection.addRange(range)
     } catch (e) {
       // 如果恢复失败，尝试重新设置光标位置
-      console.warn('恢复选中范围失败，尝试恢复光标位置:', e);
+      console.warn('恢复选中范围失败，尝试恢复光标位置:', e)
     }
-    
-    return sourceCode;
+
+    return sourceCode
   } catch (error) {
-    console.error('获取选中源代码失败:', error);
-    return '';
+    console.error('获取选中源代码失败:', error)
+    return ''
   }
-};
+}
 
 // 根据偏移量选中一段文本（用于快速搜索跳转）
 const setSelectionRange = (start: number, end: number) => {
-  const editor = editorElement.value;
-  if (!editor) return;
+  const editor = editorElement.value
+  if (!editor) return
 
-  const range = document.createRange();
-  const selection = window.getSelection();
+  const range = document.createRange()
+  const selection = window.getSelection()
 
-  let currentPosition = 0;
-  let foundStart = false;
-  let foundEnd = false;
+  let currentPosition = 0
+  let foundStart = false
+  let foundEnd = false
 
   const traverseNodes = (node: Node) => {
-    if (foundEnd) return;
+    if (foundEnd) return
 
     if (node.nodeType === Node.TEXT_NODE) {
-      const textLength = node.textContent?.length || 0;
+      const textLength = node.textContent?.length || 0
 
       if (!foundStart && currentPosition + textLength >= start) {
-        range.setStart(node, start - currentPosition);
-        foundStart = true;
+        range.setStart(node, start - currentPosition)
+        foundStart = true
       }
 
       if (foundStart && currentPosition + textLength >= end) {
-        range.setEnd(node, end - currentPosition);
-        foundEnd = true;
+        range.setEnd(node, end - currentPosition)
+        foundEnd = true
       }
 
-      currentPosition += textLength;
+      currentPosition += textLength
     } else {
       for (const child of Array.from(node.childNodes)) {
-        traverseNodes(child);
-        if (foundEnd) break;
+        traverseNodes(child)
+        if (foundEnd) break
       }
     }
-  };
+  }
 
-  traverseNodes(editor);
+  traverseNodes(editor)
 
   if (foundStart && selection) {
-    selection.removeAllRanges();
-    selection.addRange(range);
+    selection.removeAllRanges()
+    selection.addRange(range)
   }
-};
+}
 
 // 在编辑器中高亮搜索匹配项
 const setSearchHighlights = (query: string, caseSensitive: boolean, useRegex: boolean) => {
-  const editorRoot = editorElement.value;
-  if (!editorRoot) return;
+  const editorRoot = editorElement.value
+  if (!editorRoot) return
 
   // 先清除已有高亮（展开 span.quick-search-highlight）
-  const existing = editorRoot.querySelectorAll('.quick-search-highlight');
-  existing.forEach(span => {
-    const parent = span.parentNode;
-    if (!parent) return;
+  const existing = editorRoot.querySelectorAll('.quick-search-highlight')
+  existing.forEach((span) => {
+    const parent = span.parentNode
+    if (!parent) return
     while (span.firstChild) {
-      parent.insertBefore(span.firstChild, span);
+      parent.insertBefore(span.firstChild, span)
     }
-    parent.removeChild(span);
-  });
+    parent.removeChild(span)
+  })
 
-  if (!query) return;
+  if (!query) return
 
-  let regex: RegExp;
+  let regex: RegExp
   try {
-    const source = useRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const flags = caseSensitive ? 'g' : 'gi';
-    regex = new RegExp(source, flags);
+    const source = useRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const flags = caseSensitive ? 'g' : 'gi'
+    regex = new RegExp(source, flags)
   } catch (error) {
-    console.error('构建搜索高亮正则失败:', error);
-    return;
+    console.error('构建搜索高亮正则失败:', error)
+    return
   }
 
-  const walker = document.createTreeWalker(editorRoot, NodeFilter.SHOW_TEXT, null);
+  const walker = document.createTreeWalker(editorRoot, NodeFilter.SHOW_TEXT, null)
 
   // 先计算所有文本节点的全局位置
-  const textNodes: Array<{ node: Text; globalStart: number }> = [];
-  let globalPos = 0;
-  let node: Node | null;
+  const textNodes: Array<{ node: Text; globalStart: number }> = []
+  let globalPos = 0
+  let node: Node | null
   while ((node = walker.nextNode()) !== null) {
     // 跳过在脚本/样式中的文本（理论上预览里不会有）
     if (node.parentElement && ['SCRIPT', 'STYLE'].includes(node.parentElement.tagName)) {
-      continue;
+      continue
     }
-    const textNode = node as Text;
-    textNodes.push({ node: textNode, globalStart: globalPos });
-    globalPos += textNode.textContent?.length || 0;
+    const textNode = node as Text
+    textNodes.push({ node: textNode, globalStart: globalPos })
+    globalPos += textNode.textContent?.length || 0
   }
 
   // 处理每个文本节点，创建高亮
   textNodes.forEach(({ node: textNode, globalStart }) => {
-    const text = textNode.textContent || '';
-    let match: RegExpExecArray | null;
-    let lastIndex = 0;
-    const fragments: (Text | HTMLElement)[] = [];
+    const text = textNode.textContent || ''
+    let match: RegExpExecArray | null
+    let lastIndex = 0
+    const fragments: (Text | HTMLElement)[] = []
 
     while ((match = regex.exec(text)) !== null) {
-      const start = match.index;
-      const end = match.index + match[0].length;
+      const start = match.index
+      const end = match.index + match[0].length
 
       if (start > lastIndex) {
-        fragments.push(document.createTextNode(text.slice(lastIndex, start)));
+        fragments.push(document.createTextNode(text.slice(lastIndex, start)))
       }
 
-      const span = document.createElement('span');
-      span.className = 'quick-search-highlight';
-      span.textContent = text.slice(start, end);
+      const span = document.createElement('span')
+      span.className = 'quick-search-highlight'
+      span.textContent = text.slice(start, end)
       // 保存全局位置到 data 属性，方便后续查找
-      const globalMatchStart = globalStart + start;
-      const globalMatchEnd = globalStart + end;
-      span.setAttribute('data-match-start', globalMatchStart.toString());
-      span.setAttribute('data-match-end', globalMatchEnd.toString());
-      fragments.push(span);
+      const globalMatchStart = globalStart + start
+      const globalMatchEnd = globalStart + end
+      span.setAttribute('data-match-start', globalMatchStart.toString())
+      span.setAttribute('data-match-end', globalMatchEnd.toString())
+      fragments.push(span)
 
-      lastIndex = end;
+      lastIndex = end
 
       if (match[0].length === 0) {
-        regex.lastIndex++;
+        regex.lastIndex++
       }
     }
 
     if (fragments.length > 0) {
       if (lastIndex < text.length) {
-        fragments.push(document.createTextNode(text.slice(lastIndex)));
+        fragments.push(document.createTextNode(text.slice(lastIndex)))
       }
 
-      const parent = textNode.parentNode;
-      if (!parent) return;
-      const df = document.createDocumentFragment();
-      fragments.forEach(f => df.appendChild(f));
-      parent.replaceChild(df, textNode);
+      const parent = textNode.parentNode
+      if (!parent) return
+      const df = document.createDocumentFragment()
+      fragments.forEach((f) => df.appendChild(f))
+      parent.replaceChild(df, textNode)
     }
-  });
-};
+  })
+}
 
 // 标记当前匹配项（不改变 selection，只改变样式）
 const setCurrentSearchMatch = (start: number, end: number) => {
-  const editorRoot = editorElement.value;
-  if (!editorRoot) return;
+  const editorRoot = editorElement.value
+  if (!editorRoot) return
 
   // 先清除之前的"当前匹配"标记
-  const allHighlights = editorRoot.querySelectorAll('.quick-search-highlight');
-  allHighlights.forEach(span => {
-    span.classList.remove('quick-search-highlight-current');
-  });
+  const allHighlights = editorRoot.querySelectorAll('.quick-search-highlight')
+  allHighlights.forEach((span) => {
+    span.classList.remove('quick-search-highlight-current')
+  })
 
-  if (start === end) return;
+  if (start === end) return
 
   // 通过 data 属性直接查找匹配的 span
-  let currentSpan: HTMLElement | null = null;
-  allHighlights.forEach(span => {
-    const matchStart = parseInt(span.getAttribute('data-match-start') || '-1');
-    const matchEnd = parseInt(span.getAttribute('data-match-end') || '-1');
+  let currentSpan: HTMLElement | null = null
+  allHighlights.forEach((span) => {
+    const matchStart = parseInt(span.getAttribute('data-match-start') || '-1')
+    const matchEnd = parseInt(span.getAttribute('data-match-end') || '-1')
 
     // 检查这个高亮是否覆盖了目标区间
     if (matchStart !== -1 && matchEnd !== -1 && matchStart <= start && matchEnd >= end) {
-      currentSpan = span as HTMLElement;
+      currentSpan = span as HTMLElement
     }
-  });
+  })
 
   if (currentSpan) {
-    currentSpan.classList.add('quick-search-highlight-current');
+    currentSpan.classList.add('quick-search-highlight-current')
 
     // 滚动到视图：editorRoot 就是滚动容器（markdown-editor-content）
     // 使用 nextTick 确保 DOM 更新完成后再滚动
     nextTick(() => {
-      if (!editorRoot) return;
+      if (!editorRoot) return
 
-      const spanRect = currentSpan.getBoundingClientRect();
-      const editorRect = editorRoot.getBoundingClientRect();
+      const spanRect = currentSpan.getBoundingClientRect()
+      const editorRect = editorRoot.getBoundingClientRect()
 
       // 计算 span 相对于编辑器容器的位置
-      const spanTopRelativeToEditor = spanRect.top - editorRect.top + editorRoot.scrollTop;
+      const spanTopRelativeToEditor = spanRect.top - editorRect.top + editorRoot.scrollTop
 
       // 计算目标滚动位置：让匹配项显示在容器中间
-      const targetScrollTop = spanTopRelativeToEditor - (editorRect.height / 2) + (spanRect.height / 2);
+      const targetScrollTop = spanTopRelativeToEditor - editorRect.height / 2 + spanRect.height / 2
 
       // 确保滚动位置在有效范围内
-      const maxScrollTop = editorRoot.scrollHeight - editorRoot.clientHeight;
-      const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
+      const maxScrollTop = editorRoot.scrollHeight - editorRoot.clientHeight
+      const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop))
 
-      editorRoot.scrollTo({ top: finalScrollTop, behavior: 'smooth' });
-    });
+      editorRoot.scrollTo({ top: finalScrollTop, behavior: 'smooth' })
+    })
   }
-};
+}
 
 // 处理编辑器点击（左键点击引用标志）
 const handleEditorClick = async (event: MouseEvent) => {
-  const editor = editorElement.value;
-  if (!editor) return;
+  const editor = editorElement.value
+  if (!editor) return
 
   // 获取点击位置的元素
-  const target = event.target as HTMLElement;
-  const referenceSpan = target.closest('.editor-reference') as HTMLElement;
+  const target = event.target as HTMLElement
+  const referenceSpan = target.closest('.editor-reference') as HTMLElement
 
   if (referenceSpan) {
-    event.preventDefault();
-    event.stopPropagation();
+    event.preventDefault()
+    event.stopPropagation()
 
-    const fragmentId = referenceSpan.getAttribute('data-fragment-id');
-    const mode = referenceSpan.getAttribute('data-mode') || 'linked';
-    const start = parseInt(referenceSpan.getAttribute('data-start') || '0');
-    const end = parseInt(referenceSpan.getAttribute('data-end') || '0');
+    const fragmentId = referenceSpan.getAttribute('data-fragment-id')
+    const mode = referenceSpan.getAttribute('data-mode') || 'linked'
+    const start = parseInt(referenceSpan.getAttribute('data-start') || '0')
+    const end = parseInt(referenceSpan.getAttribute('data-end') || '0')
 
     if (fragmentId) {
       referenceContextMenu.value = {
@@ -4613,413 +4875,443 @@ const handleEditorClick = async (event: MouseEvent) => {
         fragmentId,
         startIndex: start,
         endIndex: end,
-        currentMode: mode
-      };
+        currentMode: mode,
+      }
     }
   } else {
     // 点击其他地方，关闭菜单
-    referenceContextMenu.value.visible = false;
+    referenceContextMenu.value.visible = false
   }
-};
+}
 
 // 点击外部关闭菜单
-const contextMenuElement = ref<HTMLDivElement>();
-const textContextMenuElement = ref<HTMLDivElement>();
+const contextMenuElement = ref<HTMLDivElement>()
+const textContextMenuElement = ref<HTMLDivElement>()
 const handleClickOutside = (event: MouseEvent) => {
   if (referenceContextMenu.value.visible) {
-    const target = event.target as HTMLElement;
-    const menu = contextMenuElement.value;
-    const editor = editorElement.value;
+    const target = event.target as HTMLElement
+    const menu = contextMenuElement.value
+    const editor = editorElement.value
 
     // 如果点击的不是菜单本身，也不是编辑器内的引用，则关闭菜单
-    if (menu && !menu.contains(target) &&
-        (!editor || !editor.contains(target) || !target.closest('.editor-reference'))) {
-      referenceContextMenu.value.visible = false;
+    if (
+      menu &&
+      !menu.contains(target) &&
+      (!editor || !editor.contains(target) || !target.closest('.editor-reference'))
+    ) {
+      referenceContextMenu.value.visible = false
     }
   }
-  
+
   if (textContextMenu.value.visible) {
-    const target = event.target as HTMLElement;
-    const menu = textContextMenuElement.value;
+    const target = event.target as HTMLElement
+    const menu = textContextMenuElement.value
 
     // 如果点击的不是菜单本身，则关闭菜单
     if (menu && !menu.contains(target)) {
-      textContextMenu.value.visible = false;
+      textContextMenu.value.visible = false
     }
   }
-};
+}
 
 // 脱钩知识片段：将引用转换为完整的文档内容
 const switchReferenceMode = async (newMode: 'detached') => {
-  const menu = referenceContextMenu.value;
-  if (!menu.fragmentId) return;
+  const menu = referenceContextMenu.value
+  if (!menu.fragmentId) return
 
   // 检查是否是placeholder格式（不应该出现，但需要处理）
   if (menu.fragmentId.startsWith('placeholder:')) {
-    console.error('Invalid fragmentId format:', menu.fragmentId);
-    alert('无法脱钩：引用格式错误');
-    return;
+    console.error('Invalid fragmentId format:', menu.fragmentId)
+    alert('无法脱钩：引用格式错误')
+    return
   }
 
   try {
-    const { FragmentReferenceParser } = await import('../../domain/services/fragment-reference-parser.service');
-    const parser = new FragmentReferenceParser();
-    const references = parser.parseReferences(content.value);
+    const { FragmentReferenceParser } = await import(
+      '../../domain/services/fragment-reference-parser.service'
+    )
+    const parser = new FragmentReferenceParser()
+    const references = parser.parseReferences(content.value)
 
     // 查找匹配的引用：优先匹配fragmentId和位置，如果找不到则只匹配fragmentId
-    let ref = references.find(r => r.fragmentId === menu.fragmentId && r.startIndex === menu.startIndex);
+    let ref = references.find(
+      (r) => r.fragmentId === menu.fragmentId && r.startIndex === menu.startIndex,
+    )
 
     // 如果找不到精确匹配，尝试只匹配fragmentId（忽略placeholder格式）
     if (!ref) {
-      ref = references.find(r =>
-        r.fragmentId === menu.fragmentId &&
-        !r.fragmentId.startsWith('placeholder:') &&
-        Math.abs(r.startIndex - menu.startIndex) < 100 // 允许一定范围内的位置差异
-      );
+      ref = references.find(
+        (r) =>
+          r.fragmentId === menu.fragmentId &&
+          !r.fragmentId.startsWith('placeholder:') &&
+          Math.abs(r.startIndex - menu.startIndex) < 100, // 允许一定范围内的位置差异
+      )
     }
 
     // 如果还是找不到，尝试通过fragmentId查找（不匹配placeholder）
     if (!ref) {
-      ref = references.find(r =>
-        r.fragmentId === menu.fragmentId &&
-        !r.fragmentId.startsWith('placeholder:')
-      );
+      ref = references.find(
+        (r) => r.fragmentId === menu.fragmentId && !r.fragmentId.startsWith('placeholder:'),
+      )
     }
 
     if (!ref) {
       console.error('Reference not found:', {
         fragmentId: menu.fragmentId,
         startIndex: menu.startIndex,
-        allReferences: references.map(r => ({ id: r.fragmentId, start: r.startIndex }))
-      });
-      alert('无法找到对应的引用标记');
-      return;
+        allReferences: references.map((r) => ({ id: r.fragmentId, start: r.startIndex })),
+      })
+      alert('无法找到对应的引用标记')
+      return
     }
 
     // 脱钩模式：获取片段内容，直接替换引用标记为完整内容
-    const { Application } = await import('../../core/application');
-    const app = Application.getInstance();
-    await app.getApplicationService().initialize();
-    const fragmentUseCases = app.getKnowledgeFragmentUseCases();
-    const fragment = await fragmentUseCases.getFragment(ref.fragmentId);
+    const { Application } = await import('../../core/application')
+    const app = Application.getInstance()
+    await app.getApplicationService().initialize()
+    const fragmentUseCases = app.getKnowledgeFragmentUseCases()
+    const fragment = await fragmentUseCases.getFragment(ref.fragmentId)
 
     if (!fragment) {
-      alert('无法获取片段内容');
-      return;
+      alert('无法获取片段内容')
+      return
     }
 
     // 获取片段内容（Markdown格式）
-    let fragmentContent = fragment.markdown;
+    let fragmentContent = fragment.markdown
 
     // 如果是外部文件，需要处理图片路径
     if (currentFilePath.value) {
       try {
-        const { FragmentReferenceResolver } = await import('../../domain/services/fragment-reference-resolver.service');
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
+        const { FragmentReferenceResolver } = await import(
+          '../../domain/services/fragment-reference-resolver.service'
+        )
+        const { InversifyContainer } = await import('../../core/container/inversify.container')
+        const container = InversifyContainer.getInstance()
 
-        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
-          const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
+        if (
+          container &&
+          typeof container.isBound === 'function' &&
+          container.isBound(TYPES.FragmentReferenceResolver)
+        ) {
+          const resolver = container.get<any>(TYPES.FragmentReferenceResolver)
           // 使用文件路径作为documentId
-          fragmentContent = await resolver.resolveReference(ref.fragmentId, `file:${currentFilePath.value}`);
+          fragmentContent = await resolver.resolveReference(
+            ref.fragmentId,
+            `file:${currentFilePath.value}`,
+          )
         }
       } catch (error) {
-        console.warn('Error resolving fragment content for file:', error);
+        console.warn('Error resolving fragment content for file:', error)
       }
     } else if (props.document) {
       try {
-        const { FragmentReferenceResolver } = await import('../../domain/services/fragment-reference-resolver.service');
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
+        const { FragmentReferenceResolver } = await import(
+          '../../domain/services/fragment-reference-resolver.service'
+        )
+        const { InversifyContainer } = await import('../../core/container/inversify.container')
+        const container = InversifyContainer.getInstance()
 
-        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceResolver)) {
-          const resolver = container.get<any>(TYPES.FragmentReferenceResolver);
-          fragmentContent = await resolver.resolveReference(ref.fragmentId, props.document.id);
+        if (
+          container &&
+          typeof container.isBound === 'function' &&
+          container.isBound(TYPES.FragmentReferenceResolver)
+        ) {
+          const resolver = container.get<any>(TYPES.FragmentReferenceResolver)
+          fragmentContent = await resolver.resolveReference(ref.fragmentId, props.document.id)
         }
       } catch (error) {
-        console.warn('Error resolving fragment content for document:', error);
+        console.warn('Error resolving fragment content for document:', error)
       }
     }
 
     // 直接替换引用标记为完整内容（不保留任何标记）
-    const before = content.value.substring(0, ref.startIndex);
-    const after = content.value.substring(ref.endIndex);
+    const before = content.value.substring(0, ref.startIndex)
+    const after = content.value.substring(ref.endIndex)
     // 在内容前后添加换行，保持格式
-    const newContent = before + '\n\n' + fragmentContent + '\n\n' + after;
-    content.value = newContent;
+    const newContent = before + '\n\n' + fragmentContent + '\n\n' + after
+    content.value = newContent
 
     // 更新 mainContent（从完整内容中分离）
-    const { mainContent: newMainContent } = splitContent(content.value);
-    mainContent.value = newMainContent;
+    const { mainContent: newMainContent } = splitContent(content.value)
+    mainContent.value = newMainContent
 
     // 取消注册引用关系（因为已经完全脱钩）
     if (currentFilePath.value) {
       try {
-        const electronAPI = (window as any).electronAPI;
+        const electronAPI = (window as any).electronAPI
         if (electronAPI && electronAPI.file && electronAPI.file.getFileCache) {
-          const cache = await electronAPI.file.getFileCache(currentFilePath.value) || { references: [] };
+          const cache = (await electronAPI.file.getFileCache(currentFilePath.value)) || {
+            references: [],
+          }
           // 移除对应的引用
-          cache.references = (cache.references || []).filter((r: any) => r.fragmentId !== ref.fragmentId);
+          cache.references = (cache.references || []).filter(
+            (r: any) => r.fragmentId !== ref.fragmentId,
+          )
           if (electronAPI.file.saveFileCache) {
-            await electronAPI.file.saveFileCache(currentFilePath.value, cache);
+            await electronAPI.file.saveFileCache(currentFilePath.value, cache)
           }
         }
       } catch (error) {
-        console.warn('Error removing file cache reference:', error);
+        console.warn('Error removing file cache reference:', error)
       }
     }
 
     if (props.document) {
       try {
-        const { InversifyContainer } = await import('../../core/container/inversify.container');
-        const container = InversifyContainer.getInstance();
+        const { InversifyContainer } = await import('../../core/container/inversify.container')
+        const container = InversifyContainer.getInstance()
 
-        if (container && typeof container.isBound === 'function' && container.isBound(TYPES.FragmentReferenceRegistrationService)) {
-          const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService);
+        if (
+          container &&
+          typeof container.isBound === 'function' &&
+          container.isBound(TYPES.FragmentReferenceRegistrationService)
+        ) {
+          const registrationService = container.get<any>(TYPES.FragmentReferenceRegistrationService)
           // 取消注册引用关系
-          await registrationService.unregisterReference(props.document.id, ref.fragmentId);
+          await registrationService.unregisterReference(props.document.id, ref.fragmentId)
         }
       } catch (error) {
-        console.warn('Error unregistering fragment reference:', error);
+        console.warn('Error unregistering fragment reference:', error)
       }
     }
 
-    referenceContextMenu.value.visible = false;
+    referenceContextMenu.value.visible = false
 
     // 先根据最新 mainContent 重建编辑器 DOM（含其它仍存在的引用的 data-fragment-id），再 checkChanges；
     // 切勿用 textContent 整段覆盖，否则会丢失引用 span，getTextContent 无法还原 {{ref:...}}，导致预览与其它引用错位。
-    await nextTick();
-    await applyEditorAnnotations();
-    console.log('[MarkdownEditor] 脱钩完成，已重新应用引用标注');
+    await nextTick()
+    await applyEditorAnnotations()
+    console.log('[MarkdownEditor] 脱钩完成，已重新应用引用标注')
 
-    checkChanges();
-    await renderContent();
+    checkChanges()
+    await renderContent()
 
-    console.log('[MarkdownEditor] 知识片段已脱钩，内容已转换为文档内容');
+    console.log('[MarkdownEditor] 知识片段已脱钩，内容已转换为文档内容')
   } catch (error) {
-    console.error('Error detaching fragment:', error);
-    alert('脱钩失败：' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('Error detaching fragment:', error)
+    alert('脱钩失败：' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 // 处理右键菜单
 const handleContextMenu = (event: MouseEvent) => {
-  event.preventDefault();
-  
-  const selection = window.getSelection();
+  event.preventDefault()
+
+  const selection = window.getSelection()
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-    return;
+    return
   }
-  
-  const selectedText = selection.toString().trim();
+
+  const selectedText = selection.toString().trim()
   if (!selectedText) {
-    return;
+    return
   }
-  
+
   // 保存选区
-  const range = selection.getRangeAt(0);
-  
+  const range = selection.getRangeAt(0)
+
   textContextMenu.value = {
     visible: true,
     x: event.clientX,
     y: event.clientY,
-    savedRange: range.cloneRange()
-  };
-};
+    savedRange: range.cloneRange(),
+  }
+}
 
 // 应用文本格式化
 const applyTextFormat = (formatType: 'bold' | 'italic' | 'strikethrough') => {
-  console.log('[右键菜单] applyTextFormat 被调用:', formatType);
-  textContextMenu.value.visible = false;
-  
-  const editor = editorElement.value;
+  console.log('[右键菜单] applyTextFormat 被调用:', formatType)
+  textContextMenu.value.visible = false
+
+  const editor = editorElement.value
   if (!editor) {
-    console.error('[右键菜单] 编辑器元素不存在');
-    return;
+    console.error('[右键菜单] 编辑器元素不存在')
+    return
   }
-  
+
   // 恢复选区
-  const savedRange = textContextMenu.value.savedRange;
+  const savedRange = textContextMenu.value.savedRange
   if (!savedRange) {
-    console.error('[右键菜单] 保存的选区不存在');
-    return;
+    console.error('[右键菜单] 保存的选区不存在')
+    return
   }
-  
-  console.log('[右键菜单] 恢复选区:', savedRange);
-  editor.focus();
-  const selection = window.getSelection();
+
+  console.log('[右键菜单] 恢复选区:', savedRange)
+  editor.focus()
+  const selection = window.getSelection()
   if (!selection) {
-    console.error('[右键菜单] 无法获取选区');
-    return;
+    console.error('[右键菜单] 无法获取选区')
+    return
   }
-  
-  selection.removeAllRanges();
-  selection.addRange(savedRange);
-  
-  const selectedText = selection.toString();
-  console.log('[右键菜单] 选中文本:', selectedText);
+
+  selection.removeAllRanges()
+  selection.addRange(savedRange)
+
+  const selectedText = selection.toString()
+  console.log('[右键菜单] 选中文本:', selectedText)
   if (!selectedText) {
-    console.warn('[右键菜单] 选中文本为空');
-    return;
+    console.warn('[右键菜单] 选中文本为空')
+    return
   }
-  
-  let formattedText = '';
+
+  let formattedText = ''
   switch (formatType) {
     case 'bold':
-      formattedText = `**${selectedText}**`;
-      break;
+      formattedText = `**${selectedText}**`
+      break
     case 'italic':
-      formattedText = `*${selectedText}*`;
-      break;
+      formattedText = `*${selectedText}*`
+      break
     case 'strikethrough':
-      formattedText = `~~${selectedText}~~`;
-      break;
+      formattedText = `~~${selectedText}~~`
+      break
   }
-  
-  console.log('[右键菜单] 格式化后的文本:', formattedText);
-  
+
+  console.log('[右键菜单] 格式化后的文本:', formattedText)
+
   // 使用 execCommand 插入文本
-  const success = document.execCommand('insertText', false, formattedText);
-  console.log('[右键菜单] insertText 执行结果:', success);
-  
+  const success = document.execCommand('insertText', false, formattedText)
+  console.log('[右键菜单] insertText 执行结果:', success)
+
   // 手动触发内容更新
   nextTick(() => {
-    const newContent = editor.textContent || '';
-    console.log('[右键菜单] 编辑器新内容:', newContent);
-    mainContent.value = newContent;
-    content.value = mergeContent(frontmatter.value, mainContent.value);
-    renderContent();
-    checkChanges();
-    debouncedSave();
-  });
-};
+    const newContent = editor.textContent || ''
+    console.log('[右键菜单] 编辑器新内容:', newContent)
+    mainContent.value = newContent
+    content.value = mergeContent(frontmatter.value, mainContent.value)
+    renderContent()
+    checkChanges()
+    debouncedSave()
+  })
+}
 
 // 添加选中文本为知识片段
 const addSelectionAsFragment = async () => {
-  console.log('[右键菜单] addSelectionAsFragment 被调用');
-  textContextMenu.value.visible = false;
-  
-  const editor = editorElement.value;
+  console.log('[右键菜单] addSelectionAsFragment 被调用')
+  textContextMenu.value.visible = false
+
+  const editor = editorElement.value
   if (!editor) {
-    console.error('[右键菜单] 编辑器元素不存在');
-    return;
+    console.error('[右键菜单] 编辑器元素不存在')
+    return
   }
-  
+
   // 恢复选区
-  const savedRange = textContextMenu.value.savedRange;
+  const savedRange = textContextMenu.value.savedRange
   if (!savedRange) {
-    console.error('[右键菜单] 保存的选区不存在');
-    return;
+    console.error('[右键菜单] 保存的选区不存在')
+    return
   }
-  
-  editor.focus();
-  const selection = window.getSelection();
+
+  editor.focus()
+  const selection = window.getSelection()
   if (!selection) {
-    console.error('[右键菜单] 无法获取选区');
-    return;
+    console.error('[右键菜单] 无法获取选区')
+    return
   }
-  
-  selection.removeAllRanges();
-  selection.addRange(savedRange);
-  
-  const selectedText = selection.toString().trim();
-  console.log('[右键菜单] 选中文本:', selectedText);
+
+  selection.removeAllRanges()
+  selection.addRange(savedRange)
+
+  const selectedText = selection.toString().trim()
+  console.log('[右键菜单] 选中文本:', selectedText)
   if (!selectedText) {
-    console.warn('[右键菜单] 选中文本为空');
-    return;
+    console.warn('[右键菜单] 选中文本为空')
+    return
   }
-  
+
   try {
-    const { InversifyContainer } = await import('../../core/container/inversify.container');
-    const container = InversifyContainer.getInstance();
-    
-    const fragmentUseCase = container.get<any>(TYPES.KnowledgeFragmentUseCases);
-    
-    const nodes = parseMarkdownToNodes(selectedText);
-    const title = selectedText.substring(0, 30) + (selectedText.length > 30 ? '...' : '');
-    
-    const documentContext = getDocumentContext();
-    const stableSourceDocumentId = documentContext.filePath || documentContext.documentId;
+    const { InversifyContainer } = await import('../../core/container/inversify.container')
+    const container = InversifyContainer.getInstance()
+
+    const fragmentUseCase = container.get<any>(TYPES.KnowledgeFragmentUseCases)
+
+    const nodes = parseMarkdownToNodes(selectedText)
+    const title = selectedText.substring(0, 30) + (selectedText.length > 30 ? '...' : '')
+
+    const documentContext = getDocumentContext()
+    const stableSourceDocumentId = documentContext.filePath || documentContext.documentId
     const fragment = await fragmentUseCase.createFragment({
       title,
-      nodes: nodes.map(n => n.toJSON ? n.toJSON() : n),
+      nodes: nodes.map((n) => (n.toJSON ? n.toJSON() : n)),
       tags: [],
       sourceDocumentId: stableSourceDocumentId,
-      sourceFilePath: documentContext.filePath
-    });
-    
-    const refMarker = `{{ref:${fragment.id}:linked}}`;
-    console.log('[右键菜单] 插入引用标记:', refMarker);
-    document.execCommand('insertText', false, refMarker);
-    
-    console.log('[右键菜单] 知识片段创建成功:', fragment);
-    
+      sourceFilePath: documentContext.filePath,
+    })
+
+    const refMarker = `{{ref:${fragment.id}:linked}}`
+    console.log('[右键菜单] 插入引用标记:', refMarker)
+    document.execCommand('insertText', false, refMarker)
+
+    console.log('[右键菜单] 知识片段创建成功:', fragment)
+
     // 手动触发内容更新
     nextTick(async () => {
-      const newContent = editor.textContent || '';
-      console.log('[右键菜单] 编辑器新内容:', newContent);
-      mainContent.value = newContent;
-      content.value = mergeContent(frontmatter.value, mainContent.value);
-      
+      const newContent = editor.textContent || ''
+      console.log('[右键菜单] 编辑器新内容:', newContent)
+      mainContent.value = newContent
+      content.value = mergeContent(frontmatter.value, mainContent.value)
+
       // 应用编辑器标注以正确渲染知识片段
-      await applyEditorAnnotations();
-      
-      renderContent();
-      checkChanges();
-      debouncedSave();
-    });
+      await applyEditorAnnotations()
+
+      renderContent()
+      checkChanges()
+      debouncedSave()
+    })
   } catch (error) {
-    console.error('[右键菜单] 创建知识片段失败:', error);
-    alert('创建知识片段失败：' + (error instanceof Error ? error.message : '未知错误'));
+    console.error('[右键菜单] 创建知识片段失败:', error)
+    alert('创建知识片段失败：' + (error instanceof Error ? error.message : '未知错误'))
   }
-};
+}
 
 // 简单的Markdown解析为AST节点（简化版）
 const parseMarkdownToNodes = (markdown: string): any[] => {
-  const nodes: any[] = [];
-  const lines = markdown.split('\n');
+  const nodes: any[] = []
+  const lines = markdown.split('\n')
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i]
 
     // 标题
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
     if (headingMatch) {
       nodes.push({
         type: NodeType.HEADING,
         level: headingMatch[1].length,
-        text: headingMatch[2]
-      });
-      continue;
+        text: headingMatch[2],
+      })
+      continue
     }
 
     // 代码块
     if (line.startsWith('```')) {
-      const language = line.substring(3).trim();
-      const codeLines: string[] = [];
-      i++;
+      const language = line.substring(3).trim()
+      const codeLines: string[] = []
+      i++
       while (i < lines.length && !lines[i].startsWith('```')) {
-        codeLines.push(lines[i]);
-        i++;
+        codeLines.push(lines[i])
+        i++
       }
       nodes.push({
         type: NodeType.CODE_BLOCK,
         content: codeLines.join('\n'),
-        language
-      });
-      continue;
+        language,
+      })
+      continue
     }
 
     // 图片
-    const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+    const imageMatch = line.match(/!\[([^\]]*)\]\(([^)]+)\)/)
     if (imageMatch) {
-      const imageSrc = imageMatch[2];
+      const imageSrc = imageMatch[2]
       nodes.push({
         type: NodeType.IMAGE,
         src: imageSrc,
-        alt: imageMatch[1]
-      });
-      continue;
+        alt: imageMatch[1],
+      })
+      continue
     }
 
     // 普通文本
@@ -5027,14 +5319,13 @@ const parseMarkdownToNodes = (markdown: string): any[] => {
       nodes.push({
         type: NodeType.TEXT,
         content: line,
-        marks: []
-      });
+        marks: [],
+      })
     }
   }
 
-  return nodes;
-};
-
+  return nodes
+}
 
 // handleEditorClick已移除，现在使用右键菜单处理引用交互
 
@@ -5042,63 +5333,63 @@ const parseMarkdownToNodes = (markdown: string): any[] => {
 const getDocumentContext = () => {
   if (props.document) {
     // 检查文档对象是否包含 filePath（外部文件）
-    const filePath = (props.document as any).filePath || currentFilePath.value;
-    return { documentId: props.document.id, filePath };
+    const filePath = (props.document as any).filePath || currentFilePath.value
+    return { documentId: props.document.id, filePath }
   } else if (currentFilePath.value) {
-    return { documentId: undefined, filePath: currentFilePath.value };
+    return { documentId: undefined, filePath: currentFilePath.value }
   }
-  return { documentId: undefined, filePath: undefined };
-};
+  return { documentId: undefined, filePath: undefined }
+}
 
 // 使用 Selection API 执行替换操作，支持撤销
 const replaceTextWithUndo = (start: number, end: number, replacement: string) => {
-  const editor = editorElement.value;
-  if (!editor) return false;
+  const editor = editorElement.value
+  if (!editor) return false
 
   // 确保编辑器获得焦点（撤销历史需要焦点）
-  editor.focus();
+  editor.focus()
 
   // 设置选择范围
-  const range = document.createRange();
-  const selection = window.getSelection();
-  if (!selection) return false;
+  const range = document.createRange()
+  const selection = window.getSelection()
+  if (!selection) return false
 
-  let currentPosition = 0;
-  let foundStart = false;
-  let foundEnd = false;
+  let currentPosition = 0
+  let foundStart = false
+  let foundEnd = false
 
   const traverseNodes = (node: Node) => {
-    if (foundEnd) return;
+    if (foundEnd) return
 
     if (node.nodeType === Node.TEXT_NODE) {
-      const textLength = node.textContent?.length || 0;
+      const textLength = node.textContent?.length || 0
 
       if (!foundStart && currentPosition + textLength >= start) {
-        range.setStart(node, start - currentPosition);
-        foundStart = true;
+        range.setStart(node, start - currentPosition)
+        foundStart = true
       }
 
       if (foundStart && currentPosition + textLength >= end) {
-        range.setEnd(node, end - currentPosition);
-        foundEnd = true;
+        range.setEnd(node, end - currentPosition)
+        foundEnd = true
       }
 
-      currentPosition += textLength;
+      currentPosition += textLength
     } else {
       for (const child of Array.from(node.childNodes)) {
-        traverseNodes(child);
-        if (foundEnd) break;
+        traverseNodes(child)
+        if (foundEnd) break
       }
     }
-  };
+  }
 
-  traverseNodes(editor);
+  traverseNodes(editor)
 
-  if (!foundStart || !foundEnd) return false;
+  if (!foundStart || !foundEnd) return false
 
   // 设置选择
-  selection.removeAllRanges();
-  selection.addRange(range);
+  selection.removeAllRanges()
+  selection.addRange(range)
 
   // 使用 document.execCommand('insertText') 来插入文本，这会自动加入到撤销历史
   // 但需要先删除选中的内容
@@ -5106,32 +5397,32 @@ const replaceTextWithUndo = (start: number, end: number, replacement: string) =>
     // 删除成功后，使用 insertText 插入新文本（支持撤销）
     if (document.execCommand('insertText', false, replacement)) {
       // 触发 input 事件，确保内容同步
-      const inputEvent = new Event('input', { bubbles: true });
-      editor.dispatchEvent(inputEvent);
-      return true;
+      const inputEvent = new Event('input', { bubbles: true })
+      editor.dispatchEvent(inputEvent)
+      return true
     }
   }
 
   // 如果 execCommand 不可用，使用 Range API 手动操作（但可能不支持撤销）
   // 作为后备方案
   try {
-    range.deleteContents();
-    const textNode = document.createTextNode(replacement);
-    range.insertNode(textNode);
-    range.setStartAfter(textNode);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    range.deleteContents()
+    const textNode = document.createTextNode(replacement)
+    range.insertNode(textNode)
+    range.setStartAfter(textNode)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
 
     // 触发 input 事件
-    const inputEvent = new Event('input', { bubbles: true });
-    editor.dispatchEvent(inputEvent);
-    return true;
+    const inputEvent = new Event('input', { bubbles: true })
+    editor.dispatchEvent(inputEvent)
+    return true
   } catch (e) {
-    console.error('替换操作失败:', e);
-    return false;
+    console.error('替换操作失败:', e)
+    return false
   }
-};
+}
 
 defineExpose({
   handleInsertFragment,
@@ -5144,8 +5435,8 @@ defineExpose({
   setSearchHighlights,
   setCurrentSearchMatch,
   replaceTextWithUndo,
-  getDocumentContext
-});
+  getDocumentContext,
+})
 </script>
 
 <style scoped>
@@ -5481,8 +5772,14 @@ defineExpose({
   width: 14px;
   height: 14px;
   pointer-events: none;
-  background:
-    linear-gradient(135deg, transparent 0 38%, var(--border-primary) 38% 48%, transparent 48% 62%, var(--border-primary) 62% 72%, transparent 72%);
+  background: linear-gradient(
+    135deg,
+    transparent 0 38%,
+    var(--border-primary) 38% 48%,
+    transparent 48% 62%,
+    var(--border-primary) 62% 72%,
+    transparent 72%
+  );
 }
 .knowledge-graph-header {
   display: flex;
@@ -5837,9 +6134,15 @@ defineExpose({
   color: var(--text-primary);
 }
 
-.markdown-preview :deep(h1) { font-size: 2em; }
-.markdown-preview :deep(h2) { font-size: 1.5em; }
-.markdown-preview :deep(h3) { font-size: 1.25em; }
+.markdown-preview :deep(h1) {
+  font-size: 2em;
+}
+.markdown-preview :deep(h2) {
+  font-size: 1.5em;
+}
+.markdown-preview :deep(h3) {
+  font-size: 1.25em;
+}
 
 .markdown-preview :deep(p) {
   margin-bottom: 16px;
@@ -6048,4 +6351,3 @@ defineExpose({
   margin: 4px 0;
 }
 </style>
-
