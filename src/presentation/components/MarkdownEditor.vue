@@ -338,7 +338,10 @@
             </div>
             <div v-else>
               <div class="knowledge-graph-list-group">
-                <div class="knowledge-graph-list-group-title">未保存（各 1 槽）</div>
+                <div class="knowledge-graph-list-group-title">临时未保存</div>
+                <p class="knowledge-graph-list-group-desc">
+                  标题 / AI 各 1 槽，仅约束未入库的会话图谱；下方「已保存」可多份，不占此槽位。
+                </p>
                 <div
                   v-for="slot in knowledgeGraphTempSlots"
                   :key="slot.kind"
@@ -410,7 +413,12 @@
               （样例展示，实际数据将由 RAG 等方式提取）
             </div>
             <div
-              v-else-if="isKnowledgeGraphRendering && knowledgeGraphMode === 'ai' && !isSampleMode"
+              v-else-if="
+                showAiKnowledgeGraphBuildProgressInPane &&
+                  isAiKnowledgeGraphRendering &&
+                  knowledgeGraphMode === 'ai' &&
+                  !isSampleMode
+              "
               class="knowledge-graph-ai-building"
             >
               <p class="knowledge-graph-ai-building-title">正在生成 AI 知识图谱</p>
@@ -424,8 +432,17 @@
                 <div class="kg-progress-fill" :style="{ width: `${aiGraphBuildProgress}%` }" />
               </div>
               <p class="kg-progress-hint">{{ aiGraphBuildLabel || '请稍候…' }}</p>
+              <button
+                v-if="activeDocumentId"
+                type="button"
+                class="kg-ai-cancel-build-btn"
+                title="停止本次生成（当前片段的模型调用仍会跑完）"
+                @click="cancelAiKnowledgeGraphBuild"
+              >
+                中止生成
+              </button>
             </div>
-            <div v-else-if="isKnowledgeGraphRendering" class="knowledge-graph-loading">
+            <div v-else-if="isHeadingKnowledgeGraphRendering && !isSampleMode" class="knowledge-graph-loading">
               正在生成图谱…
             </div>
             <div v-else-if="knowledgeGraphError" class="knowledge-graph-error">
@@ -455,10 +472,16 @@
                     : '请先打开或关联一篇文档，再生成 AI 知识图谱。'
                 }}
               </p>
+              <p
+                v-if="isAiKnowledgeGraphRendering && !showAiKnowledgeGraphBuildProgressInPane"
+                class="kg-ai-build-background-hint"
+              >
+                生成中… 点击左侧「AI 知识图谱」空槽可查看进度或中止
+              </p>
               <button
                 type="button"
                 class="kg-ai-generate-primary-btn"
-                :disabled="!activeDocumentId || isKnowledgeGraphRendering"
+                :disabled="!activeDocumentId || isAiKnowledgeGraphRendering"
                 title="生成或更新当前文档的 AI 知识图谱"
                 @click="buildAiKnowledgeGraph"
               >
@@ -611,7 +634,12 @@ const currentFormulaType = ref<'inline' | 'block'>('inline')
 const showKnowledgeGraphModal = ref(false)
 const knowledgeGraphData = ref<KnowledgeGraph | null>(null)
 const knowledgeGraphError = ref('')
-const isKnowledgeGraphRendering = ref(false)
+/** 标题图谱生成中（仅标题流式 UI） */
+const isHeadingKnowledgeGraphRendering = ref(false)
+/** AI 图谱正在构建或后台轮询恢复中 */
+const isAiKnowledgeGraphRendering = ref(false)
+/** 仅在点击左侧 AI 空槽（或在该槽界面点击生成）时，主区域展示 AI 进度条 */
+const showAiKnowledgeGraphBuildProgressInPane = ref(false)
 /** AI 构建进度 0–100，仅在为 AI 生成时更新 */
 const aiGraphBuildProgress = ref(0)
 const aiGraphBuildLabel = ref('')
@@ -622,6 +650,15 @@ const knowledgeGraphService = new FileSystemKnowledgeGraphService()
 const aiDocumentGraphService = Application.getInstance()
   .getApplicationService()
   .getAiDocumentGraphService()
+
+/** 离开页面后恢复「正在生成」：与 metadata 中 building 状态配合，轮询结束后清理 */
+let aiGraphPollToken = 0
+let aiGraphResumePromise: Promise<void> | null = null
+
+function abortAiGraphResumePolling() {
+  aiGraphPollToken += 1
+}
+
 const knowledgeGraphWindowRef = ref<HTMLDivElement | null>(null)
 const knowledgeGraphViewRef = ref<InstanceType<typeof KnowledgeGraphView> | null>(null)
 const knowledgeGraphWindowPosition = ref({ x: 80, y: 64 })
@@ -708,7 +745,7 @@ const unsavedGraphEntries = computed<KnowledgeGraphEntry[]>(() => {
   return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 })
 
-/** 侧栏「未保存」固定两个槽位：标题临时 / AI 临时，每槽至多 1 份（与 headingTempGraphByDoc / aiTempGraphByDoc 一致） */
+/** 侧栏「临时未保存」：仅 headingTempGraphByDoc / aiTempGraphByDoc，每文档各类型至多 1 份；已保存图谱在 savedGraphEntries，不占此槽 */
 const knowledgeGraphTempSlots = computed(() => {
   const scopeId = getKnowledgeGraphScopeId()
   return [
@@ -2319,6 +2356,7 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', stopKnowledgeGraphWindowDrag)
   window.removeEventListener('resize', ensureKnowledgeGraphWindowInViewport)
   stopKnowledgeGraphWindowDrag()
+  abortAiGraphResumePolling()
   void flushKnowledgeGraphToDisk()
 
   // 组件卸载前，如果有未保存的更改，强制保存
@@ -3255,6 +3293,7 @@ async function setActiveKnowledgeGraph(entry: KnowledgeGraphEntry | null): Promi
   knowledgeGraphData.value = entry.graph
   selectedKnowledgeGraphEntryKey.value = entry.entryKey
   knowledgeGraphMode.value = entry.graphType === 'ai' ? 'ai' : 'markdown'
+  showAiKnowledgeGraphBuildProgressInPane.value = false
   isSampleMode.value = false
   knowledgeGraphError.value = ''
   activeKnowledgeGraphLoadKey.value = `${getKnowledgeGraphScopeId()}#${entry.entryKey}#${Date.now()}`
@@ -3323,12 +3362,13 @@ watch(
   () => activeDocumentId.value,
   async (newId, oldId) => {
     if (oldId === undefined || newId === oldId) return
+    abortAiGraphResumePolling()
     const oldEntryKey = selectedKnowledgeGraphEntryKey.value
     await flushKnowledgeGraphToDisk(oldId, oldEntryKey)
   },
 )
 
-/** 每文档、每类型至多 1 份：写入即覆盖对应槽（标题 / AI 各一条） */
+/** 每文档、每类型至多 1 份临时未保存图：写入即覆盖对应槽（标题 / AI 各一条）；已保存文件不在此结构中 */
 function upsertTempGraph(
   graphType: KnowledgeGraphEntryType,
   graph: KnowledgeGraph,
@@ -3349,8 +3389,82 @@ function upsertTempGraph(
   return { ...base, source: 'temp' }
 }
 
+/**
+ * 元数据仍为 building 时（例如切换主界面导致编辑器卸载、但后台任务仍在跑），恢复「正在生成」并轮询至完成。
+ * 与本机正在执行的 buildAiKnowledgeGraph 互斥：后者已把 isAiKnowledgeGraphRendering 置为 true 时不再重复轮询。
+ */
+async function resumeAiKnowledgeGraphBuildIfNeeded(): Promise<void> {
+  const docId = activeDocumentId.value;
+  if (!docId) return;
+  const initial = await aiDocumentGraphService.getDocumentGraphState(docId);
+  if (initial.status !== 'building') return;
+  if (isAiKnowledgeGraphRendering.value) return;
+
+  if (aiGraphResumePromise) {
+    return aiGraphResumePromise;
+  }
+
+  aiGraphResumePromise = (async () => {
+    const pollToken = ++aiGraphPollToken;
+    const lockedDocId = docId;
+    isAiKnowledgeGraphRendering.value = true;
+    knowledgeGraphError.value = '';
+    aiGraphBuildProgress.value = 0;
+    aiGraphBuildLabel.value = '后台正在生成，请稍候…';
+
+    try {
+      while (true) {
+        if (pollToken !== aiGraphPollToken) return;
+        if (activeDocumentId.value !== lockedDocId) return;
+
+        const state = await aiDocumentGraphService.getDocumentGraphState(lockedDocId);
+        if (state.status !== 'building') {
+          if (activeDocumentId.value !== lockedDocId) return;
+          if (state.status === 'failed') {
+            const msg = state.errorMessage || '生成 AI 知识图谱失败';
+            knowledgeGraphError.value = msg === '已中止生成' ? '' : msg;
+          } else if (state.status === 'ready' || state.status === 'ready_empty') {
+            const graph = await aiDocumentGraphService.getDocumentKnowledgeGraph(lockedDocId);
+            if (graph && activeDocumentId.value === lockedDocId) {
+              const converted = convertAiGraphToKnowledgeGraph(graph);
+              const entry = upsertTempGraph('ai', converted, 'AI 图谱 (临时)');
+              await setActiveKnowledgeGraph(entry);
+            }
+          }
+          return;
+        }
+        await new Promise(r => setTimeout(r, 800));
+      }
+    } finally {
+      aiGraphResumePromise = null;
+      isAiKnowledgeGraphRendering.value = false;
+      aiGraphBuildProgress.value = 0;
+      aiGraphBuildLabel.value = '';
+      showAiKnowledgeGraphBuildProgressInPane.value = false;
+    }
+  })();
+
+  return aiGraphResumePromise;
+}
+
+function isAiGraphAbortError(e: unknown): boolean {
+  if (typeof DOMException !== 'undefined' && e instanceof DOMException && e.name === 'AbortError') {
+    return true;
+  }
+  return e instanceof Error && e.name === 'AbortError';
+}
+
+/** 请求中止当前文档的 AI 图谱构建，并结束「后台恢复」轮询 */
+function cancelAiKnowledgeGraphBuild() {
+  const docId = activeDocumentId.value;
+  if (!docId) return;
+  aiDocumentGraphService.requestCancelDocumentGraphBuild(docId);
+  abortAiGraphResumePolling();
+  showAiKnowledgeGraphBuildProgressInPane.value = false;
+}
+
 const generateHeadingKnowledgeGraph = async () => {
-  isKnowledgeGraphRendering.value = true
+  isHeadingKnowledgeGraphRendering.value = true
   knowledgeGraphError.value = ''
   try {
     const fullContent = getContent()
@@ -3373,7 +3487,7 @@ const generateHeadingKnowledgeGraph = async () => {
     knowledgeGraphData.value = null
     knowledgeGraphError.value = e instanceof Error ? e.message : '生成标题图谱失败'
   } finally {
-    isKnowledgeGraphRendering.value = false
+    isHeadingKnowledgeGraphRendering.value = false
   }
 }
 
@@ -3382,7 +3496,15 @@ async function onClickKnowledgeGraphModeTab(mode: 'markdown' | 'ai') {
   if (isSampleMode.value) {
     isSampleMode.value = false
   }
-  await switchKnowledgeGraphMode(mode)
+  await switchKnowledgeGraphMode(mode, { showAiBuildProgress: false })
+}
+
+/** 侧栏「标题」空槽：始终按当前正文生成新的临时标题图；不因已有已保存标题图而去打开文件（与顶栏「标题图谱」标签逻辑区分） */
+async function openEmptyHeadingTempSlotFromSidebar() {
+  showAiKnowledgeGraphBuildProgressInPane.value = false
+  knowledgeGraphMode.value = 'markdown'
+  knowledgeGraphError.value = ''
+  await generateHeadingKnowledgeGraph()
 }
 
 /** 点击侧栏固定槽位：有则打开对应临时图，无则切模式并触发生成/空状态 */
@@ -3397,7 +3519,7 @@ async function onKnowledgeGraphTempSlotClick(kind: 'heading' | 'ai') {
       await selectKnowledgeGraphEntry(e.entryKey)
       return
     }
-    await onClickKnowledgeGraphModeTab('markdown')
+    await openEmptyHeadingTempSlotFromSidebar()
     return
   }
   const ai = aiTempGraphByDoc.value[scopeId]
@@ -3405,10 +3527,11 @@ async function onKnowledgeGraphTempSlotClick(kind: 'heading' | 'ai') {
     await selectKnowledgeGraphEntry(ai.entryKey)
     return
   }
-  await onClickKnowledgeGraphModeTab('ai')
+  await switchKnowledgeGraphMode('ai', { showAiBuildProgress: true })
 }
 
-async function switchKnowledgeGraphMode(mode: 'markdown' | 'ai') {
+async function switchKnowledgeGraphMode(mode: 'markdown' | 'ai', opts?: { showAiBuildProgress?: boolean }) {
+  const showAiBuildProgress = opts?.showAiBuildProgress === true
   isSampleMode.value = false
   const scopeId = getKnowledgeGraphScopeId()
   const target =
@@ -3419,6 +3542,8 @@ async function switchKnowledgeGraphMode(mode: 'markdown' | 'ai') {
   }
 
   if (mode === 'markdown') {
+    showAiKnowledgeGraphBuildProgressInPane.value = false
+    // 顶栏「标题图谱」：无临时图时优先打开已保存；侧栏空槽用 openEmptyHeadingTempSlotFromSidebar，始终生成新临时图
     const savedHeading = savedGraphEntries.value.find((item) => item.graphType === 'heading')
     if (savedHeading) {
       await selectKnowledgeGraphEntry(savedHeading.entryKey)
@@ -3430,17 +3555,39 @@ async function switchKnowledgeGraphMode(mode: 'markdown' | 'ai') {
   }
 
   // AI：仅展示临时槽；已保存的 AI 图谱只从左侧「已保存」列表点开，避免顶栏误进历史文件
+  if (activeDocumentId.value) {
+    const aiSt = await aiDocumentGraphService.getDocumentGraphState(activeDocumentId.value)
+    if (aiSt.status === 'building') {
+      knowledgeGraphMode.value = 'ai'
+      knowledgeGraphData.value = null
+      selectedKnowledgeGraphEntryKey.value = null
+      showAiKnowledgeGraphBuildProgressInPane.value = showAiBuildProgress
+      if (!isAiKnowledgeGraphRendering.value) {
+        await resumeAiKnowledgeGraphBuildIfNeeded()
+      }
+      return
+    }
+  }
   knowledgeGraphMode.value = 'ai'
   knowledgeGraphData.value = null
   knowledgeGraphError.value = ''
   selectedKnowledgeGraphEntryKey.value = null
+  showAiKnowledgeGraphBuildProgressInPane.value = false
 }
 
 const buildAiKnowledgeGraph = async () => {
   if (!activeDocumentId.value) return
-  isKnowledgeGraphRendering.value = true
+  const existing = await aiDocumentGraphService.getDocumentGraphState(activeDocumentId.value)
+  if (existing.status === 'building') {
+    showAiKnowledgeGraphBuildProgressInPane.value = true
+    if (isAiKnowledgeGraphRendering.value) return
+    await resumeAiKnowledgeGraphBuildIfNeeded()
+    return
+  }
+  isAiKnowledgeGraphRendering.value = true
   knowledgeGraphError.value = ''
   knowledgeGraphMode.value = 'ai'
+  showAiKnowledgeGraphBuildProgressInPane.value = true
   aiGraphBuildProgress.value = 0
   aiGraphBuildLabel.value = '准备中…'
   try {
@@ -3470,9 +3617,14 @@ const buildAiKnowledgeGraph = async () => {
     const entry = upsertTempGraph('ai', graph, 'AI 图谱 (临时)')
     await setActiveKnowledgeGraph(entry)
   } catch (e) {
-    knowledgeGraphError.value = e instanceof Error ? e.message : '生成 AI 知识图谱失败'
+    if (isAiGraphAbortError(e)) {
+      knowledgeGraphError.value = ''
+    } else {
+      knowledgeGraphError.value = e instanceof Error ? e.message : '生成 AI 知识图谱失败'
+    }
   } finally {
-    isKnowledgeGraphRendering.value = false
+    isAiKnowledgeGraphRendering.value = false
+    showAiKnowledgeGraphBuildProgressInPane.value = false
     aiGraphBuildProgress.value = 0
     aiGraphBuildLabel.value = ''
   }
@@ -3491,6 +3643,13 @@ const openKnowledgeGraph = () => {
   })
   void (async () => {
     await loadSavedKnowledgeGraphEntries()
+    const docId = activeDocumentId.value
+    if (docId) {
+      const aiState = await aiDocumentGraphService.getDocumentGraphState(docId)
+      if (aiState.status === 'building' && !isAiKnowledgeGraphRendering.value) {
+        void resumeAiKnowledgeGraphBuildIfNeeded()
+      }
+    }
     const scopeId = getKnowledgeGraphScopeId()
     const lastOpened = lastOpenedGraphByDoc.value[scopeId]
     if (lastOpened) {
@@ -5892,7 +6051,14 @@ defineExpose({
 .knowledge-graph-list-group-title {
   font-size: 0.78rem;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+}
+.knowledge-graph-list-group-desc {
+  margin: 0 0 8px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  opacity: 0.92;
 }
 .knowledge-graph-list-item {
   padding: 8px 10px;
@@ -6019,6 +6185,21 @@ defineExpose({
   min-height: 1.25em;
 }
 
+.kg-ai-cancel-build-btn {
+  margin-top: 4px;
+  padding: 8px 18px;
+  font-size: 0.88rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary, #fff);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.kg-ai-cancel-build-btn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
 .knowledge-graph-loading,
 .knowledge-graph-error {
   padding: 24px;
@@ -6055,6 +6236,15 @@ defineExpose({
   color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.55;
+}
+
+.kg-ai-build-background-hint {
+  margin: -8px 0 0;
+  max-width: 400px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  opacity: 0.92;
 }
 
 .kg-ai-generate-primary-btn {

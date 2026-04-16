@@ -387,4 +387,81 @@ describe('AiDocumentGraphService', () => {
     await expect(service.getNodeEvidence('node-1')).resolves.toEqual(nodeEvidence);
     expect(graphRepo.getNodeEvidence).toHaveBeenCalledWith('node-1');
   });
+
+  it('saves failed metadata with 已中止生成 when requestCancelDocumentGraphBuild is used between chunks', async () => {
+    const chunk1 = {
+      chunkId: 'doc-1:chunk:0',
+      docId,
+      markdown: '# A',
+      headingPath: ['A'],
+      startOffset: 0,
+      endOffset: 3
+    };
+    const chunk2 = {
+      chunkId: 'doc-1:chunk:1',
+      docId,
+      markdown: '# B',
+      headingPath: ['B'],
+      startOffset: 3,
+      endOffset: 6
+    };
+
+    const metadataRepo = {
+      saveRecord: vi.fn().mockResolvedValue(undefined),
+      getRecord: vi.fn().mockResolvedValue(null)
+    };
+    const graphRepo = {
+      replaceDocumentContribution: vi.fn().mockResolvedValue(undefined),
+      getDocumentGraph: vi.fn().mockResolvedValue(null),
+      getGlobalGraph: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+      getNodeEvidence: vi.fn().mockResolvedValue(null)
+    };
+    const settingsGateway = {
+      load: vi.fn().mockResolvedValue({
+        providerName: 'dashscope',
+        apiKey: 'sk-test',
+        baseUrl: 'https://example.com/v1',
+        model: 'test-model'
+      })
+    };
+
+    let callCount = 0;
+    let service!: AiDocumentGraphService;
+    const extractor = {
+      extractChunk: vi.fn().mockImplementation(async () => {
+        callCount += 1;
+        if (callCount === 1) {
+          service.requestCancelDocumentGraphBuild(docId);
+        }
+        return { entities: [], relations: [] };
+      })
+    };
+
+    service = new AiDocumentGraphService({
+      metadataRepo,
+      graphRepo,
+      settingsGateway,
+      extractor,
+      documentRepo: {
+        findById: vi.fn().mockResolvedValue({
+          title: 'Doc',
+          content: '# A\n\n# B\n'
+        })
+      },
+      chunker: {
+        splitMarkdown: vi.fn().mockReturnValue([chunk1, chunk2])
+      }
+    });
+
+    await expect(service.buildDocumentKnowledgeGraph(docId)).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(graphRepo.replaceDocumentContribution).not.toHaveBeenCalled();
+    expect(metadataRepo.saveRecord).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        docId,
+        status: 'failed',
+        errorMessage: '已中止生成'
+      })
+    );
+  });
 });
