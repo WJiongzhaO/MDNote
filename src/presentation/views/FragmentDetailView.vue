@@ -1,7 +1,7 @@
 <template>
   <div class="fragment-detail fragment-asset-page">
     <header class="page-header">
-      <router-link to="/fragments" class="back">← 返回列表</router-link>
+      <router-link :to="backUrl" class="back">← 返回列表</router-link>
       <h1>{{ detail?.title ?? (loading ? '加载中…' : '片段') }}</h1>
     </header>
     <div v-if="loading" class="detail-skeleton" aria-busy="true">
@@ -131,10 +131,15 @@ import type {
 } from '../../application/dto/knowledge-fragment.dto'
 import type { FragmentCategoryTreeNode } from '../../domain/types/fragment-category.types'
 
+const props = defineProps<{
+  vaultId?: string
+}>()
+
 const route = useRoute()
 const fragmentId = computed(() => route.params.fragmentId as string)
 const vaultId = computed(
   () =>
+    props.vaultId ??
     (route.params.vaultId as string | undefined) ??
     (route.query.vaultId as string | undefined) ??
     'default',
@@ -198,9 +203,20 @@ function statusLabel(s: string) {
   return m[s] ?? s
 }
 
+const backUrl = computed(() => {
+  const v = vaultId.value
+  if (route.params.vaultId) {
+    return `/vault/${encodeURIComponent(v)}/fragments`
+  }
+  return `/fragments?vaultId=${encodeURIComponent(v)}`
+})
+
 function fragmentLink(id: string) {
-  const q = route.query.vaultId ? `?vaultId=${encodeURIComponent(String(route.query.vaultId))}` : ''
-  return `/fragments/${id}${q}`
+  const v = vaultId.value
+  if (route.params.vaultId) {
+    return `/vault/${encodeURIComponent(v)}/fragments/${id}`
+  }
+  return `/fragments/${id}?vaultId=${encodeURIComponent(v)}`
 }
 
 async function loadCategoryTree() {

@@ -149,7 +149,7 @@
             </div>
             <div class="card-content">
               <div class="card-header">
-                <router-link class="card-title" :to="`/fragments/${f.id}`" @click.stop>
+                <router-link class="card-title" :to="`/fragments/${f.id}?vaultId=${encodeURIComponent(vaultId)}`" @click.stop>
                   {{ f.title }}
                 </router-link>
                 <span class="card-status" :class="`status-${f.status}`">
@@ -180,7 +180,7 @@
         <template v-if="selectedDetail">
           <div class="detail-header">
             <h3 class="detail-title">{{ selectedDetail.title }}</h3>
-            <router-link :to="`/fragments/${selectedDetail.id}`" class="detail-link">
+            <router-link :to="`/fragments/${selectedDetail.id}?vaultId=${encodeURIComponent(vaultId)}`" class="detail-link">
               查看详情 →
             </router-link>
           </div>

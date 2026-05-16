@@ -57,12 +57,14 @@ const router = createRouter({
     {
       path: '/fragments/:fragmentId',
       name: 'fragment-detail',
-      component: FragmentDetailView
+      component: FragmentDetailView,
+      props: (route) => ({ vaultId: (route.query.vaultId as string) || 'default' })
     },
     {
       path: '/vault/:vaultId/fragments/:fragmentId',
       name: 'vault-fragment-detail',
-      component: FragmentDetailView
+      component: FragmentDetailView,
+      props: (route) => ({ vaultId: route.params.vaultId as string })
     },
     {
       path: '/:pathMatch(.*)*',

@@ -313,6 +313,38 @@ export class FragmentReferenceCounterService {
       '[FragmentReferenceCounter] Rebuild completed, total fragments:',
       this.counters.size,
     )
+
+    // 3. 同步更新片段实体的 referencedDocuments，确保与计数器一致
+    try {
+      const fragments = await fragmentRepository.findAll()
+      for (const fragment of fragments) {
+        const fragmentId = fragment.getId().value
+        const counterRecord = this.counters.get(fragmentId)
+        if (counterRecord) {
+          const refs = counterRecord.references.map((r) => ({
+            documentId: r.documentId,
+            documentTitle: r.documentTitle,
+            referencedAt: new Date(r.referencedAt),
+            isConnected: true,
+            referenceCount: r.count,
+          }))
+          fragment.syncReferencedDocuments(refs)
+        } else {
+          fragment.syncReferencedDocuments([])
+        }
+        await fragmentRepository.save(fragment)
+      }
+      console.log(
+        '[FragmentReferenceCounter] Synced fragment referencedDocuments for',
+        fragments.length,
+        'fragments',
+      )
+    } catch (error) {
+      console.error(
+        '[FragmentReferenceCounter] Error syncing fragment referencedDocuments:',
+        error,
+      )
+    }
   }
 
   /**

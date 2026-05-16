@@ -409,6 +409,15 @@ export class KnowledgeFragment {
   }
 
   /**
+   * 同步引用文档列表（用计数器重建的数据替换整个列表）
+   * 确保 fragment 实体的 referencedDocuments 与独立计数器保持一致
+   */
+  syncReferencedDocuments(refs: FragmentReference[]): void {
+    this.referencedDocuments = refs
+    this.updatedAt = new Date()
+  }
+
+  /**
    * 获取所有引用文档
    */
   getReferencedDocuments(): FragmentReference[] {
