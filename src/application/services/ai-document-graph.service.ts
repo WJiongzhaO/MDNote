@@ -72,6 +72,13 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Failed to build AI graph.';
 }
 
+function isAbortError(error: unknown): boolean {
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError') {
+    return true;
+  }
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 function previewText(value: string, maxLength = 120): string {
   const normalized = value.replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxLength) {
@@ -235,12 +242,28 @@ function buildKnowledgeGraph(contribution: NormalizedContribution): AiKnowledgeG
 }
 
 export class AiDocumentGraphService {
+  private readonly cancelBuildRequested = new Set<string>();
+
   constructor(private readonly deps: AiDocumentGraphServiceDeps) {}
+
+  /** 请求中止当前文档的构建；在下一个分片边界生效（当前 LLM 调用仍会跑完）。 */
+  requestCancelDocumentGraphBuild(docId: string): void {
+    this.cancelBuildRequested.add(docId);
+  }
+
+  private throwIfBuildCancelled(docId: string): void {
+    if (this.cancelBuildRequested.has(docId)) {
+      this.cancelBuildRequested.delete(docId);
+      throw new DOMException('Aborted', 'AbortError');
+    }
+  }
 
   async buildDocumentKnowledgeGraph(
     docId: string,
     options?: BuildDocumentKnowledgeGraphOptions
   ): Promise<AiKnowledgeGraph> {
+    this.cancelBuildRequested.delete(docId);
+
     const onProgress = options?.onProgress;
     console.log('[AI Graph] buildDocumentKnowledgeGraph called', { docId });
     const config = await this.deps.settingsGateway.load();
@@ -264,6 +287,8 @@ export class AiDocumentGraphService {
     });
 
     try {
+      this.throwIfBuildCancelled(docId);
+
       const documentRepo = this.deps.documentRepo;
       const chunker = this.deps.chunker;
       const extractor = this.deps.extractor;
@@ -307,6 +332,7 @@ export class AiDocumentGraphService {
         } else {
           onProgress?.({ phase: 'chunks', current: 0, total: chunks.length });
           for (let index = 0; index < chunks.length; index += 1) {
+            this.throwIfBuildCancelled(docId);
             const chunk = chunks[index];
             const extraction = await extractor.extractChunk(chunk, providerConfig);
             console.log(
@@ -333,6 +359,8 @@ export class AiDocumentGraphService {
           }
         }
 
+        this.throwIfBuildCancelled(docId);
+
         normalizedChunks.forEach((chunkContribution, index) => {
           console.log('[AI Graph] Chunk normalized result', {
             docId,
@@ -343,6 +371,7 @@ export class AiDocumentGraphService {
         });
 
         onProgress?.({ phase: 'merge' });
+        this.throwIfBuildCancelled(docId);
 
         const contribution =
           chunks.length === 0
@@ -359,6 +388,7 @@ export class AiDocumentGraphService {
         });
 
         onProgress?.({ phase: 'persist' });
+        this.throwIfBuildCancelled(docId);
 
         await this.deps.graphRepo.replaceDocumentContribution({
           docId,
@@ -375,6 +405,8 @@ export class AiDocumentGraphService {
           nodeCount: graph.nodes.length,
           edgeCount: graph.edges.length
         });
+
+        this.cancelBuildRequested.delete(docId);
 
         await this.deps.metadataRepo.saveRecord({
           docId,
@@ -402,12 +434,14 @@ export class AiDocumentGraphService {
       });
 
       onProgress?.({ phase: 'chunks', current: 0, total: 1 });
+      this.throwIfBuildCancelled(docId);
       const result = await this.deps.extractor.buildForDocument(docId, providerConfig);
       onProgress?.({ phase: 'chunks', current: 1, total: 1 });
       onProgress?.({ phase: 'merge' });
       contentHash = result.contentHash;
 
       onProgress?.({ phase: 'persist' });
+      this.throwIfBuildCancelled(docId);
 
       await this.deps.graphRepo.replaceDocumentContribution({
         docId,
@@ -419,6 +453,8 @@ export class AiDocumentGraphService {
 
       const storedGraph = await this.deps.graphRepo.getDocumentGraph(docId);
       const graph = storedGraph ?? result.graph;
+
+      this.cancelBuildRequested.delete(docId);
 
       await this.deps.metadataRepo.saveRecord({
         docId,
@@ -433,6 +469,11 @@ export class AiDocumentGraphService {
 
       return graph;
     } catch (error) {
+      const aborted = isAbortError(error);
+      if (!aborted) {
+        this.cancelBuildRequested.delete(docId);
+      }
+
       await this.deps.metadataRepo.saveRecord({
         docId,
         contentHash,
@@ -441,7 +482,7 @@ export class AiDocumentGraphService {
         model: providerConfig.model,
         startedAt,
         finishedAt: new Date().toISOString(),
-        errorMessage: getErrorMessage(error),
+        errorMessage: aborted ? '已中止生成' : getErrorMessage(error),
         graphVersion: GRAPH_VERSION
       });
 
