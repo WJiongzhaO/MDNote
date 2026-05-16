@@ -1,7 +1,7 @@
 import { KnowledgeFragment } from '../../domain/entities/knowledge-fragment.entity'
 import type { KnowledgeFragmentData } from './file-system.knowledge-fragment.repository.impl'
 
-const STORAGE_KEY = 'mdnote-knowledge-fragments'
+const STORAGE_KEY = 'mdnote-knowledge-fragments-default'
 const CATEGORY_KEY_PREFIX = 'mdnote-fragment-categories-'
 
 const sampleFragments: KnowledgeFragmentData[] = [

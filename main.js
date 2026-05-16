@@ -32,6 +32,13 @@ function saveConfig(config) {
   }
 }
 
+// 获取项目 mock 文件夹路径（仅开发环境）
+function getMockDataPath() {
+  // __dirname 在开发环境中指向 main.js 所在目录（项目根目录）
+  const mockPath = path.join(__dirname, 'mock', '软件工程', '软件工程');
+  return mockPath;
+}
+
 // 获取项目数据存储目录（支持自定义路径，随项目切换）
 function getDataPath() {
   const config = loadConfig();
@@ -59,7 +66,13 @@ function getDataPath() {
     return path.join(basePath, 'MDNoteData');
   }
 
-  // 开发环境：使用用户数据目录
+  // 开发环境：优先使用项目 mock 文件夹
+  const mockPath = getMockDataPath();
+  if (fs.existsSync(mockPath)) {
+    return mockPath;
+  }
+
+  // mock 文件夹不存在时回退到用户数据目录
   return path.join(userDataPath, 'data');
 }
 
@@ -69,6 +82,13 @@ function getAutoOpenFolder() {
   // 优先使用项目数据路径（customDataPath）
   if (config.customDataPath && fs.existsSync(config.customDataPath)) {
     return config.customDataPath;
+  }
+  // 开发环境：使用项目 mock 文件夹
+  if (isDev) {
+    const mockPath = getMockDataPath();
+    if (fs.existsSync(mockPath)) {
+      return mockPath;
+    }
   }
   // 否则使用上次打开的文件夹
   if (config.lastOpenedFolder && fs.existsSync(config.lastOpenedFolder)) {
@@ -825,6 +845,38 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // 开发环境：自动注册项目 mock 知识库
+  if (isDev) {
+    const mockPath = getMockDataPath();
+    if (fs.existsSync(mockPath)) {
+      const vaultJsonPath = path.join(mockPath, 'vault.json');
+      if (fs.existsSync(vaultJsonPath)) {
+        try {
+          const vaultData = JSON.parse(fs.readFileSync(vaultJsonPath, 'utf8'));
+          const registry = loadVaultRegistry();
+          const existingIndex = registry.vaults.findIndex(v => v.id === vaultData.id);
+          const vaultEntry = {
+            id: vaultData.id,
+            name: vaultData.name || '软件工程',
+            path: mockPath,
+            lastAccessedAt: new Date().toISOString(),
+            createdAt: vaultData.createdAt || new Date().toISOString()
+          };
+          if (existingIndex >= 0) {
+            registry.vaults[existingIndex] = vaultEntry;
+          } else {
+            registry.vaults.push(vaultEntry);
+          }
+          registry.lastOpenedVaultId = vaultData.id;
+          saveVaultRegistry(registry);
+          console.log('[Main Process] Mock vault registered:', vaultData.id);
+        } catch (err) {
+          console.error('[Main Process] Failed to register mock vault:', err);
+        }
+      }
+    }
+  }
 
   // 在 app 就绪后注册：避免旧进程未加载到新 handler；修改 main.js 后必须重启 Electron 主进程
   ipcMain.handle('fragment:open-storage-in-explorer', async (_event, fragmentId) => {

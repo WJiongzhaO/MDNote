@@ -9,10 +9,7 @@
         @contextmenu="handleContextMenu($event, item.id)"
         :title="item.title"
       >
-        <span class="icon">
-          <img v-if="item.icon.endsWith('.svg')" :src="item.icon" :alt="item.title" class="svg-icon" />
-          <template v-else>{{ item.icon }}</template>
-        </span>
+        <span class="icon">{{ item.icon }}</span>
       </button>
     </div>
 
@@ -33,9 +30,7 @@
       @click="handleBackToVaultSelect"
       title="返回知识库选择"
     >
-      <span class="icon">
-        <img src="/icon/home.svg" alt="返回知识库选择" class="svg-icon" />
-      </span>
+      <span class="icon">🏠</span>
     </button>
 
     <button
@@ -43,9 +38,7 @@
       @click="toggleTheme"
       :title="isDark ? '切换到浅色主题' : '切换到暗色主题'"
     >
-      <span class="icon">
-        <img :src="isDark ? '/icon/dark.svg' : '/icon/light.svg'" :alt="isDark ? '暗色主题' : '浅色主题'" class="svg-icon" />
-      </span>
+      <span class="icon">{{ isDark ? '🌙' : '☀️' }}</span>
     </button>
   </div>
 </template>
@@ -89,10 +82,10 @@ const contextMenu = ref({
 });
 
 const sidebarItems: SidebarItem[] = [
-  { id: 'folders', icon: '/icon/folder.svg', title: '文件夹' },
-  { id: 'fragments', icon: '/icon/fragment.svg', title: '知识片段库' },
-  { id: 'templates', icon: '/icon/paper.svg', title: '文档模板' },
-  { id: 'knowledge-graphs', icon: '/icon/net.svg', title: '知识图谱' }
+  { id: 'folders', icon: '📂', title: '文件夹' },
+  { id: 'fragments', icon: '📋', title: '知识片段库' },
+  { id: 'templates', icon: '📄', title: '文档模板' },
+  { id: 'knowledge-graphs', icon: '🔗', title: '知识图谱' }
 ];
 
 const handleIconClick = (id: SidebarType) => {
@@ -189,12 +182,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.svg-icon {
-  width: 24px;
-  height: 24px;
-  display: block;
 }
 
 .context-menu {
